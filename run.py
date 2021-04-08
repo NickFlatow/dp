@@ -204,7 +204,7 @@ def grantRequest(cbsd):
     
     
     grantResponse(response.json())
-    logging.info("RESPONSE FROM grant REQUEST:" + response.json())
+    logging.info("RESPONSE FROM grant REQUEST:" + response.json() )
 
 
 def spectrumResponse(response):
