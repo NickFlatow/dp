@@ -267,7 +267,7 @@ def spectrumRequest(cbsd):
             }
         )
     
-    logging.info("REQUEST FOR SPECTRUM INQUIRY: " + str(spec))
+    logging.info("REQUEST FOR SPECTRUM INQUIRY: " + str(spec) )
     # #Send request to SAS server #contact SAS server
     response = contactSAS(spec,"spectrumInquiry")
     # # #pass response to spectrum response
