@@ -9,6 +9,7 @@ import math
 import time
 from datetime import datetime
 import logging
+logging.basicConfig(filename='app.log', format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 hbtimer = 0
 
@@ -80,6 +81,16 @@ def EARFCNtoMHZ(cbsd):
     #         logging.error(e)
 
     # conn.dbClose()
+def cbsdAction(cbsdSN,action,time):
+    logging.info("Triggering CBSD action")
+    conn = dbConn("ACS_V1_1")
+    sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+cbsdSN+"\',\'"+action+"\',\'"+time+"\')"
+    logging.info(cbsdSN + " : SQL cmd " + sql_action)
+    try:
+        conn.cursor.execute(sql_action)
+    except Exception as e:
+        logging.error(e)
+    conn.dbClose()
 
 def heartbeatResponse(cbsd):
     # print(cbsd)
@@ -88,6 +99,7 @@ def heartbeatResponse(cbsd):
     #Make connection to ACS_V1_1 database
     conn = dbConn("ACS_V1_1")
     for i in range(len(cbsd['heartbeatResponse'])):
+        logging.info(cbsd['heartbeatResponse'][i]['cbsdId'] + ": Heartbeat Response : " + str(cbsd['heartbeatResponse'][i]))
         #if error code = 0 then process handle reply for cbsd
         # print(cbsd['heartbeatResponse'][i])
         if cbsd['heartbeatResponse'][i]['response']['responseCode'] == 0: 
@@ -97,20 +109,18 @@ def heartbeatResponse(cbsd):
         #TODO WHAT IF MEAS REPORT
 
             sql_get_op = "SELECT operationalState FROM dp_heartbeat WHERE cbsdID = \'"+cbsd['heartbeatResponse'][i]['cbsdId']+"\'"
+            logging.info(sql_get_op)
             conn.cursor.execute(sql_get_op)
             opState = conn.cursor.fetchone()
             #update operational state to granted/ what if operational state is already authorized
             sql = "UPDATE dp_heartbeat SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + cbsd['heartbeatResponse'][i]['cbsdId'] + "\'"
             #update transmist expire time
             sql1 = "UPDATE dp_heartbeat SET transmitExpireTime = \'" + cbsd['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + cbsd['heartbeatResponse'][i]['cbsdId'] + "\'"
-        
-    
             try:
                 conn.cursor.execute(sql)
                 conn.cursor.execute(sql1)
             except Exception as e:
                 print(e)
-
             #collect SN from dp_device_info where cbsdId = $cbsdid
             if opState['operationalState'] == 'GRANTED':
                 print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
@@ -119,8 +129,9 @@ def heartbeatResponse(cbsd):
                 conn.cursor.execute(sql_get_sn)
                 sn = conn.cursor.fetchone()
                 #turn on RF in cell
-                sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+sn['SN']+"\','RF_ON',\'"+str(datetime.now())+"\')"
-                conn.cursor.execute(sql_action)
+                # sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+sn['SN']+"\','RF_ON',\'"+str(datetime.now())+"\')"
+                # conn.cursor.execute(sql_action)
+                cbsdAction(sn['SN',"RF_ON",str(datetime.now())])
             # print(sql_action)
 
 
@@ -142,11 +153,11 @@ def heartbeatRequest(cbsd):
                     "operationState":cbsd[i]['operationalState']
                 }
             )
+        logging.info(heartbeat['heartbeatRequest'][i]['cbsdId']+ ": Heartbeat Request: " + str(grant['heartbeatRequest'][i]))
 
-
-    logging.info("REQUEST FROM heartbeat: " + str(heartbeat))
+    # logging.info("REQUEST FROM heartbeat: " + str(heartbeat))
     response = contactSAS(heartbeat,"heartbeat")
-    logging.info("RESPONSE FROM heartbeat: " + str(response))
+    # logging.info("RESPONSE FROM heartbeat: " + str(response))
     heartbeatResponse(response.json())
 
 
@@ -155,6 +166,7 @@ def grantResponse(cbsd):
     #Make connection to ACS_V1_1 database
     conn = dbConn("ACS_V1_1")
     for i in range(len(cbsd['grantResponse'])):
+        logging.info(cbsd['grantResponse'][i]['cbsdId'] + ": Grant Response : " + str(cbsd['grantResponse'][i]))
         #Check if responseCode is > 0 
         if cbsd['grantResponse'][i]['response']['responseCode'] == 0: 
             #TODO Check for measurement Report
@@ -195,16 +207,15 @@ def grantRequest(cbsd):
                     }
                 }
             )
+        logging.info(grant['grantRequest'][i]['cbsdId']+ ": Grant Request: " + str(grant['grantRequest'][i]))
 
 
 
-    logging.info("REQUEST FROM GRANT: " + str(grant))
+    # logging.info("REQUEST FROM GRANT: " + str(grant))
     # print(grant)
     response = contactSAS(grant,"grant")
-    
-    
     grantResponse(response.json())
-    logging.info("RESPONSE FROM grant REQUEST:" + response.json() )
+    # logging.info("RESPONSE FROM grant REQUEST:" + response.json() )
 
 
 def spectrumResponse(response):
@@ -212,6 +223,7 @@ def spectrumResponse(response):
     conn = dbConn("ACS_V1_1")
     #for each resposne in resposne array
     for i in range(len(response['spectrumInquiryResponse'])):
+        logging.info(response['spectrumInquiryResponse'][i]['cbsdId'] + ": Spec Response : " + str(response['spectrumInquiryResponse'][i]))
         if response['spectrumInquiryResponse'][i]['response']['responseCode'] == 0:
             # if high frequcy and low frequcy match value(convert to hz) for cbsdId in database then move to next
             low = math.floor(response['spectrumInquiryResponse'][i]['availableChannel'][0]['frequencyRange']['lowFrequency']/1000000)
@@ -266,18 +278,20 @@ def spectrumRequest(cbsd):
                 ]
             }
         )
+        logging.info(spec['spectrumInquiryRequest'][i]['cbsdId']+ ": Spec Request: " + str(spec['spectrumInquiryRequest'][i]))
     
-    logging.info("REQUEST FOR SPECTRUM INQUIRY: " + str(spec) )
+    # logging.info("REQUEST FOR SPECTRUM INQUIRY: " + str(spec) )
     # #Send request to SAS server #contact SAS server
     response = contactSAS(spec,"spectrumInquiry")
     # # #pass response to spectrum response
-    logging.info("RESPONSE FOR SPECTRUM INQUIRY:",response.json())
+    # logging.info("RESPONSE FOR SPECTRUM INQUIRY:",response.json())
     spectrumResponse(response.json())
 
 def regResponse(response,row):
     #Make connection to ACS_V1_1 database
     conn = dbConn("ACS_V1_1")
     for i in range(len(response['registrationResponse'])):
+        logging.info(row[i]["SN"] + ": REG Response : " + str(response['registrationResponse'][i]))
         #Check if responseCode is > 0 
         if response['registrationResponse'][i]['response']['responseCode'] == 0: 
             #TODO Check for measurement Report
@@ -310,13 +324,13 @@ def regRequest(row):
                     "userId": str(row[i]["userID"])
                 }
         )
-    # print("REQUEST FROM REG",reg)
+        logging.info(row[i]["SN"]+ ": Reg Request: " + str(reg['registrationRequest'][i]))
 
-    logging.info("REQUEST FROM REG:" + str(reg))
+    # logging.info("REQUEST FROM REG:" + str(reg))
  
     response = contactSAS(reg,"registration")
     
-    logging.info("RESPONSE FROM REG REQUEST",response.json())
+    # logging.info("RESPONSE FROM REG REQUEST",response.json())
 
     regResponse(response.json(),row)
     
@@ -334,19 +348,24 @@ if __name__ == "__main__":
 
     # logging.basicConfig(filename='/tmp/dp.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
     # logging.warning('This will get logged to a file')
-    logging.basicConfig(filename="/tmp/dp.log",format='%(asctime)s %(levelname)-8s %(message)s',level=logging.INFO,datefmt='%Y-%m-%d %H:%M:%S')
+    # logging.basicConfig(filename="/tmp/dp.log",
+    #         level=logging.DEBUG,
+    #         datefmt='%Y-%m-%d %H:%M:%S',
+    #         format='%(asctime)s %(levelname)-8s %(message)s')
 
-    # # EARFCNtoMHZ([{'EARFCN':55240},{'EARFCN':55990},{'EARFCN':56739}])
+    # cbsdAction("DCE994613163","RF_OFF",str(datetime.now()))
+    # # # EARFCNtoMHZ([{'EARFCN':55240},{'EARFCN':55990},{'EARFCN':56739}])
     conn = dbConn("ACS_V1_1")
     sql = 'SELECT * FROM dp_device_info where sasStage = \'\''
     conn.cursor.execute(sql)
     reg = conn.cursor.fetchall()
     conn.dbClose()
     print("reg", flush=True)
+    logging.info("/////////////////////////REGISTRATION\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
 
     try:
         regRequest(reg)
-        EARFCNtoMHZ(reg)
+        # EARFCNtoMHZ(reg)
     except Exception as e:
         print(e)
 
@@ -357,6 +376,7 @@ if __name__ == "__main__":
     conn.dbClose()
 
     print("spec")
+    logging.info("/////////////////////////SPECTRUM\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
     try:
         spectrumRequest(spec)
     except Exception as e:
@@ -376,6 +396,7 @@ if __name__ == "__main__":
     conn.dbClose()
 
     print("grant")
+    logging.info("/////////////////////////GRANT\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
     #TODO FINISH grantRequest
     try:
         grantRequest(grant)
@@ -386,6 +407,7 @@ if __name__ == "__main__":
     #TODO LOOP AT 80% OF heartbeat TIMER
     while True:
         # print("hb")
+        logging.info("/////////////////////////HEARTBEAT\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
         conn = dbConn("ACS_V1_1")
         sql = 'SELECT * FROM dp_heartbeat'
         conn.cursor.execute(sql)
@@ -399,7 +421,7 @@ if __name__ == "__main__":
             print(e)
         # 80% of hbtimer
         time.sleep(45)
-
+    
 
     # hbresponse = {'heartbeatResponse': [{'grantId': '578807884', 'cbsdId': 'FoxconnMock-SASDCE994613163', 'transmitExpireTime': '2021-03-26T21:30:48Z', 'response': {'responseCode': 0}}, {'grantId': '32288332', 'cbsdId': 'FoxconMock-SAS1111', 'transmitExpireTime': '2021-03-26T21:30:48Z', 'response': {'responseCode': 0}}]}
 
