@@ -8,6 +8,7 @@ from flask import request
 import math
 import time
 from datetime import datetime
+from datetime import timedelta
 import logging
 
 logging.basicConfig(filename='app.log', format='%(asctime)s - %(message)s', level=logging.DEBUG)
@@ -160,10 +161,7 @@ def heartbeatRequest(cbsd):
     # logging.info("REQUEST FROM heartbeat: " + str(heartbeat))
     response = contactSAS(heartbeat,"heartbeat")
 
-
     heartbeatResponse(response.json())
-
-
 
 def grantResponse(cbsd):
     #Make connection to ACS_V1_1 database
@@ -349,6 +347,33 @@ def errorModule(response):
 
 print(__name__)
 
+if __name__ == "run":
+    #convert sting to datetime and compare to current time.
+    hbinterval = 60
+    hbresponse = {'heartbeatResponse': [{'grantId': '578807884', 'cbsdId': 'FoxconnMock-SASDCE994613163', 'transmitExpireTime': '2021-04-9T18:01:48Z', 'response': {'responseCode': 0}}, {'grantId': '32288332', 'cbsdId': 'FoxconMock-SAS1111', 'transmitExpireTime': '2021-03-26T21:30:48Z', 'response': {'responseCode': 0}}]}
+    # print(hbresposne['hearbeatResposne'][i]['transmitExpireTime'])
+    try:
+        #convert transmitExpireTime(str) to datetime object
+        expireTime = datetime.strptime(hbresponse['heartbeatResponse'][0]['transmitExpireTime'],"%Y-%m-%dT%H:%M:%SZ")
+        print(expireTime)
+        timeChange = expireTime + timedelta(seconds=hbinterval)
+        print(datetime.now())
+        print(timeChange)
+        if timeChange > datetime.now():
+            try:
+                conn = dbConn("ACS_V1_1")
+                sql = "UPDATE `dp_device_info` SET `sasStage` = 'dereg' where `cbsdID` = 'FoxconnMock-SASDCE994613163'"
+                conn.cursor.execute(sql)
+                cbsdAction("DCE994613163","RF_OFF",str(datetime.now()))
+            except Exception as e:
+                print(e)
+        else:
+            print(False)
+        # print(hbresponse['heartbeatResponse'][0]['transmitExpireTime'] + str(2))
+    except Exception as e:
+        print(e)
+
+
 if __name__ == "__main__":
     app.run(port = app.config["PORT"])
 
@@ -416,6 +441,8 @@ if __name__ == "__main__":
         conn.dbClose()
         # print(hb)
         try:
+            #TODO if grant expire time + hbinterval > datetime.now()
+                #print(wrong)
             heartbeatRequest(hb)
         except Exception as e:
             print(e)
