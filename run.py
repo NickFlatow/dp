@@ -9,6 +9,8 @@ import math
 import time
 from datetime import datetime
 import logging
+import pdb
+from pdb import set_trace as bp
 logging.basicConfig(filename='app.log', format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 hbtimer = 0
@@ -22,6 +24,7 @@ def contactSAS(request,method):
     cert=('certs/client.cert','certs/client.key'),
     verify=('certs/ca.cert'),
     json=request)
+  
 
 def EARFCNtoMHZ(cbsd):
     # Function to convert frequency from EARFCN  to MHz 3660 - 3700
@@ -95,7 +98,6 @@ def cbsdAction(cbsdSN,action,time):
 def heartbeatResponse(cbsd):
     # print(cbsd)
 
-
     #Make connection to ACS_V1_1 database
     conn = dbConn("ACS_V1_1")
     for i in range(len(cbsd['heartbeatResponse'])):
@@ -131,7 +133,7 @@ def heartbeatResponse(cbsd):
                 #turn on RF in cell
                 # sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+sn['SN']+"\','RF_ON',\'"+str(datetime.now())+"\')"
                 # conn.cursor.execute(sql_action)
-                cbsdAction(sn['SN',"RF_ON",str(datetime.now())])
+                cbsdAction(sn['SN'],"RF_ON",str(datetime.now()))
             # print(sql_action)
 
 
@@ -157,8 +159,10 @@ def heartbeatRequest(cbsd):
 
     # logging.info("REQUEST FROM heartbeat: " + str(heartbeat))
     response = contactSAS(heartbeat,"heartbeat")
-    # logging.info("RESPONSE FROM heartbeat: " + str(response))
-    heartbeatResponse(response.json())
+
+
+    # heartbeatResponse(response.json())
+    heartbeatResponse(response)
 
 
 
@@ -342,8 +346,9 @@ def errorModule(response):
     print(response)
     print("!!!Error!!!")
 
+# if __name__ == "__main__":
+app.run(port = app.config["PORT"])
 
-if __name__ == "__main__":
     # COLLECT ALL DEVICES LOOKING TO BE REGISTERED
 
     # logging.basicConfig(filename='/tmp/dp.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
@@ -355,80 +360,78 @@ if __name__ == "__main__":
 
     # cbsdAction("DCE994613163","RF_OFF",str(datetime.now()))
     # # # EARFCNtoMHZ([{'EARFCN':55240},{'EARFCN':55990},{'EARFCN':56739}])
-    # conn = dbConn("ACS_V1_1")
-    # sql = 'SELECT * FROM dp_device_info where sasStage = \'\''
-    # conn.cursor.execute(sql)
-    # reg = conn.cursor.fetchall()
-    # conn.dbClose()
-    # print("reg", flush=True)
-    # logging.info("/////////////////////////REGISTRATION\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+conn = dbConn("ACS_V1_1")
+sql = 'SELECT * FROM dp_device_info where sasStage = \'\''
+conn.cursor.execute(sql)
+reg = conn.cursor.fetchall()
+conn.dbClose()
+print("reg", flush=True)
+logging.info("/////////////////////////REGISTRATION\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
 
-    # try:
-    #     regRequest(reg)
-    #     # EARFCNtoMHZ(reg)
-    # except Exception as e:
-    #     print(e)
+try:
+    regRequest(reg)
+    # EARFCNtoMHZ(reg)
+except Exception as e:
+    print(e)
 
-    # conn = dbConn("ACS_V1_1")
-    # sql = 'SELECT cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = \'spectrum\''
-    # conn.cursor.execute(sql)
-    # spec = conn.cursor.fetchall()
-    # conn.dbClose()
+conn = dbConn("ACS_V1_1")
+sql = 'SELECT cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = \'spectrum\''
+conn.cursor.execute(sql)
+spec = conn.cursor.fetchall()
+conn.dbClose()
 
-    # print("spec")
-    # logging.info("/////////////////////////SPECTRUM\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
-    # try:
-    #     spectrumRequest(spec)
-    # except Exception as e:
-    #     print(e)
+print("spec")
+logging.info("/////////////////////////SPECTRUM\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+try:
+    spectrumRequest(spec)
+except Exception as e:
+    print(e)
 
-    # # spec = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3570000000, 'lowFrequency': 3550000000}}], 'cbsdId': 'abc123Mock-SAS1111', 'response': {'responseCode': 0}}, {'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3700000000, 'lowFrequency': 3670000000}}], 'cbsdId': 'xyz123Mock-SAS4444', 'response': {'responseCode': 0}}]}
+# spec = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3570000000, 'lowFrequency': 3550000000}}], 'cbsdId': 'abc123Mock-SAS1111', 'response': {'responseCode': 0}}, {'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3700000000, 'lowFrequency': 3670000000}}], 'cbsdId': 'xyz123Mock-SAS4444', 'response': {'responseCode': 0}}]}
 
-    # # try:
-    # #     spectrumResponse(spec)
-    # # except Exception as e:
-    # #     print(e)
+# try:
+#     spectrumResponse(spec)
+# except Exception as e:
+#     print(e)
 
-    # conn = dbConn("ACS_V1_1")
-    # sql = 'SELECT * FROM dp_device_info where sasStage = \'grant\''
-    # conn.cursor.execute(sql)
-    # grant = conn.cursor.fetchall()
-    # conn.dbClose()
+conn = dbConn("ACS_V1_1")
+sql = 'SELECT * FROM dp_device_info where sasStage = \'grant\''
+conn.cursor.execute(sql)
+grant = conn.cursor.fetchall()
+conn.dbClose()
 
-    # print("grant")
-    # logging.info("/////////////////////////GRANT\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
-    # #TODO FINISH grantRequest
-    # try:
-    #     grantRequest(grant)
-    # except Exception as e:
-    #     print(e)
+print("grant")
+logging.info("/////////////////////////GRANT\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+#TODO FINISH grantRequest
+try:
+    grantRequest(grant)
+except Exception as e:
+    print(e)
 
-    # #TODO if error break
-    # #TODO LOOP AT 80% OF heartbeat TIMER
-    # while True:
-    #     # print("hb")
-    #     logging.info("/////////////////////////HEARTBEAT\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
-    #     conn = dbConn("ACS_V1_1")
-    #     sql = 'SELECT * FROM dp_heartbeat'
-    #     conn.cursor.execute(sql)
-    #     hb = conn.cursor.fetchall()
-    #     conn.dbClose()
-    #     # print(hb)
-
-    #     try:
-    #         heartbeatRequest(hb)
-    #     except Exception as e:
-    #         print(e)
-    #     # 80% of hbtimer
-    #     time.sleep(45)
-    
-
-    hbresponse = {'heartbeatResponse': [{'grantId': '578807884', 'cbsdId': 'FoxconnMock-SASDCE994613163', 'transmitExpireTime': '2021-03-26T21:30:48Z', 'response': {'responseCode': 0}}, {'grantId': '32288332', 'cbsdId': 'FoxconMock-SAS1111', 'transmitExpireTime': '2021-03-26T21:30:48Z', 'response': {'responseCode': 0}}]}
-
+#TODO if error break
+#TODO LOOP AT 80% OF heartbeat TIMER
+while True:
+    # print("hb")
+    logging.info("/////////////////////////HEARTBEAT\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+    conn = dbConn("ACS_V1_1")
+    sql = 'SELECT * FROM dp_heartbeat'
+    conn.cursor.execute(sql)
+    hb = conn.cursor.fetchall()
+    conn.dbClose()
+    # print(hb)
     try:
-        heartbeatResponse(hbresponse)
+        heartbeatRequest(hb)
     except Exception as e:
         print(e)
+        # 80% of hbtimer
+        time.sleep(45)
+
+    # hbresponse = {'heartbeatResponse': [{'grantId': '578807884', 'cbsdId': 'FoxconnMock-SASDCE994613163', 'transmitExpireTime': '2021-03-26T21:30:48Z', 'response': {'responseCode': 0}}, {'grantId': '32288332', 'cbsdId': 'FoxconMock-SAS1111', 'transmitExpireTime': '2021-03-26T21:30:48Z', 'response': {'responseCode': 0}}]}
+
+    # try:
+    #     heartbeatResponse(hbresponse)
+    # except Exception as e:
+    #     print(e)
 
     # cbsd = {'grantResponse': [{'grantExpireTime': '2021-04-02T17:08:58Z', 'grantId': '758988412', 'cbsdId': 'abc123Mock-SAS1111', 'response': {'responseCode': 0}, 'channelType': 'GAA', 'heartbeatInterval': 60}, {'grantExpireTime': '2021-04-02T17:08:58Z', 'grantId': '594127834', 'cbsdId': 'xyz123Mock-SAS4444', 'response': {'responseCode': 0}, 'channelType': 'GAA', 'heartbeatInterval': 60}]}
 
@@ -451,5 +454,5 @@ if __name__ == "__main__":
     # conn.cursor.execute(sql)
     # conn.cursor.commit()
 
-app.run(port = app.config["PORT"])
+# app.run(port = app.config["PORT"])
 
