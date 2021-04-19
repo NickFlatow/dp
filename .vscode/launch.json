@@ -29,7 +29,7 @@
 //             "type": "python",
 //             "request": "launch",
 //             "stopOnEntry": false,
-//             // "pythonPath": "${config:python.pythonPath}",
+//             // "python": "${command:python.interpreterPath}",
 //             "program": "${workspaceRoot}/run.py",
 //             "env": {
 //                 "FLASK_APP": "${workspaceRoot}/run.py"
