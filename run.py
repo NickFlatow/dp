@@ -11,6 +11,7 @@ from datetime import datetime
 from datetime import timedelta
 import logging
 import socket
+import threading
 
 # app = flask.Flask(__name__, instance_relative_config=True)
 # app.config.from_object('config.default')
@@ -30,14 +31,14 @@ def contactSAS(request,method):
     verify=('certs/ca.cert'),
     json=request)
   
-
-def EARFCNtoMHZ(cbsd):
-    
+def EARFCNtoMHZ():
     # Function to convert frequency from EARFCN  to MHz 3660 - 3700
     # mhz plus 6 zeros
     # L_frq = 0
     # H_frq = 0
-
+    conn = dbConn("ACS_V1_1")
+    sql = 'SELECT SN,cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = \'reg\''
+    cbsd = conn.select(sql)
 
     for i in range(len(cbsd)):
         logging.info("////////////////////////////////EARFCN CONVERTION "+ cbsd[i]['SN']+"\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
@@ -58,18 +59,10 @@ def EARFCNtoMHZ(cbsd):
         print(L_frq,H_frq)
         
         sql = "UPDATE `dp_device_info` SET lowFrequency=\'"+str(L_frq)+"\', highFrequency=\'"+str(H_frq)+"\' WHERE SN = \'"+str(cbsd[i]['SN'])+"\'"
-        logging.info("SQL COMMAND: " + sql)
+        conn.update(sql)        
 
-        print(sql)
-        try:
-            logging.info(sql)
-            conn.cursor.execute(sql)
-        except Exception as e:
-            logging.info("error")
-            print(e)
-            logging.DEBUG(e)
+    conn.dbClose()
 
-    # conn.dbClose()
 def cbsdAction(cbsdSN,action,time):
     logging.info("Triggering CBSD action")
     conn = dbConn("ACS_V1_1")
@@ -211,26 +204,33 @@ def spectrumResponse(response):
     conn = dbConn("ACS_V1_1")
     #for each resposne in resposne array
     for i in range(len(response['spectrumInquiryResponse'])):
+        
+        
         logging.info(response['spectrumInquiryResponse'][i]['cbsdId'] + ": Spec Response : " + str(response['spectrumInquiryResponse'][i]))
+        
         if response['spectrumInquiryResponse'][i]['response']['responseCode'] == 0:
             # if high frequcy and low frequcy match value(convert to hz) for cbsdId in database then move to next
             low = math.floor(response['spectrumInquiryResponse'][i]['availableChannel'][0]['frequencyRange']['lowFrequency']/1000000)
             high = math.floor(response['spectrumInquiryResponse'][i]['availableChannel'][0]['frequencyRange']['highFrequency']/1000000)
 
             sql = "SELECT `lowFrequency`,`highFrequency` from dp_device_info where cbsdID = \'" + response['spectrumInquiryResponse'][i]['cbsdId'] + "\'"
-            try:
-                conn.cursor.execute(sql)
-                freq = conn.cursor.fetchall()
-            except Exception as e:
-                print(e)
+ 
+ 
+            #if frequency if different than that requested by the cbsd. use the freqency of which was choosen by SAS and set value on cell.
+ 
+            # try:
+            #     conn.cursor.execute(sql)
+            #     freq = conn.cursor.fetchall()
+            # except Exception as e:
+            #     print(e)
 
-            #if frequncy on cell is within the range of the spectrum request move to next cbsd
-            if freq[0]['lowFrequency'] < low or freq[0]['highFrequency'] > high:
-                print("FREQUENCY ERROR!!!")
-                #TODO if they do not match update with the range provided by SAS or just widen search
-            else:
-                sql = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
-                conn.cursor.execute(sql)
+            # #if frequncy on cell is within the range of the spectrum request move to next cbsd
+            # if freq[0]['lowFrequency'] < low or freq[0]['highFrequency'] > high:
+            #     print("FREQUENCY ERROR!!!")
+            #     #TODO if they do not match update with the range provided by SAS or just widen search
+            # else:
+            sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
+            conn.update(sqlUpdate)
 
     #TODO WHAT IF THE AVAIABLE CHANNEL ARRAY IS EMPTY
     #TODO ADD ERROR HANDELING MODULE
@@ -238,21 +238,19 @@ def spectrumResponse(response):
     conn.dbClose()
 
 
-def spectrumRequest(cbsd):
+def spectrumRequest():
 
     #ADD form to the web interface to request specific spectrum in MHz. EX: 
     #get EARFCNinUSE for each cbsdID in request (TODO how to change the database to make this query more convienient)
-    # conn = dbConn("ACS_V1_1")
-    # sql = 'SELECT EARFCNinUSE FROM apt_cpe_list WHERE SN = \'DCE994613163\''
-    # conn.cursor.execute(sql)
-    # row = conn.cursor.fetchone()
-    # conn.dbClose()
+    conn = dbConn("ACS_V1_1")
+    sql = 'SELECT cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = \'spectrum\''
+    cbsd = conn.select(sql)
+
     spec = {"spectrumInquiryRequest":[]}
-    # print(row['EARFCNinUSE'])
-    # print(db[0]['EARFCN'])
+
     for i in range(len(cbsd)):
-        #Convert from EARFCN to MHz accounting for bandwidth of 20MHz for each cbsdID in request
-        #build json request for SAS for each row in request
+        logging.info(f"/////////////////////////SPECTRUM for {cbsd[i]['cbsdId']} \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+        #build json request for SAS
         spec["spectrumInquiryRequest"].append(
             {
                 "cbsdId":cbsd[i]['cbsdId'],
@@ -268,42 +266,48 @@ def spectrumRequest(cbsd):
         )
         logging.info(spec['spectrumInquiryRequest'][i]['cbsdId']+ ": Spec Request: " + str(spec['spectrumInquiryRequest'][i]))
     
-    # logging.info("REQUEST FOR SPECTRUM INQUIRY: " + str(spec) )
-    # #Send request to SAS server #contact SAS server
-    response = contactSAS(spec,"spectrumInquiry")
-    # # #pass response to spectrum response
-    # logging.info("RESPONSE FOR SPECTRUM INQUIRY:",response.json())
-    spectrumResponse(response.json())
+    #Send request to SAS server #contact SAS server
+    # response = contactSAS(spec,"spectrumInquiry")
+    response = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3585000000, 'lowFrequency': 3565000000 } } ], 'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0} } ] }
+                                                                                                                     
 
-def regResponse(response,row):
-    #Make connection to ACS_V1_1 database
+    # pass response to spectrum response
+    # spectrumResponse(response.json())
+    conn.dbClose()
+    spectrumResponse(response)
+
+def regResponse(response):
     conn = dbConn("ACS_V1_1")
+    sql = 'SELECT SN,cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = \'reg\''
+    row = conn.select(sql)
+
     for i in range(len(response['registrationResponse'])):
         logging.info(row[i]["SN"] + ": REG Response : " + str(response['registrationResponse'][i]))
-        #Check if responseCode is > 0 
+        
+        #If there are no errors 
         if response['registrationResponse'][i]['response']['responseCode'] == 0: 
             #TODO Check for measurement Report
 
             #Update cbsdID, SAS_STAGE in device info table
-            sql = "UPDATE `dp_device_info` SET cbsdID=\""+response['registrationResponse'][i]['cbsdId']+"\",sasStage=\"spectrum\" WHERE SN=\'"+row[i]["SN"]+"\'"
-            print(sql)
-            try:
-                # print(sql)
-                conn.cursor.execute(sql)
-            except Exception as e:
-                print(e)
+            sqlUpdate = "UPDATE `dp_device_info` SET cbsdID=\""+response['registrationResponse'][i]['cbsdId']+"\",sasStage=\"spectrum\" WHERE SN=\'"+row[i]["SN"]+"\'"
+            conn.update(sqlUpdate)
         else:
             errorModule(response['registrationResponse'][i])
-    #close db connection s
+
+    #close db connection
     conn.dbClose()
-    #start spectrum inquiry
+
+def regRequest():
+    # COLLECT ALL DEVICES LOOKING TO BE REGISTERED
+    conn = dbConn("ACS_V1_1")
+    sql = 'SELECT * FROM dp_device_info where sasStage = \'reg\''
+    row = conn.select(sql)
 
 
-def regRequest(row):
-    #create reg request
     reg = {"registrationRequest":[]}
     
     for i in range(len(row)):
+        logging.info(f"/////////////////////////REGISTRATION for {row[i]['SN']} \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
         reg['registrationRequest'].append(
                 {
                     "cbsdSerialNumber": str(row[i]["SN"]),
@@ -313,14 +317,13 @@ def regRequest(row):
                 }
         )
         logging.info(row[i]["SN"]+ ": Reg Request: " + str(reg['registrationRequest'][i]))
-
-    # logging.info("REQUEST FROM REG:" + str(reg))
  
-    response = contactSAS(reg,"registration")
-    
-    # logging.info("RESPONSE FROM REG REQUEST",response.json())
+    # response = contactSAS(reg,"registration")
+    response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
 
-    regResponse(response.json(),row)
+    conn.dbClose()
+    # regResponse(response.json(),row)
+    regResponse(response)
 
 
 def errorModule(response):
@@ -356,81 +359,109 @@ def expired(time):
 
 print(__name__) 
 
-while True:  
+# while True:  
     # app.run(port = app.config["PORT"])
 
-        # COLLECT ALL DEVICES LOOKING TO BE REGISTERED
-
-        # cbsdAction("DCE994613163","RF_OFF",str(datetime.now()))
-    # EARFCNtoMHZ([{'EARFCN':55240},{'EARFCN':55990},{'EARFCN':56739}])
-    conn = dbConn("ACS_V1_1")
-    sql = 'SELECT * FROM dp_device_info where sasStage = \'reg\''
-    conn.cursor.execute(sql)
-    reg = conn.cursor.fetchall()
-    # conn.dbClose()
-    print("reg", flush=True)
-    logging.info("/////////////////////////REGISTRATION\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
-
-    if reg != ():
-        EARFCNtoMHZ(reg)
-        regRequest(reg)
-        conn.dbClose()
         
-        conn = dbConn("ACS_V1_1")
-        sql = 'SELECT cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = \'spectrum\''
-        conn.cursor.execute(sql)
-        spec = conn.cursor.fetchall()
-        conn.dbClose()
 
-        print("spec")
-        logging.info("/////////////////////////SPECTRUM\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+    # cbsdAction("DCE994613163","RF_OFF",str(datetime.now()))
+    # EARFCNtoMHZ([{'EARFCN':55240},{'EARFCN':55990},{'EARFCN':56739}])
+    
+
+    #Convert EARFCN into hz
+# EARFCNtoMHZ()
+# regRequest()
+# spectrumRequest()
+
+
+# try:
+#     a_socket.connect(("192.168.4.5", 10500))
+#     print("connected")
+# except:
+#     print("Connection failed")
+#     #     conn.dbClose()
+
+# while True:
+
+
+def some_test(cbsd):
+    with socket.socket() as s:
         try:
-            spectrumRequest(spec)
+            s.connect((cbsd, 10500))
+            print(f"connected to ip: {cbsd}")
         except Exception as e:
-            print(e)
+            print(f"Connection failed reason: {e}")
+        time.sleep(10)
+        s.close()
+        print("finished")
 
-        # spec = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3570000000, 'lowFrequency': 3550000000}}], 'cbsdId': 'abc123Mock-SAS1111', 'response': {'responseCode': 0}}, {'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3700000000, 'lowFrequency': 3670000000}}], 'cbsdId': 'xyz123Mock-SAS4444', 'response': {'responseCode': 0}}]}
+cbsds = ["192.168.4.5", "192.168.4.9"]
+for cbsd in cbsds:
+    print(cbsd)
+    try:
+        #comma for tuple
+        thread = threading.Thread(target=some_test, args=(cbsd,))
+        thread.start()
+    except Exception as e:
+        print(f"Connection failed reason: {e}")
+    
 
-        # try:
-        #     spectrumResponse(spec)
-        # except Exception as e:
-        #     print(e)
+            
+    #     conn = dbConn("ACS_V1_1")
+    #     sql = 'SELECT cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = \'spectrum\''
+    #     conn.cursor.execute(sql)
+    #     spec = conn.cursor.fetchall()
+    #     conn.dbClose()
 
-        conn = dbConn("ACS_V1_1")
-        sql = 'SELECT * FROM dp_device_info where sasStage = \'grant\''
-        conn.cursor.execute(sql)
-        grant = conn.cursor.fetchall()
-        conn.dbClose()
+    #     print("spec")
+    #     logging.info("/////////////////////////SPECTRUM\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+    #     try:
+    #         spectrumRequest(spec)
+    #     except Exception as e:
+    #         print(e)
 
-        print("grant")
-        logging.info("/////////////////////////GRANT\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
-        #TODO FINISH grantRequest
-        try:
-            grantRequest(grant)
-        except Exception as e:
-            print(e)
+    #     # spec = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3570000000, 'lowFrequency': 3550000000}}], 'cbsdId': 'abc123Mock-SAS1111', 'response': {'responseCode': 0}}, {'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3700000000, 'lowFrequency': 3670000000}}], 'cbsdId': 'xyz123Mock-SAS4444', 'response': {'responseCode': 0}}]}
 
-        #TODO if error break
-        #TODO LOOP AT 80% OF heartbeat TIMER
-        while True:
-            # print("hb")
-            logging.info("/////////////////////////HEARTBEAT\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
-            conn = dbConn("ACS_V1_1")
-            sql = 'SELECT * FROM dp_heartbeat'
-            conn.cursor.execute(sql)
-            hb = conn.cursor.fetchall()
-            conn.dbClose()
-            # print(hb)
-            try:
-                #TODO if grant expire time + hbinterval > datetime.now()
-                    #print(wrong)
-                heartbeatRequest(hb)
-            except Exception as e:
-                print(e)
-                # 80% of hbtimer
-            time.sleep(45)
-    logging.info("loop")
-    time.sleep(10)
+    #     # try:
+    #     #     spectrumResponse(spec)
+    #     # except Exception as e:
+    #     #     print(e)
+
+    #     conn = dbConn("ACS_V1_1")
+    #     sql = 'SELECT * FROM dp_device_info where sasStage = \'grant\''
+    #     conn.cursor.execute(sql)
+    #     grant = conn.cursor.fetchall()
+    #     conn.dbClose()
+
+    #     print("grant")
+    #     logging.info("/////////////////////////GRANT\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+    #     #TODO FINISH grantRequest
+    #     try:
+    #         grantRequest(grant)
+    #     except Exception as e:
+    #         print(e)
+
+    #     #TODO if error break
+    #     #TODO LOOP AT 80% OF heartbeat TIMER
+    #     while True:
+    #         # print("hb")
+    #         logging.info("/////////////////////////HEARTBEAT\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+    #         conn = dbConn("ACS_V1_1")
+    #         sql = 'SELECT * FROM dp_heartbeat'
+    #         conn.cursor.execute(sql)
+    #         hb = conn.cursor.fetchall()
+    #         conn.dbClose()
+    #         # print(hb)
+    #         try:
+    #             #TODO if grant expire time + hbinterval > datetime.now()
+    #                 #print(wrong)
+    #             heartbeatRequest(hb)
+    #         except Exception as e:
+    #             print(e)
+    #             # 80% of hbtimer
+    #         time.sleep(45)
+    # logging.info("loop")
+    # time.sleep(10)
 
     # hbresponse = {'heartbeatResponse': [{'grantId': '578807884', 'cbsdId': 'FoxconnMock-SASDCE994613163', 'transmitExpireTime': '2021-03-26T21:30:48Z', 'response': {'responseCode': 0}}, {'grantId': '32288332', 'cbsdId': 'FoxconMock-SAS1111', 'transmitExpireTime': '2021-03-26T21:30:48Z', 'response': {'responseCode': 0}}]}
 
