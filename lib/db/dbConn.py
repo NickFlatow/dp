@@ -23,7 +23,7 @@ class dbConn():
 
     def select(self, sql, params=None):
         self.cursor = self.conn.cursor()
-        logging.info("SQL COMMAND: " + sql)
+        logging.info("SQL COMMAND: " + sql + " " +  str(params))
         try:
             if params:
                 self.cursor.execute(sql, params)
@@ -35,7 +35,7 @@ class dbConn():
         return result
     def update(self, sql, params=None):
             self.cursor = self.conn.cursor()
-            logging.info("SQL COMMAND: " + sql)
+            logging.info("SQL COMMAND: " + sql + " " +  str(params))
             try:
                 if params:
                     self.cursor.execute(sql, params)

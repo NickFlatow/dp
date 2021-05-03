@@ -75,22 +75,27 @@ def cbsdAction(cbsdSN,action,time):
     conn.dbClose()
 
 def heartbeatResponse(cbsd):
-    # print(cbsd)
+    # cbsd is the response from the SAS for the preceding heartbeat request
 
-    #Make connection to ACS_V1_1 database
-    conn = dbConn("ACS_V1_1")
-    print("response")
+    print("hb response")
     for i in range(len(cbsd['heartbeatResponse'])):
+        #Make connection to ACS_V1_1 database
+        conn = dbConn("ACS_V1_1")
+        sql_select_all = "SELECT * FROM dp_device_info WHERE cbsdID = %s"
+        #select everything from the database where cbsdID = cbsdId from heartbeat response
+        cbsd_db = conn.select(sql_select_all,cbsd['heartbeatResponse'][i]['cbsdId'])
+        
+        #add cbsd heartbeat response to log file
         logging.info(cbsd['heartbeatResponse'][i]['cbsdId'] + ": Heartbeat Response : " + str(cbsd['heartbeatResponse'][i]))
+        
         #if error code = 0 then process handle reply for cbsd
-        # print(cbsd['heartbeatResponse'][i])
         if cbsd['heartbeatResponse'][i]['response']['responseCode'] == 0: 
         #TODO what if no reply... lost in the internet
         #TODO check if reply is recieved from all cbsds
         #TODO WHAT IF NEW OPERATIONAL PARAMS
         #TODO WHAT IF MEAS REPORT
 
-            sql_get_op = "SELECT operationalState FROM dp_heartbeat WHERE cbsdID = \'"+cbsd['heartbeatResponse'][i]['cbsdId']+"\'"
+            sql_get_op = "SELECT operationalState FROM dp_device_info WHERE cbsdID = \'"+cbsd['heartbeatResponse'][i]['cbsdId']+"\'"
             logging.info("SQL cmd : " + sql_get_op)
             conn.cursor.execute(sql_get_op)
             opState = conn.cursor.fetchone()
@@ -124,9 +129,13 @@ def heartbeatResponse(cbsd):
     #close database
     conn.dbClose()
 
-def heartbeatRequest(cbsd):
+def heartbeatRequest():
+    conn = dbConn("ACS_V1_1")
+    sql_select = "SELECT * FROM dp_device_info WHERE sasStage = \'heartbeat\'"
+    cbsd = conn.select(sql_select)
+
     heartbeat = {"heartbeatRequest":[]}
-    print("request")
+    print("hb request")
     for i in range(len(cbsd)):
         heartbeat['heartbeatRequest'].append(
                 {
@@ -139,30 +148,32 @@ def heartbeatRequest(cbsd):
 
     # logging.info("REQUEST FROM heartbeat: " + str(heartbeat))
     response = contactSAS(heartbeat,"heartbeat")
-
+    conn.dbClose()
     heartbeatResponse(response.json())
 
 def grantResponse(cbsd):
     #Make connection to ACS_V1_1 database
     conn = dbConn("ACS_V1_1")
-    print("response")
+    print("grant response")
     for i in range(len(cbsd['grantResponse'])):
         logging.info(cbsd['grantResponse'][i]['cbsdId'] + ": Grant Response : " + str(cbsd['grantResponse'][i]))
         #Check if responseCode is > 0 
         if cbsd['grantResponse'][i]['response']['responseCode'] == 0: 
             #TODO Check for measurement Report
 
-            sql_heartbeat_update = "REPLACE INTO dp_heartbeat (`cbsdID`, `grantID`, `renewGrant`,`measReport`,`operationalState`,`grantExpireTime`) VALUES ( \'" + cbsd['grantResponse'][i]['cbsdId'] + "\' , \'" + cbsd['grantResponse'][i]['grantId'] + "\' , \'false\' , \'false\', \'GRANTED\', \'" + cbsd['grantResponse'][i]['grantExpireTime'] +"\')"
-            sql_device_info_update = "update `dp_device_info` SET sasStage = 'heartbeat' where cbsdID= \'" + cbsd['grantResponse'][i]['cbsdId'] +"\'"
+            # sql_heartbeat_update = "REPLACE INTO dp_heartbeat (`cbsdID`, `grantID`, `renewGrant`,`measReport`,`operationalState`,`grantExpireTime`) VALUES ( \'" + cbsd['grantResponse'][i]['cbsdId'] + "\' , \'" + cbsd['grantResponse'][i]['grantId'] + "\' , \'false\' , \'false\', \'GRANTED\', \'" + cbsd['grantResponse'][i]['grantExpireTime'] +"\')"
+            sql_update = "UPDATE `dp_device_info` SET `grantID` = %s , `grantExpireTime` = %s, `sasStage` = \'heartbeat\' WHERE `cbsdID` = %s"
 
-            try:
-                # print(sql)
-                conn.cursor.execute(sql_heartbeat_update)
-                conn.cursor.execute(sql_device_info_update)
-            except Exception as e:
-                print(e)
+            conn.update(sql_update,(cbsd['grantResponse'][i]['grantId'],cbsd['grantResponse'][i]['grantExpireTime'],cbsd['grantResponse'][i]['cbsdId']))
+            # sql_device_info_update = "update `dp_device_info` SET sasStage = 'heartbeat' where cbsdID= \'" + cbsd['grantResponse'][i]['cbsdId'] +"\'"
+
+            # try:
+            #     # print(sql)
+            #     conn.cursor.execute(sql_heartbeat_update)
+            #     conn.cursor.execute(sql_device_info_update)
+            # except Exception as e:
+            #     print(e)
         else:
-
             errorModule(response['grantResponse'][i])
     #close db connection s
 
@@ -171,9 +182,16 @@ def grantResponse(cbsd):
     conn.dbClose()
     #start spectrum inquiry
 
-def grantRequest(cbsd):
+def grantRequest():
+    #make connection to database
+    conn = dbConn("ACS_V1_1")
+    #select eveything where sasStage = grant
+    sql_select = "select * from dp_device_info WHERE sasStage = \'grant\'"
+    cbsd = conn.select(sql_select)
+
+
     grant = {"grantRequest":[]}
-    print("request")
+    print("grant request")
     for i in range(len(cbsd)):
         grant['grantRequest'].append(
                 {
@@ -195,6 +213,7 @@ def grantRequest(cbsd):
     # logging.info("REQUEST FROM GRANT: " + str(grant))
     # print(grant)
     response = contactSAS(grant,"grant")
+    conn.dbClose()
     grantResponse(response.json())
     # logging.info("RESPONSE FROM grant REQUEST:" + response.json() )
 
@@ -205,34 +224,31 @@ def spectrumResponse(response):
     #for each resposne in resposne array
     for i in range(len(response['spectrumInquiryResponse'])):
         
-        
         logging.info(response['spectrumInquiryResponse'][i]['cbsdId'] + ": Spec Response : " + str(response['spectrumInquiryResponse'][i]))
         
         if response['spectrumInquiryResponse'][i]['response']['responseCode'] == 0:
             # if high frequcy and low frequcy match value(convert to hz) for cbsdId in database then move to next
+
+            #TODO WHAT IF THE AVAIABLE CHANNEL ARRAY IS EMPTY
             low = math.floor(response['spectrumInquiryResponse'][i]['availableChannel'][0]['frequencyRange']['lowFrequency']/1000000)
             high = math.floor(response['spectrumInquiryResponse'][i]['availableChannel'][0]['frequencyRange']['highFrequency']/1000000)
 
-            sql = "SELECT `lowFrequency`,`highFrequency` from dp_device_info where cbsdID = \'" + response['spectrumInquiryResponse'][i]['cbsdId'] + "\'"
+            sql = "SELECT `SN`,`lowFrequency`,`highFrequency` from dp_device_info where cbsdID = \'" + response['spectrumInquiryResponse'][i]['cbsdId'] + "\'"
  
  
-            #if frequency if different than that requested by the cbsd. use the freqency of which was choosen by SAS and set value on cell.
+            #if the SAS sends back spectrum response with avaible channgel array outsid of the use values set on the cell. Use the values set by the spectrum response
+            
+            #select values currently used in the database per cbsd
+            # cbsd_freq_values = conn.select(sql)
+            #  if cbsd_freq_values are outside of the range of low and high(set above) then use value inside the low and high range
+            #  cbsdaction(SN,setvalues,now)
+            #
  
-            # try:
-            #     conn.cursor.execute(sql)
-            #     freq = conn.cursor.fetchall()
-            # except Exception as e:
-            #     print(e)
 
-            # #if frequncy on cell is within the range of the spectrum request move to next cbsd
-            # if freq[0]['lowFrequency'] < low or freq[0]['highFrequency'] > high:
-            #     print("FREQUENCY ERROR!!!")
-            #     #TODO if they do not match update with the range provided by SAS or just widen search
-            # else:
             sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
             conn.update(sqlUpdate)
 
-    #TODO WHAT IF THE AVAIABLE CHANNEL ARRAY IS EMPTY
+    
     #TODO ADD ERROR HANDELING MODULE
     
     conn.dbClose()
@@ -267,14 +283,15 @@ def spectrumRequest():
         logging.info(spec['spectrumInquiryRequest'][i]['cbsdId']+ ": Spec Request: " + str(spec['spectrumInquiryRequest'][i]))
     
     #Send request to SAS server #contact SAS server
-    # response = contactSAS(spec,"spectrumInquiry")
-    response = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3585000000, 'lowFrequency': 3565000000 } } ], 'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0} } ] }
+    response = contactSAS(spec,"spectrumInquiry")
+    # response = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3585000000, 'lowFrequency': 3565000000 } } ], 'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0} } ] }
                                                                                                                      
 
-    # pass response to spectrum response
-    # spectrumResponse(response.json())
+  
     conn.dbClose()
-    spectrumResponse(response)
+    #   pass response to spectrum response
+    spectrumResponse(response.json())
+    # spectrumResponse(response)
 
 def regResponse(response):
     conn = dbConn("ACS_V1_1")
@@ -304,6 +321,7 @@ def regRequest():
     row = conn.select(sql)
 
 
+    #TODO what if there are no rows with sasStage = reg
     reg = {"registrationRequest":[]}
     
     for i in range(len(row)):
@@ -318,12 +336,12 @@ def regRequest():
         )
         logging.info(row[i]["SN"]+ ": Reg Request: " + str(reg['registrationRequest'][i]))
  
-    # response = contactSAS(reg,"registration")
-    response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
+    response = contactSAS(reg,"registration")
+    # response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
 
     conn.dbClose()
-    # regResponse(response.json(),row)
-    regResponse(response)
+    regResponse(response.json())
+    # regResponse(response)
 
 
 def errorModule(response):
@@ -368,10 +386,22 @@ print(__name__)
     # EARFCNtoMHZ([{'EARFCN':55240},{'EARFCN':55990},{'EARFCN':56739}])
     
 
+
     #Convert EARFCN into hz
-# EARFCNtoMHZ()
-# regRequest()
-# spectrumRequest()
+def start():
+    EARFCNtoMHZ()
+    regRequest()
+    spectrumRequest()
+    grantRequest()
+
+def test():
+    conn = dbConn("ACS_V1_1")
+    sql = "UPDATE `dp_device_info` SET `grantID` = %s WHERE `SN` = %s"
+    conn.update(sql,("1234g","DCE994613163"))
+
+start()
+
+
 
 
 # try:
@@ -384,26 +414,26 @@ print(__name__)
 # while True:
 
 
-def some_test(cbsd):
-    with socket.socket() as s:
-        try:
-            s.connect((cbsd, 10500))
-            print(f"connected to ip: {cbsd}")
-        except Exception as e:
-            print(f"Connection failed reason: {e}")
-        time.sleep(10)
-        s.close()
-        print("finished")
+# def some_test(cbsd):
+#     with socket.socket() as s:
+#         try:
+#             s.connect((cbsd, 10500))
+#             print(f"connected to ip: {cbsd}")
+#         except Exception as e:
+#             print(f"Connection failed reason: {e}")
+#         time.sleep(10)
+#         s.close()
+#         print("finished")
 
-cbsds = ["192.168.4.5", "192.168.4.9"]
-for cbsd in cbsds:
-    print(cbsd)
-    try:
-        #comma for tuple
-        thread = threading.Thread(target=some_test, args=(cbsd,))
-        thread.start()
-    except Exception as e:
-        print(f"Connection failed reason: {e}")
+# cbsds = ["192.168.4.5", "192.168.4.9"]
+# for cbsd in cbsds:
+#     print(cbsd)
+#     try:
+#         #comma for tuple
+#         thread = threading.Thread(target=some_test, args=(cbsd,))
+#         thread.start()
+#     except Exception as e:
+#         print(f"Connection failed reason: {e}")
     
 
             
