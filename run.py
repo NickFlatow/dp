@@ -68,10 +68,7 @@ def cbsdAction(cbsdSN,action,time):
     conn = dbConn("ACS_V1_1")
     sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+cbsdSN+"\',\'"+action+"\',\'"+time+"\')"
     logging.info(cbsdSN + " : SQL cmd " + sql_action)
-    try:
-        conn.cursor.execute(sql_action)
-    except Exception as e:
-        logging.error(e)
+    conn.update(sql_action)
     conn.dbClose()
 
 def heartbeatResponse(cbsd):
@@ -88,68 +85,61 @@ def heartbeatResponse(cbsd):
         #add cbsd heartbeat response to log file
         logging.info(cbsd['heartbeatResponse'][i]['cbsdId'] + ": Heartbeat Response : " + str(cbsd['heartbeatResponse'][i]))
         
+        #TODO WHAT IF NEW OPERATIONAL PARAMS(HANDLE THIS IN ERROR HANDLE MODULE)
+
         #if error code = 0 then process handle reply for cbsd
         if cbsd['heartbeatResponse'][i]['response']['responseCode'] == 0: 
         #TODO what if no reply... lost in the internet
         #TODO check if reply is recieved from all cbsds
-        #TODO WHAT IF NEW OPERATIONAL PARAMS
         #TODO WHAT IF MEAS REPORT
-
-            sql_get_op = "SELECT operationalState FROM dp_device_info WHERE cbsdID = \'"+cbsd['heartbeatResponse'][i]['cbsdId']+"\'"
-            logging.info("SQL cmd : " + sql_get_op)
-            conn.cursor.execute(sql_get_op)
-            opState = conn.cursor.fetchone()
+        #TODO
             #update operational state to granted/ what if operational state is already authorized
-            sql = "UPDATE dp_heartbeat SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + cbsd['heartbeatResponse'][i]['cbsdId'] + "\'"
+            update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + cbsd['heartbeatResponse'][i]['cbsdId'] + "\'"
+            conn.update(update_operational_state)
             #update transmist expire time
-            sql1 = "UPDATE dp_heartbeat SET transmitExpireTime = \'" + cbsd['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + cbsd['heartbeatResponse'][i]['cbsdId'] + "\'"
-            try:
-                conn.cursor.execute(sql)
-                conn.cursor.execute(sql1)
-            except Exception as e:
-                print(e)
-            #collect SN from dp_device_info where cbsdId = $cbsdid
-            if opState['operationalState'] == 'GRANTED':
-                print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
-                sql_get_sn = "SELECT `SN` FROM dp_device_info WHERE cbsdID =\'"+cbsd['heartbeatResponse'][i]['cbsdId']+"\'"
-                print(sql_get_sn)
-                conn.cursor.execute(sql_get_sn)
-                sn = conn.cursor.fetchone()
-                #turn on RF in cell
-                # sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+sn['SN']+"\','RF_ON',\'"+str(datetime.now())+"\')"
-                # conn.cursor.execute(sql_action)
-                cbsdAction(sn['SN'],"RF_ON",str(datetime.now()))
-            # print(sql_action)
+            update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + cbsd['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + cbsd['heartbeatResponse'][i]['cbsdId'] + "\'"
+            conn.update(update_transmit_time)
+            conn.dbClose()
 
+            #collect SN from dp_device_info where cbsdId = $cbsdid
+            if cbsd_db[i]['operationalState'] == 'GRANTED':
+                print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
+                # turn on RF in cell
+                cbsdAction(cbsd_db[i]['SN'],"RF_ON",str(datetime.now()))
+    
+        else:
+            #close database
+            conn.dbClose()
+            return break
+            #handle error
 
         #if operational state  = gratned turn rf on
 
-    #else handle error
-
-    #close database
-    conn.dbClose()
-
 def heartbeatRequest():
+
     conn = dbConn("ACS_V1_1")
     sql_select = "SELECT * FROM dp_device_info WHERE sasStage = \'heartbeat\'"
     cbsd = conn.select(sql_select)
 
-    heartbeat = {"heartbeatRequest":[]}
-    print("hb request")
-    for i in range(len(cbsd)):
-        heartbeat['heartbeatRequest'].append(
-                {
-                    "cbsdId":cbsd[i]['cbsdID'],
-                    "grantId":cbsd[i]['grantID'],
-                    "operationState":cbsd[i]['operationalState']
-                }
-            )
-        logging.info(heartbeat['heartbeatRequest'][i]['cbsdId']+ ": Heartbeat Request: " + str(heartbeat['heartbeatRequest'][i]))
+    if cbsd != ():
+        heartbeat = {"heartbeatRequest":[]}
+        print("hb request")
+        for i in range(len(cbsd)):
+            heartbeat['heartbeatRequest'].append(
+                    {
+                        "cbsdId":cbsd[i]['cbsdID'],
+                        "grantId":cbsd[i]['grantID'],
+                        "operationState":cbsd[i]['operationalState']
+                    }
+                )
+            logging.info(heartbeat['heartbeatRequest'][i]['cbsdId']+ ": Heartbeat Request: " + str(heartbeat['heartbeatRequest'][i]))
 
-    # logging.info("REQUEST FROM heartbeat: " + str(heartbeat))
-    response = contactSAS(heartbeat,"heartbeat")
-    conn.dbClose()
-    heartbeatResponse(response.json())
+        # logging.info("REQUEST FROM heartbeat: " + str(heartbeat))
+        response = contactSAS(heartbeat,"heartbeat")
+        conn.dbClose()
+        heartbeatResponse(response.json())
+    else:
+        conn.dbClose()
 
 def grantResponse(cbsd):
     #Make connection to ACS_V1_1 database
@@ -158,11 +148,12 @@ def grantResponse(cbsd):
     for i in range(len(cbsd['grantResponse'])):
         logging.info(cbsd['grantResponse'][i]['cbsdId'] + ": Grant Response : " + str(cbsd['grantResponse'][i]))
         #Check if responseCode is > 0 
+
         if cbsd['grantResponse'][i]['response']['responseCode'] == 0: 
             #TODO Check for measurement Report
 
             # sql_heartbeat_update = "REPLACE INTO dp_heartbeat (`cbsdID`, `grantID`, `renewGrant`,`measReport`,`operationalState`,`grantExpireTime`) VALUES ( \'" + cbsd['grantResponse'][i]['cbsdId'] + "\' , \'" + cbsd['grantResponse'][i]['grantId'] + "\' , \'false\' , \'false\', \'GRANTED\', \'" + cbsd['grantResponse'][i]['grantExpireTime'] +"\')"
-            sql_update = "UPDATE `dp_device_info` SET `grantID` = %s , `grantExpireTime` = %s, `sasStage` = \'heartbeat\' WHERE `cbsdID` = %s"
+            sql_update = "UPDATE `dp_device_info` SET `grantID` = %s , `grantExpireTime` = %s, `operationalState` = \'GRANTED\', `sasStage` = \'heartbeat\' WHERE `cbsdID` = %s"
 
             conn.update(sql_update,(cbsd['grantResponse'][i]['grantId'],cbsd['grantResponse'][i]['grantExpireTime'],cbsd['grantResponse'][i]['cbsdId']))
             # sql_device_info_update = "update `dp_device_info` SET sasStage = 'heartbeat' where cbsdID= \'" + cbsd['grantResponse'][i]['cbsdId'] +"\'"
@@ -286,8 +277,6 @@ def spectrumRequest():
     response = contactSAS(spec,"spectrumInquiry")
     # response = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3585000000, 'lowFrequency': 3565000000 } } ], 'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0} } ] }
                                                                                                                      
-
-  
     conn.dbClose()
     #   pass response to spectrum response
     spectrumResponse(response.json())
@@ -320,32 +309,39 @@ def regRequest():
     sql = 'SELECT * FROM dp_device_info where sasStage = \'reg\''
     row = conn.select(sql)
 
-
-    #TODO what if there are no rows with sasStage = reg
-    reg = {"registrationRequest":[]}
-    
-    for i in range(len(row)):
-        logging.info(f"/////////////////////////REGISTRATION for {row[i]['SN']} \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
-        reg['registrationRequest'].append(
-                {
-                    "cbsdSerialNumber": str(row[i]["SN"]),
-                    "fccId": row[i]["fccID"],
-                    "cbsdCategory": str(row[i]["cbsdCategory"]),
-                    "userId": str(row[i]["userID"])
-                }
-        )
-        logging.info(row[i]["SN"]+ ": Reg Request: " + str(reg['registrationRequest'][i]))
- 
-    response = contactSAS(reg,"registration")
-    # response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
-
-    conn.dbClose()
-    regResponse(response.json())
+    if row != ():
+        #TODO what if there are no rows with sasStage = reg
+        reg = {"registrationRequest":[]}
+        
+        for i in range(len(row)):
+            logging.info(f"/////////////////////////REGISTRATION for {row[i]['SN']} \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+            reg['registrationRequest'].append(
+                    {
+                        "cbsdSerialNumber": str(row[i]["SN"]),
+                        "fccId": row[i]["fccID"],
+                        "cbsdCategory": str(row[i]["cbsdCategory"]),
+                        "userId": str(row[i]["userID"])
+                    }
+            )
+            logging.info(row[i]["SN"]+ ": Reg Request: " + str(reg['registrationRequest'][i]))
+        try:
+            response = contactSAS(reg,"registration")
+            conn.dbClose()
+            return regResponse(response.json())
+        except Exception as e: 
+            logging.info(f"Connection to SAS failed reason: {e}")
+            print(f"Connection to SAS failed reason: {e}")
+            return False
+        # response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
+    else:
+        print("nothing")
+        conn.dbClose()
+        return False
     # regResponse(response)
 
 
 def errorModule(response):
-    #add some sort of logging mechanism something like ECCLogger
+    #TODO check for operational params
     print("!!!Error!!!")
     print(response)
     print("!!!Error!!!")
@@ -388,12 +384,28 @@ print(__name__)
 
 
     #Convert EARFCN into hz
-def start():
-    EARFCNtoMHZ()
-    regRequest()
-    spectrumRequest()
-    grantRequest()
 
+def heartbeat():
+        spectrumRequest()
+        grantRequest()
+        while True:
+            heartbeatRequest()
+            # time.sleep(5)    
+def start():
+    while True:
+        EARFCNtoMHZ()
+        if regRequest() != False:
+            try:
+                #if using args a comma for tuple is needed 
+                thread = threading.Thread(target=heartbeat, args=())
+                thread.start()
+            except Exception as e:
+                print("Connection failed reason:")
+            # while True:
+            #     heartbeatRequest()
+            #     time.sleep(5)
+        else:
+            time.sleep(15)
 def test():
     conn = dbConn("ACS_V1_1")
     sql = "UPDATE `dp_device_info` SET `grantID` = %s WHERE `SN` = %s"
