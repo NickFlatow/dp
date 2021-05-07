@@ -110,7 +110,6 @@ def heartbeatResponse(cbsd):
         else:
             #close database
             conn.dbClose()
-            return break
             #handle error
 
         #if operational state  = gratned turn rf on
