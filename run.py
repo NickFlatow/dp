@@ -25,11 +25,14 @@ def contactSAS(request,method):
     # Function to contact the SAS server
     # request - json array to pass to SAS
     # method - which method SAS you would like to contact registration, spectrum, grant, heartbeat 
-
-    return requests.post(app.config['SAS']+method, 
-    cert=('certs/client.cert','certs/client.key'),
-    verify=('certs/ca.cert'),
-    json=request)
+    try:
+        return requests.post(app.config['SAS']+method, 
+        cert=('certs/client.cert','certs/client.key'),
+        verify=('certs/ca.cert'),
+        json=request)
+    except Exception as e:
+        print(f"your connection has failed: {e}")
+        return False
   
 def EARFCNtoMHZ():
     # Function to convert frequency from EARFCN  to MHz 3660 - 3700
@@ -134,9 +137,12 @@ def heartbeatRequest():
             logging.info(heartbeat['heartbeatRequest'][i]['cbsdId']+ ": Heartbeat Request: " + str(heartbeat['heartbeatRequest'][i]))
 
         # logging.info("REQUEST FROM heartbeat: " + str(heartbeat))
+        print("before")
+        
         response = contactSAS(heartbeat,"heartbeat")
         conn.dbClose()
-        heartbeatResponse(response.json())
+        if response != False:
+            heartbeatResponse(response.json())
     else:
         conn.dbClose()
 
@@ -204,7 +210,8 @@ def grantRequest():
     # print(grant)
     response = contactSAS(grant,"grant")
     conn.dbClose()
-    grantResponse(response.json())
+    if response != False:
+        grantResponse(response.json())
     # logging.info("RESPONSE FROM grant REQUEST:" + response.json() )
 
 
@@ -274,11 +281,11 @@ def spectrumRequest():
     
     #Send request to SAS server #contact SAS server
     response = contactSAS(spec,"spectrumInquiry")
-    # response = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3585000000, 'lowFrequency': 3565000000 } } ], 'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0} } ] }
-                                                                                                                     
+    # response = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3585000000, 'lowFrequency': 3565000000 } } ], 'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0} } ] }                                                                                                       
     conn.dbClose()
     #   pass response to spectrum response
-    spectrumResponse(response.json())
+    if response != False:
+        spectrumResponse(response.json())
     # spectrumResponse(response)
 
 def regResponse(response):
@@ -301,7 +308,7 @@ def regResponse(response):
 
     #close db connection
     conn.dbClose()
-
+    
 def regRequest():
     # COLLECT ALL DEVICES LOOKING TO BE REGISTERED
     conn = dbConn("ACS_V1_1")
@@ -323,19 +330,17 @@ def regRequest():
                     }
             )
             logging.info(row[i]["SN"]+ ": Reg Request: " + str(reg['registrationRequest'][i]))
-        try:
-            response = contactSAS(reg,"registration")
-            conn.dbClose()
-            return regResponse(response.json())
-        except Exception as e: 
-            logging.info(f"Connection to SAS failed reason: {e}")
-            print(f"Connection to SAS failed reason: {e}")
-            return False
+    
+        response = contactSAS(reg,"registration")
+        conn.dbClose()
+        if response != False:
+            regResponse(response.json())
+
+            
         # response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
     else:
         print("nothing")
         conn.dbClose()
-        return False
     # regResponse(response)
 
 
@@ -383,13 +388,22 @@ print(__name__)
 
 
     #Convert EARFCN into hz
-
-def heartbeat():
+def registration():
+    while True:
+        # EARFCNtoMHZ()
+        print("registartion")
+        regRequest()
         spectrumRequest()
         grantRequest()
+
+        time.sleep(4)
+def heartbeat():
         while True:
+            print("heartbeat")
             heartbeatRequest()
-            # time.sleep(5)    
+            #TODO dereg()
+            #TODO reliquishment()
+            time.sleep(4)    
 def start():
     while True:
         EARFCNtoMHZ()
@@ -406,11 +420,22 @@ def start():
         else:
             time.sleep(15)
 def test():
-    conn = dbConn("ACS_V1_1")
-    sql = "UPDATE `dp_device_info` SET `grantID` = %s WHERE `SN` = %s"
-    conn.update(sql,("1234g","DCE994613163"))
+    try:
+        #if using args a comma for tuple is needed 
+        thread = threading.Thread(target=registration, args=())
+        thread.start()
+    except Exception as e:
+        print(f"Registration thread failed: {e}")
+    try:
+        #if using args a comma for tuple is needed 
+        thread = threading.Thread(target=heartbeat, args=())
+        thread.start()
+    except Exception as e:
+        print(f"Heartbeat thread failed reason: {e}")
 
-start()
+
+# start()
+test()
 
 
 
