@@ -12,14 +12,23 @@ from datetime import timedelta
 import logging
 import socket
 import threading
+from flask_cors import CORS, cross_origin
 
-# app = flask.Flask(__name__, instance_relative_config=True)
-# app.config.from_object('config.default')
-# app.config.from_pyfile('config.py')
 
 logging.basicConfig(filename='app.log', format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 hbtimer = 0
+@app.route('/', methods=['GET'])
+def home():
+    return"<h1>Domain Proxy</h1><p>test version</p>"
+
+@app.route('/dp/v1/test', methods=['POST'])
+@cross_origin()
+def dp_test():
+    testSN = request.args.get('key1')
+    # testSN = "regular test"
+    print("!!!!!!!!!!!!!!!!!!!!!\n" + testSN + "11111111111111111111\n")
+    return testSN
 
 def contactSAS(request,method):
     # Function to contact the SAS server
@@ -432,6 +441,9 @@ def test():
         thread.start()
     except Exception as e:
         print(f"Heartbeat thread failed reason: {e}")
+    runFlaskSever()
+   
+        
 
 
 # start()
