@@ -14,10 +14,7 @@ import socket
 import threading
 from flask_cors import CORS, cross_origin
 
-
 logging.basicConfig(filename='app.log', format='%(asctime)s - %(message)s', level=logging.DEBUG)
-
-
 # enter a test commit
 
 hbtimer = 0
@@ -30,10 +27,12 @@ def home():
 @app.route('/dp/v1/test', methods=['POST'])
 @cross_origin()
 def dp_test():
-    testSN = request.args.get('key1')
-    # testSN = "regular test"
-    print("!!!!!!!!!!!!!!!!!!!!!\n" + testSN + "11111111111111111111\n")
-    return testSN
+    deregistrationRequest()
+    return "this"
+    # testSN = request.args.get('key1')
+    # # testSN = "regular test"
+    # print("!!!!!!!!!!!!!!!!!!!!!\n" + testSN + "11111111111111111111\n")
+    # return testSN
 
 def contactSAS(request,method):
     # Function to contact the SAS server
@@ -199,34 +198,36 @@ def grantRequest():
     sql_select = "select * from dp_device_info WHERE sasStage = \'grant\'"
     cbsd = conn.select(sql_select)
 
-
-    grant = {"grantRequest":[]}
-    print("grant request")
-    for i in range(len(cbsd)):
-        grant['grantRequest'].append(
-                {
-                    "cbsdId":cbsd[i]['cbsdID'],
-                    "operationParam":{
-                        # grab antennaGain from web interface
-                        "maxEirp":int(cbsd[i]['TxPower'] + cbsd[i]['antennaGain']),
-                        "operationFrequencyRange":{
-                            "lowFrequency":cbsd[i]['lowFrequency'] * 1000000,
-                            "highFrequency":cbsd[i]['highFrequency'] * 1000000
+    if cbsd != ():
+        grant = {"grantRequest":[]}
+        print("grant request")
+        for i in range(len(cbsd)):
+            grant['grantRequest'].append(
+                    {
+                        "cbsdId":cbsd[i]['cbsdID'],
+                        "operationParam":{
+                            # grab antennaGain from web interface
+                            "maxEirp":int(cbsd[i]['TxPower'] + cbsd[i]['antennaGain']),
+                            "operationFrequencyRange":{
+                                "lowFrequency":cbsd[i]['lowFrequency'] * 1000000,
+                                "highFrequency":cbsd[i]['highFrequency'] * 1000000
+                            }
                         }
                     }
-                }
-            )
-        logging.info(grant['grantRequest'][i]['cbsdId']+ ": Grant Request: " + str(grant['grantRequest'][i]))
+                )
+            logging.info(grant['grantRequest'][i]['cbsdId']+ ": Grant Request: " + str(grant['grantRequest'][i]))
 
 
 
-    # logging.info("REQUEST FROM GRANT: " + str(grant))
-    # print(grant)
-    response = contactSAS(grant,"grant")
-    conn.dbClose()
-    if response != False:
-        grantResponse(response.json())
-    # logging.info("RESPONSE FROM grant REQUEST:" + response.json() )
+        # logging.info("REQUEST FROM GRANT: " + str(grant))
+        # print(grant)
+        response = contactSAS(grant,"grant")
+        conn.dbClose()
+        if response != False:
+            grantResponse(response.json())
+        # logging.info("RESPONSE FROM grant REQUEST:" + response.json() )
+    else:
+        conn.dbClose()
 
 
 def spectrumResponse(response):
@@ -273,34 +274,37 @@ def spectrumRequest():
     sql = 'SELECT cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = \'spectrum\''
     cbsd = conn.select(sql)
 
-    spec = {"spectrumInquiryRequest":[]}
+    if cbsd != ():
+        spec = {"spectrumInquiryRequest":[]}
 
-    for i in range(len(cbsd)):
-        logging.info(f"/////////////////////////SPECTRUM for {cbsd[i]['cbsdId']} \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
-        #build json request for SAS
-        spec["spectrumInquiryRequest"].append(
-            {
-                "cbsdId":cbsd[i]['cbsdId'],
-                "inquiredSpectrum":[
-                    {
-                        "highFrequency":cbsd[i]['highFrequency'] * 1000000,
-                        "lowFrequency":cbsd[i]['lowFrequency']  * 1000000
-                        # "highFrequency":3700 * 1000000,
-                        # "lowFrequency":3590 * 1000000
-                    }
-                ]
-            }
-        )
-        logging.info(spec['spectrumInquiryRequest'][i]['cbsdId']+ ": Spec Request: " + str(spec['spectrumInquiryRequest'][i]))
-    
-    #Send request to SAS server #contact SAS server
-    response = contactSAS(spec,"spectrumInquiry")
-    # response = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3585000000, 'lowFrequency': 3565000000 } } ], 'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0} } ] }                                                                                                       
-    conn.dbClose()
-    #   pass response to spectrum response
-    if response != False:
-        spectrumResponse(response.json())
-    # spectrumResponse(response)
+        for i in range(len(cbsd)):
+            logging.info(f"/////////////////////////SPECTRUM for {cbsd[i]['cbsdId']} \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+            #build json request for SAS
+            spec["spectrumInquiryRequest"].append(
+                {
+                    "cbsdId":cbsd[i]['cbsdId'],
+                    "inquiredSpectrum":[
+                        {
+                            "highFrequency":cbsd[i]['highFrequency'] * 1000000,
+                            "lowFrequency":cbsd[i]['lowFrequency']  * 1000000
+                            # "highFrequency":3700 * 1000000,
+                            # "lowFrequency":3590 * 1000000
+                        }
+                    ]
+                }
+            )
+            logging.info(spec['spectrumInquiryRequest'][i]['cbsdId']+ ": Spec Request: " + str(spec['spectrumInquiryRequest'][i]))
+        
+        #Send request to SAS server #contact SAS server
+        response = contactSAS(spec,"spectrumInquiry")
+        # response = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3585000000, 'lowFrequency': 3565000000 } } ], 'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0} } ] }                                                                                                       
+        conn.dbClose()
+        #   pass response to spectrum response
+        if response != False:
+            spectrumResponse(response.json())
+        # spectrumResponse(response)
+    else:
+        conn.dbClose()
 
 def regResponse(response):
     conn = dbConn("ACS_V1_1")
@@ -353,9 +357,37 @@ def regRequest():
             
         # response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
     else:
-        print("nothing")
         conn.dbClose()
     # regResponse(response)
+def deregistrationRequest():
+    conn = dbConn("ACS_V1_1")
+    cbsds = conn.select("SELECT * FROM dp_device_info WHERE sasStage = \'dereg\'")
+
+    #send deregistration
+    dereg = {"deregistrationRequest":[]}
+    for i in range(len(cbsds)):
+        #power off RF(How do I know if the CBSD turned off ADMIN_STATE check? do I still need to socket test?)
+        cbsdAction(cbsds[i]['SN'],"RF_OFF",str(datetime.now()))
+        #build json request for SAS
+        dereg["deregistrationRequest"].append(
+            {
+                "cbsdId":cbsds[i]['cbsdID'],
+            }
+        )
+    logging.info(f"\n\n\n\n\n DEREG: {dereg} \n\n\n\n")
+    
+    response = contactSAS(dereg,"deregistration")
+    logging.info(f"deregistartion response: {response}")
+    #check for grant ID
+    #cancel any grants
+def deregistrationResposne():
+    pass
+
+def grantRelinquishmentRequest():
+    #clear grant ID
+    pass
+def grantRelinquishmentResponse():
+    pass
 
 
 def errorModule(response):
@@ -448,14 +480,8 @@ def test():
         print(f"Heartbeat thread failed reason: {e}")
     runFlaskSever()
    
-        
-
-
 # start()
 test()
-
-
-
 
 # try:
 #     a_socket.connect(("192.168.4.5", 10500))

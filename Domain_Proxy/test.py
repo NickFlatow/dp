@@ -12,6 +12,7 @@ app.config['CORS_HEADER'] = 'Content-Type'
 import routes
 
 
+
 def runFlaskSever():
    # app.run(port = app.config["PORT"], use_reloader=False) 
    app.run(port = app.config["PORT"], use_reloader=False, host='0.0.0.0') 
