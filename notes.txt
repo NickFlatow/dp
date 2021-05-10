@@ -1,9 +1,0 @@
-#ssl dns issue
-
-/usr/lib64/python3.6/ssl.py
-1.) search "doesn't match" 
-2.) uncomment commented code
-3.) remove do nothing var
-
-
-
