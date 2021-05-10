@@ -21,6 +21,8 @@ logging.basicConfig(filename='app.log', format='%(asctime)s - %(message)s', leve
 # enter a test commit
 
 hbtimer = 0
+def test():
+    pass
 @app.route('/', methods=['GET'])
 def home():
     return"<h1>Domain Proxy</h1><p>test version</p>"
