@@ -17,6 +17,9 @@ from flask_cors import CORS, cross_origin
 
 logging.basicConfig(filename='app.log', format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
+
+#enter a test commit
+
 hbtimer = 0
 @app.route('/', methods=['GET'])
 def home():

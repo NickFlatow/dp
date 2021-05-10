@@ -1,0 +1,5 @@
+# Logs, databases and config files #
+######################
+*.log
+*.sql
+*.sqlite
