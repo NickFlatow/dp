@@ -27,7 +27,8 @@ def home():
 @app.route('/dp/v1/test', methods=['POST'])
 @cross_origin()
 def dp_test():
-    deregistrationRequest()
+    cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
+    # deregistrationRequest(('abc123', 'DCE994613163'))
     return "this"
     # testSN = request.args.get('key1')
     # # testSN = "regular test"
@@ -354,37 +355,52 @@ def regRequest():
         if response != False:
             regResponse(response.json())
 
-            
         # response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
     else:
         conn.dbClose()
     # regResponse(response)
-def deregistrationRequest():
+def deregistrationRequest(cbsds_SN = None):
     conn = dbConn("ACS_V1_1")
-    cbsds = conn.select("SELECT * FROM dp_device_info WHERE sasStage = \'dereg\'")
+
+    sql_select = "select * from dp_device_info where `SN` in "+ str(cbsds_SN) +";"
+    
+    # cbsd_db = conn.select("SELECT * FROM dp_device_info WHERE sasStage = \'dereg\'")
+    
+    cbsd_db = conn.select(sql_select)
+    conn.dbClose()
+    #check for grant ID
+    print(cbsd_db[i]["grantID"])
+    if cbsd_db[i]["grantID"] != None:
+        print("\n\n is null \n\n")
 
     #send deregistration
     dereg = {"deregistrationRequest":[]}
-    for i in range(len(cbsds)):
+    for i in range(len(cbsd_db)):
         #power off RF(How do I know if the CBSD turned off ADMIN_STATE check? do I still need to socket test?)
-        cbsdAction(cbsds[i]['SN'],"RF_OFF",str(datetime.now()))
+        cbsdAction(cbsd_db[i]['SN'],"RF_OFF",str(datetime.now()))
+
+            #reliunqish any grants
+
         #build json request for SAS
         dereg["deregistrationRequest"].append(
             {
-                "cbsdId":cbsds[i]['cbsdID'],
+                "cbsdId":cbsd_db[i]['cbsdID'],
             }
         )
     logging.info(f"\n\n\n\n\n DEREG: {dereg} \n\n\n\n")
     
     response = contactSAS(dereg,"deregistration")
+    
     logging.info(f"deregistartion response: {response}")
-    #check for grant ID
-    #cancel any grants
+
 def deregistrationResposne():
+    #check for response code > 0 
+    #log resposne to log file
     pass
 
 def grantRelinquishmentRequest():
-    #clear grant ID
+    #send relquisment
+    #set grant ID to NULL
     pass
 def grantRelinquishmentResponse():
     pass
