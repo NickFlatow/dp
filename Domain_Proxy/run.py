@@ -121,10 +121,10 @@ def heartbeatResponse(cbsd):
             conn.dbClose()
 
             #collect SN from dp_device_info where cbsdId = $cbsdid
-            if cbsd_db[i]['operationalState'] == 'GRANTED':
+            if cbsd_db[0]['operationalState'] == 'GRANTED':
                 print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
                 # turn on RF in cell
-                cbsdAction(cbsd_db[i]['SN'],"RF_ON",str(datetime.now()))
+                cbsdAction(cbsd_db[0]['SN'],"RF_ON",str(datetime.now()))
     
         else:
             #close database
@@ -495,7 +495,7 @@ def test():
         thread.start()
     except Exception as e:
         print(f"Heartbeat thread failed reason: {e}")
-    # runFlaskSever()
+    runFlaskSever()
    
 # start()
 test()
