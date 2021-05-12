@@ -29,12 +29,13 @@ def home():
 def dp_test():
     # cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
     # deregistrationRequest(('abc123','DCE994613163'))
-    # return "this"
-    testSN = request.args.get('key1')
-    deregistrationRequest()
-    # testSN = "regular test"
-    print("!!!!!!!!!!!!!!!!!!!!!\n" + testSN + "\n11111111111111111111\n")
-    return testSN
+    SNlist = request.form['json']
+    SN_json_dict = json.loads(SNlist)
+    deregistrationRequest(tuple(SN_json_dict.values()))
+
+    #     print("!!!!!!!!!!!!!!!!!!!!!\n" + val + "\n11111111111111111111\n")
+    
+    return SN_json_dict
 
 def contactSAS(request,method):
     # Function to contact the SAS server
@@ -361,14 +362,17 @@ def regRequest():
         conn.dbClose()
     # regResponse(response)
     # cbsds_SN = None
-def deregistrationRequest():
+def deregistrationRequest(cbsds_SN = None):
     conn = dbConn("ACS_V1_1")
 
-    # sql_select = "select * from dp_device_info where `SN` in "+ str(cbsds_SN) +";"
     
-    cbsd_db = conn.select("SELECT * FROM dp_device_info WHERE sasStage = \'dereg\'")
+    print(f"2222222222222222222222\n\n {cbsds_SN} \n\n2222222222222222222222222222222")
     
-    # cbsd_db = conn.select(sql_select)
+    sql_select = "select * from dp_device_info where `SN` in "+ str(cbsds_SN) +";"
+
+    # sql_select = "SELECT * FROM dp_device_info WHERE sasStage = \'dereg\'"
+    
+    cbsd_db = conn.select(sql_select)
     conn.dbClose()
     #check for grant ID
     # print(cbsd_db[i]["grantID"])
@@ -491,7 +495,7 @@ def test():
         thread.start()
     except Exception as e:
         print(f"Heartbeat thread failed reason: {e}")
-    runFlaskSever()
+    # runFlaskSever()
    
 # start()
 test()
