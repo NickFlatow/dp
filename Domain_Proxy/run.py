@@ -43,8 +43,8 @@ def contactSAS(request,method):
     # method - which method SAS you would like to contact registration, spectrum, grant, heartbeat 
     try:
         return requests.post(app.config['SAS']+method, 
-        cert=('certs/client.cert','certs/client.key'),
-        verify=('certs/ca.cert'),
+        cert=('/home/gtadmin/dp/Domain_Proxy/certs/client.cert','/home/gtadmin/dp/Domain_Proxy/certs/client.key'),
+        verify=('/home/gtadmin/dp/Domain_Proxy/certs/ca.cert'),
         json=request)
     except Exception as e:
         print(f"your connection has failed: {e}")
