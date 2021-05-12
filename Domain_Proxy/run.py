@@ -27,13 +27,14 @@ def home():
 @app.route('/dp/v1/test', methods=['POST'])
 @cross_origin()
 def dp_test():
-    cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
-    # deregistrationRequest(('abc123', 'DCE994613163'))
-    return "this"
-    # testSN = request.args.get('key1')
-    # # testSN = "regular test"
-    # print("!!!!!!!!!!!!!!!!!!!!!\n" + testSN + "11111111111111111111\n")
-    # return testSN
+    # cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
+    # deregistrationRequest(('abc123','DCE994613163'))
+    # return "this"
+    testSN = request.args.get('key1')
+    deregistrationRequest()
+    # testSN = "regular test"
+    print("!!!!!!!!!!!!!!!!!!!!!\n" + testSN + "\n11111111111111111111\n")
+    return testSN
 
 def contactSAS(request,method):
     # Function to contact the SAS server
@@ -359,19 +360,20 @@ def regRequest():
     else:
         conn.dbClose()
     # regResponse(response)
-def deregistrationRequest(cbsds_SN = None):
+    # cbsds_SN = None
+def deregistrationRequest():
     conn = dbConn("ACS_V1_1")
 
-    sql_select = "select * from dp_device_info where `SN` in "+ str(cbsds_SN) +";"
+    # sql_select = "select * from dp_device_info where `SN` in "+ str(cbsds_SN) +";"
     
-    # cbsd_db = conn.select("SELECT * FROM dp_device_info WHERE sasStage = \'dereg\'")
+    cbsd_db = conn.select("SELECT * FROM dp_device_info WHERE sasStage = \'dereg\'")
     
-    cbsd_db = conn.select(sql_select)
+    # cbsd_db = conn.select(sql_select)
     conn.dbClose()
     #check for grant ID
-    print(cbsd_db[i]["grantID"])
-    if cbsd_db[i]["grantID"] != None:
-        print("\n\n is null \n\n")
+    # print(cbsd_db[i]["grantID"])
+    # if cbsd_db[i]["grantID"] != None:
+    #     print("\n\n is null \n\n")
 
     #send deregistration
     dereg = {"deregistrationRequest":[]}
@@ -442,22 +444,17 @@ print(__name__)
 # while True:  
     # app.run(port = app.config["PORT"])
 
-        
-
     # cbsdAction("DCE994613163","RF_OFF",str(datetime.now()))
     # EARFCNtoMHZ([{'EARFCN':55240},{'EARFCN':55990},{'EARFCN':56739}])
     
-
-
     #Convert EARFCN into hz
 def registration():
     while True:
-        # EARFCNtoMHZ()
+        EARFCNtoMHZ()
         print("registartion")
         regRequest()
         spectrumRequest()
         grantRequest()
-
         time.sleep(4)
 def heartbeat():
         while True:
