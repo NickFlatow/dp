@@ -46,11 +46,17 @@ class dbConn():
                 logging.debug(e)
             finally:
                 self.cursor.close()
-    def getSasStage(self, params=None):
-        self.cursor = self.conn.cursor()
-        sql = 'SELECT sasStage from dp_device_info where SN = %s'
-        cursor.execute(sql, cbsd)
-
+    def updateSasStage(self,sasStage,cbsds_SN_list):
+            self.cursor = self.conn.cursor()
+            sql = "UPDATE `dp_device_info` SET `sasStage` = \'" +sasStage+ "\' WHERE SN IN ({})".format(','.join(['%s'] * len(cbsds_SN_list)))
+            logging.debug("SQL COMMAND: " + sql + " cbsd list: " +  str(cbsds_SN_list))
+            try:
+                self.cursor.execute(sql,cbsds_SN_list)
+                self.conn.commit()
+            except Exception as e:
+                logging.debug(e)
+            finally:
+                self.cursor.close()
     def setSasStage(self, cbsd):
         pass
 

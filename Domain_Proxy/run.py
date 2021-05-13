@@ -33,7 +33,10 @@ def dp_register():
     # print(f"{request.form['json']}")
     SNlist = request.form['json']
     SN_json_dict = json.loads(SNlist)
-    regRequest(tuple(SN_json_dict.values()))
+    logging.info(f"{SN_json_dict.values()}")
+    SN_json_list = ",".join( map(str,SN_json_dict.values() ) )
+    logging.info(f"{SN_json_list}")
+    regRequest(list(SN_json_dict.values()))
 
     # for val in SN_json_dict.values():
     #     print("!!!!!!!!!!!!!!!!!!!!!\n" + val + "\n11111111111111111111\n")
@@ -357,7 +360,6 @@ def regRequest(cbsds_SN = None):
         reg = {"registrationRequest":[]}
         
         for i in range(len(row)):
-            # logging.info(f"/////////////////////////REGISTRATION for {row[i]['SN']} \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
             reg['registrationRequest'].append(
                     {
                         "cbsdSerialNumber": str(row[i]["SN"]),
@@ -366,8 +368,6 @@ def regRequest(cbsds_SN = None):
                         "userId": str(row[i]["userID"])
                     }
             )
-            # logging.info(row[i]["SN"]+ ": Reg Request: " + str(reg['registrationRequest'][i]))
-
         logger.log_json(reg,len(row))
         response = contactSAS(reg,"registration")
         
@@ -379,11 +379,10 @@ def regRequest(cbsds_SN = None):
         pass
 def deregistrationRequest(cbsds_SN = None):
 
+    #send relinquishment
+    grantRelinquishmentRequest(cbsds_SN)
+
     cbsd_db = query_update(cbsds_SN,'dereg')
-    #check for grant ID
-    # print(cbsd_db[i]["grantID"])
-    # if cbsd_db[i]["grantID"] != None:
-    #     print("\n\n is null \n\n")
 
     #send deregistration
     dereg = {"deregistrationRequest":[]}
@@ -391,7 +390,6 @@ def deregistrationRequest(cbsds_SN = None):
         #power off RF(How do I know if the CBSD turned off ADMIN_STATE check? do I still need to socket test?)
         cbsdAction(cbsd_db[i]['SN'],"RF_OFF",str(datetime.now()))
 
-        #reliunqish any grants
 
         #build json request for SAS
         dereg["deregistrationRequest"].append(
@@ -406,29 +404,66 @@ def deregistrationRequest(cbsds_SN = None):
 def deregistrationResposne(response):
     logger.log_json(response,(len(response['deregistrationResponse'])))
 
-    for i in range(len(response['registrationResponse'])):
-        if response['registrationResponse'][i]['response']['responseCode'] == 0: 
+    for i in range(len(response['deregistrationResponse'])):
+        if response['deregistrationResponse'][i]['response']['responseCode'] == 0: 
             pass
             #do nothing
         else:
-            errorModule(response['registrationResponse'][i])
+            errorModule(response['deregistrationResponse'][i])
 
-def grantRelinquishmentRequest():
-    #send relquisment
-    #set grant ID to NULL
-    pass
-def grantRelinquishmentResponse():
-    pass
-
-
-def query_update(cbsds_SN_list, sasStage):
+def grantRelinquishmentRequest(cbsd_SN_list):
+    #select all cbsds looking to have grant relinquished
+    cbsds = query_update(cbsd_SN_list,'relinquish')
+    
+    #build reliquishment array
+    relinquish = {"relinquishmentRequest":[]}
+    for cbsd in cbsds:
+        # print(cbsd['userID'])
+        relinquish["relinquishmentRequest"].append(
+            {
+                "cbsdId":cbsd['cbsdID'],
+                "grantId":cbsd['grantID']
+            }
+        )
+    
+    logger.log_json(relinquish,len(cbsds))
+    
+    #set grant IDs to NULL
     conn = dbConn("ACS_V1_1")
-    sql_select = "select * from dp_device_info where `SN` in "+ str(cbsds_SN_list) +";"
-    rows = conn.select(sql_select)
-    sql_update = "UPDATE dp_device_info SET sasStage = %s WHERE SN in" + str(cbsds_SN_list) +";"
-    conn.update(sql_update,sasStage)
+    update_grantID = "UPDATE dp_device_info SET grantID = NULL WHERE SN in" + str(cbsd_SN_list) + ";"
+    
+    logging.info(f"\n grant ID = NULL: {update_grantID} ")
+    conn.update(update_grantID)
+    conn.dbClose()
+    
+    
+    #send request to SAS
+    response = contactSAS(relinquish,"relinquishment")
+    
+    #process reponse
+    if response != False:
+        grantRelinquishmentResponse(response.json())
+
+
+def grantRelinquishmentResponse(response):
+    logger.log_json(response,(len(response['relinquishmentResponse'])))
+
+    for i in range(len(response['relinquishmentResponse'])):
+        if response['relinquishmentResponse'][i]['response']['responseCode'] == 0: 
+            pass
+            #do nothing
+        else:
+            errorModule(response['relinquishmentResponse'][i])
+
+def query_update(cbsds_SN_list,sasStage):
+    conn = dbConn("ACS_V1_1")
+    sql_select = 'SELECT * FROM dp_device_info WHERE SN IN ({})'.format(','.join(['%s'] * len(cbsds_SN_list)))
+    rows = conn.select(sql_select,cbsds_SN_list)
+    print(rows)
+    conn.updateSasStage(sasStage,cbsds_SN_list)
     conn.dbClose()
     return rows
+    
 
 def errorModule(response):
     #TODO check for operational params
@@ -500,11 +535,22 @@ def start():
         print(f"Heartbeat thread failed reason: {e}")
     runFlaskSever()
 def test():
-    # SNlist = {"SN1":"DCE994613163","SN2":"abc123"}
-    # SN_json_dict = json.loads(SNlist)
-    # regRequest(("DCE994613163","abc123"))
-    response = {'deregistrationRequest': [{'cbsdId': 'FoxconnMock-SASabc123'}, {'cbsdId': 'FoxconnMock-SASDCE994613163'}]}
-    deregistrationResposne(response)
+    lst = ['DCE994613163','abc123']
+    print(lst)
+    # query_update(lst)
+    sasStage = 'spec'
+    sql = "UPDATE `dp_device_info` SET `sasStage` = \'" +sasStage+ "\' WHERE SN IN ({})".format(','.join(['%s'] * len(lst)))
+    
+    # sql = "UPDATE `dp_device_info` SET `sasStage` = 'dereg' where `cbsdID` = 'FoxconnMock-SASDCE994613163'"
+    # grantRelinquishmentRequest(lst)
+    conn = dbConn("ACS_V1_1")
+    # query = 'SELECT * FROM dp_device_info WHERE SN IN ({})'.format(','.join(['%s'] * len(lst)))
+    # print(query)
+    a = conn.update(sql,lst)
+    print(a)
+    # grantRelinquishmentRequest(lst)
+
+
 start()
 # test()
 
