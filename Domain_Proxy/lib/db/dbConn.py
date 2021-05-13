@@ -23,7 +23,7 @@ class dbConn():
 
     def select(self, sql, params=None):
         self.cursor = self.conn.cursor()
-        logging.info("SQL COMMAND: " + sql + " params: " +  str(params))
+        logging.debug("SQL COMMAND: " + sql + " params: " +  str(params))
         try:
             if params:
                 self.cursor.execute(sql, params)
@@ -35,7 +35,7 @@ class dbConn():
         return result
     def update(self, sql, params=None):
             self.cursor = self.conn.cursor()
-            logging.info("SQL COMMAND: " + sql + " params: " +  str(params))
+            logging.debug("SQL COMMAND: " + sql + " params: " +  str(params))
             try:
                 if params:
                     self.cursor.execute(sql, params)
@@ -43,7 +43,7 @@ class dbConn():
                     self.cursor.execute(sql)
                 self.conn.commit()
             except Exception as e:
-                logging.info(e)
+                logging.debug(e)
             finally:
                 self.cursor.close()
     def getSasStage(self, params=None):

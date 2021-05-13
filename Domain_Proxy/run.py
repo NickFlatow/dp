@@ -1,6 +1,7 @@
 import requests
 import sys
 from lib.db.dbConn import dbConn
+from lib.log.log import logger
 from test import app, runFlaskSever
 import json
 import flask
@@ -14,9 +15,8 @@ import socket
 import threading
 from flask_cors import CORS, cross_origin
 
-logging.basicConfig(filename='app.log', format='%(asctime)s - %(message)s', level=logging.DEBUG)
-
-
+#init log class
+logger = logger()
 hbtimer = 0
 def test():
     pass
@@ -58,6 +58,7 @@ def contactSAS(request,method):
     # Function to contact the SAS server
     # request - json array to pass to SAS
     # method - which method SAS you would like to contact registration, spectrum, grant, heartbeat 
+    # logger.info(f"{app.config['SAS']}  {method}")
     try:
         return requests.post(app.config['SAS']+method, 
         cert=('/home/gtadmin/dp/Domain_Proxy/certs/client.cert','/home/gtadmin/dp/Domain_Proxy/certs/client.key'),
@@ -100,10 +101,10 @@ def EARFCNtoMHZ():
     conn.dbClose()
 
 def cbsdAction(cbsdSN,action,time):
-    logging.info("Triggering CBSD action")
+    logging.critical("Triggering CBSD action")
     conn = dbConn("ACS_V1_1")
     sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+cbsdSN+"\',\'"+action+"\',\'"+time+"\')"
-    logging.info(cbsdSN + " : SQL cmd " + sql_action)
+    logging.critical(cbsdSN + " : SQL cmd " + sql_action)
     conn.update(sql_action)
     conn.dbClose()
 
@@ -111,6 +112,9 @@ def heartbeatResponse(cbsd):
     # cbsd is the response from the SAS for the preceding heartbeat request
 
     print("hb response")
+
+    #add cbsd heartbeat response to log file
+    logger.log_json(cbsd,len(cbsd['heartbeatResponse']))
     for i in range(len(cbsd['heartbeatResponse'])):
         #Make connection to ACS_V1_1 database
         conn = dbConn("ACS_V1_1")
@@ -118,8 +122,8 @@ def heartbeatResponse(cbsd):
         #select everything from the database where cbsdID = cbsdId from heartbeat response
         cbsd_db = conn.select(sql_select_all,cbsd['heartbeatResponse'][i]['cbsdId'])
         
-        #add cbsd heartbeat response to log file
-        logging.info(cbsd['heartbeatResponse'][i]['cbsdId'] + ": Heartbeat Response : " + str(cbsd['heartbeatResponse'][i]))
+        
+        
         
         #TODO WHAT IF NEW OPERATIONAL PARAMS(HANDLE THIS IN ERROR HANDLE MODULE)
 
@@ -167,10 +171,7 @@ def heartbeatRequest():
                         "operationState":cbsd[i]['operationalState']
                     }
                 )
-            logging.info(heartbeat['heartbeatRequest'][i]['cbsdId']+ ": Heartbeat Request: " + str(heartbeat['heartbeatRequest'][i]))
-
-        # logging.info("REQUEST FROM heartbeat: " + str(heartbeat))
-        print("before")
+        logger.log_json(heartbeat,len(cbsd))
         
         response = contactSAS(heartbeat,"heartbeat")
         conn.dbClose()
@@ -183,10 +184,13 @@ def grantResponse(cbsd):
     #Make connection to ACS_V1_1 database
     conn = dbConn("ACS_V1_1")
     print("grant response")
-    for i in range(len(cbsd['grantResponse'])):
-        logging.info(cbsd['grantResponse'][i]['cbsdId'] + ": Grant Response : " + str(cbsd['grantResponse'][i]))
-        #Check if responseCode is > 0 
 
+    #log reponse
+    logger.log_json(cbsd,len(cbsd['grantResponse']))
+
+    for i in range(len(cbsd['grantResponse'])):
+        
+        #Check if responseCode is > 0 
         if cbsd['grantResponse'][i]['response']['responseCode'] == 0: 
             #TODO Check for measurement Report
 
@@ -195,13 +199,6 @@ def grantResponse(cbsd):
 
             conn.update(sql_update,(cbsd['grantResponse'][i]['grantId'],cbsd['grantResponse'][i]['grantExpireTime'],cbsd['grantResponse'][i]['cbsdId']))
             # sql_device_info_update = "update `dp_device_info` SET sasStage = 'heartbeat' where cbsdID= \'" + cbsd['grantResponse'][i]['cbsdId'] +"\'"
-
-            # try:
-            #     # print(sql)
-            #     conn.cursor.execute(sql_heartbeat_update)
-            #     conn.cursor.execute(sql_device_info_update)
-            # except Exception as e:
-            #     print(e)
         else:
             errorModule(response['grantResponse'][i])
     #close db connection s
@@ -217,6 +214,7 @@ def grantRequest():
     #select eveything where sasStage = grant
     sql_select = "select * from dp_device_info WHERE sasStage = \'grant\'"
     cbsd = conn.select(sql_select)
+    conn.dbClose()
 
     if cbsd != ():
         grant = {"grantRequest":[]}
@@ -235,28 +233,24 @@ def grantRequest():
                         }
                     }
                 )
-            logging.info(grant['grantRequest'][i]['cbsdId']+ ": Grant Request: " + str(grant['grantRequest'][i]))
-
-
-
-        # logging.info("REQUEST FROM GRANT: " + str(grant))
-        # print(grant)
+        logger.log_json(grant,len(cbsd))
         response = contactSAS(grant,"grant")
-        conn.dbClose()
+       
         if response != False:
             grantResponse(response.json())
         # logging.info("RESPONSE FROM grant REQUEST:" + response.json() )
     else:
-        conn.dbClose()
+        pass
 
 
 def spectrumResponse(response):
     #make connection to domain proxy db
     conn = dbConn("ACS_V1_1")
     #for each resposne in resposne array
+    logger.log_json(response,len(response['spectrumInquiryResponse']))
     for i in range(len(response['spectrumInquiryResponse'])):
         
-        logging.info(response['spectrumInquiryResponse'][i]['cbsdId'] + ": Spec Response : " + str(response['spectrumInquiryResponse'][i]))
+        # logging.info(response['spectrumInquiryResponse'][i]['cbsdId'] + ": Spec Response : " + str(response['spectrumInquiryResponse'][i]))
         
         if response['spectrumInquiryResponse'][i]['response']['responseCode'] == 0:
             # if high frequcy and low frequcy match value(convert to hz) for cbsdId in database then move to next
@@ -298,7 +292,7 @@ def spectrumRequest():
         spec = {"spectrumInquiryRequest":[]}
 
         for i in range(len(cbsd)):
-            logging.info(f"/////////////////////////SPECTRUM for {cbsd[i]['cbsdId']} \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+            # logging.info(f"/////////////////////////SPECTRUM for {cbsd[i]['cbsdId']} \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
             #build json request for SAS
             spec["spectrumInquiryRequest"].append(
                 {
@@ -313,8 +307,8 @@ def spectrumRequest():
                     ]
                 }
             )
-            logging.info(spec['spectrumInquiryRequest'][i]['cbsdId']+ ": Spec Request: " + str(spec['spectrumInquiryRequest'][i]))
-        
+            # logging.info(spec['spectrumInquiryRequest'][i]['cbsdId']+ ": Spec Request: " + str(spec['spectrumInquiryRequest'][i]))
+        logger.log_json(spec,len(cbsd))
         #Send request to SAS server #contact SAS server
         response = contactSAS(spec,"spectrumInquiry")
         # response = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3585000000, 'lowFrequency': 3565000000 } } ], 'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0} } ] }                                                                                                       
@@ -332,7 +326,8 @@ def regResponse(response):
     row = conn.select(sql)
 
     for i in range(len(response['registrationResponse'])):
-        logging.info(row[i]["SN"] + ": REG Response : " + str(response['registrationResponse'][i]))
+        logger.log_json(response,(len(response['registrationResponse'])))
+        # logging.info(row[i]["SN"] + ": REG Response : " + str(response['registrationResponse'][i]))
         
         #If there are no errors 
         if response['registrationResponse'][i]['response']['responseCode'] == 0: 
@@ -362,7 +357,7 @@ def regRequest(cbsds_SN = None):
         reg = {"registrationRequest":[]}
         
         for i in range(len(row)):
-            logging.info(f"/////////////////////////REGISTRATION for {row[i]['SN']} \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+            # logging.info(f"/////////////////////////REGISTRATION for {row[i]['SN']} \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
             reg['registrationRequest'].append(
                     {
                         "cbsdSerialNumber": str(row[i]["SN"]),
@@ -371,8 +366,9 @@ def regRequest(cbsds_SN = None):
                         "userId": str(row[i]["userID"])
                     }
             )
-            logging.info(row[i]["SN"]+ ": Reg Request: " + str(reg['registrationRequest'][i]))
-    
+            # logging.info(row[i]["SN"]+ ": Reg Request: " + str(reg['registrationRequest'][i]))
+
+        logger.log_json(reg,len(row))
         response = contactSAS(reg,"registration")
         
         if response != False:
@@ -381,9 +377,6 @@ def regRequest(cbsds_SN = None):
         # response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
     else:
         pass
-        # conn.dbClose()
-    # regResponse(response)
-    # cbsds_SN = None
 def deregistrationRequest(cbsds_SN = None):
 
     cbsd_db = query_update(cbsds_SN,'dereg')
@@ -406,16 +399,19 @@ def deregistrationRequest(cbsds_SN = None):
                 "cbsdId":cbsd_db[i]['cbsdID'],
             }
         )
-    logging.info(f"\n\n\n\n\n DEREG: {dereg} \n\n\n\n")
-    
+    logger.log_json(dereg,len(cbsd_db))
     response = contactSAS(dereg,"deregistration")
-    
-    logging.info(f"deregistartion response: {response}")
+    deregistrationResposne(response.json())
 
-def deregistrationResposne():
-    #check for response code > 0 
-    #log resposne to log file
-    pass
+def deregistrationResposne(response):
+    logger.log_json(response,(len(response['deregistrationResponse'])))
+
+    for i in range(len(response['registrationResponse'])):
+        if response['registrationResponse'][i]['response']['responseCode'] == 0: 
+            pass
+            #do nothing
+        else:
+            errorModule(response['registrationResponse'][i])
 
 def grantRelinquishmentRequest():
     #send relquisment
@@ -506,7 +502,9 @@ def start():
 def test():
     # SNlist = {"SN1":"DCE994613163","SN2":"abc123"}
     # SN_json_dict = json.loads(SNlist)
-    regRequest(("DCE994613163","abc123"))
+    # regRequest(("DCE994613163","abc123"))
+    response = {'deregistrationRequest': [{'cbsdId': 'FoxconnMock-SASabc123'}, {'cbsdId': 'FoxconnMock-SASDCE994613163'}]}
+    deregistrationResposne(response)
 start()
 # test()
 
