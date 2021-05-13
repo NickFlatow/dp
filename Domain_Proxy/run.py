@@ -15,7 +15,7 @@ import threading
 from flask_cors import CORS, cross_origin
 
 logging.basicConfig(filename='app.log', format='%(asctime)s - %(message)s', level=logging.DEBUG)
-# enter a test commit
+
 
 hbtimer = 0
 def test():
@@ -24,11 +24,28 @@ def test():
 def home():
     return"<h1>Domain Proxy</h1><p>test version</p>"
 
+
+@app.route('/dp/v1/register', methods=['POST'])
+@cross_origin()
+def dp_register():
+    # cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
+    # deregistrationRequest(('abc123','DCE994613163'))
+    # print(f"{request.form['json']}")
+    SNlist = request.form['json']
+    SN_json_dict = json.loads(SNlist)
+    regRequest(tuple(SN_json_dict.values()))
+
+    # for val in SN_json_dict.values():
+    #     print("!!!!!!!!!!!!!!!!!!!!!\n" + val + "\n11111111111111111111\n")
+        
+    return SN_json_dict
+
 @app.route('/dp/v1/test', methods=['POST'])
 @cross_origin()
 def dp_test():
     # cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
     # deregistrationRequest(('abc123','DCE994613163'))
+    
     SNlist = request.form['json']
     SN_json_dict = json.loads(SNlist)
     deregistrationRequest(tuple(SN_json_dict.values()))
@@ -330,14 +347,18 @@ def regResponse(response):
     #close db connection
     conn.dbClose()
     
-def regRequest():
-    # COLLECT ALL DEVICES LOOKING TO BE REGISTERED
-    conn = dbConn("ACS_V1_1")
-    sql = 'SELECT * FROM dp_device_info where sasStage = \'reg\''
-    row = conn.select(sql)
+def regRequest(cbsds_SN = None):
+    
+    if cbsds_SN:
+        row = query_update(cbsds_SN, 'reg')
+
+    else:
+        conn = dbConn("ACS_V1_1")
+        sql = 'SELECT * FROM dp_device_info where sasStage = \'reg\''
+        row = conn.select(sql)
+        conn.dbClose()
 
     if row != ():
-        #TODO what if there are no rows with sasStage = reg
         reg = {"registrationRequest":[]}
         
         for i in range(len(row)):
@@ -353,27 +374,19 @@ def regRequest():
             logging.info(row[i]["SN"]+ ": Reg Request: " + str(reg['registrationRequest'][i]))
     
         response = contactSAS(reg,"registration")
-        conn.dbClose()
+        
         if response != False:
             regResponse(response.json())
 
         # response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
     else:
-        conn.dbClose()
+        pass
+        # conn.dbClose()
     # regResponse(response)
     # cbsds_SN = None
 def deregistrationRequest(cbsds_SN = None):
-    conn = dbConn("ACS_V1_1")
 
-    
-    print(f"2222222222222222222222\n\n {cbsds_SN} \n\n2222222222222222222222222222222")
-    
-    sql_select = "select * from dp_device_info where `SN` in "+ str(cbsds_SN) +";"
-
-    # sql_select = "SELECT * FROM dp_device_info WHERE sasStage = \'dereg\'"
-    
-    cbsd_db = conn.select(sql_select)
-    conn.dbClose()
+    cbsd_db = query_update(cbsds_SN,'dereg')
     #check for grant ID
     # print(cbsd_db[i]["grantID"])
     # if cbsd_db[i]["grantID"] != None:
@@ -385,7 +398,7 @@ def deregistrationRequest(cbsds_SN = None):
         #power off RF(How do I know if the CBSD turned off ADMIN_STATE check? do I still need to socket test?)
         cbsdAction(cbsd_db[i]['SN'],"RF_OFF",str(datetime.now()))
 
-            #reliunqish any grants
+        #reliunqish any grants
 
         #build json request for SAS
         dereg["deregistrationRequest"].append(
@@ -411,6 +424,15 @@ def grantRelinquishmentRequest():
 def grantRelinquishmentResponse():
     pass
 
+
+def query_update(cbsds_SN_list, sasStage):
+    conn = dbConn("ACS_V1_1")
+    sql_select = "select * from dp_device_info where `SN` in "+ str(cbsds_SN_list) +";"
+    rows = conn.select(sql_select)
+    sql_update = "UPDATE dp_device_info SET sasStage = %s WHERE SN in" + str(cbsds_SN_list) +";"
+    conn.update(sql_update,sasStage)
+    conn.dbClose()
+    return rows
 
 def errorModule(response):
     #TODO check for operational params
@@ -459,7 +481,7 @@ def registration():
         regRequest()
         spectrumRequest()
         grantRequest()
-        time.sleep(4)
+        time.sleep(10)
 def heartbeat():
         while True:
             print("heartbeat")
@@ -468,21 +490,6 @@ def heartbeat():
             #TODO reliquishment()
             time.sleep(4)    
 def start():
-    while True:
-        EARFCNtoMHZ()
-        if regRequest() != False:
-            try:
-                #if using args a comma for tuple is needed 
-                thread = threading.Thread(target=heartbeat, args=())
-                thread.start()
-            except Exception as e:
-                print("Connection failed reason:")
-            # while True:
-            #     heartbeatRequest()
-            #     time.sleep(5)
-        else:
-            time.sleep(15)
-def test():
     try:
         #if using args a comma for tuple is needed 
         thread = threading.Thread(target=registration, args=())
@@ -496,9 +503,12 @@ def test():
     except Exception as e:
         print(f"Heartbeat thread failed reason: {e}")
     runFlaskSever()
-   
-# start()
-test()
+def test():
+    # SNlist = {"SN1":"DCE994613163","SN2":"abc123"}
+    # SN_json_dict = json.loads(SNlist)
+    regRequest(("DCE994613163","abc123"))
+start()
+# test()
 
 # try:
 #     a_socket.connect(("192.168.4.5", 10500))

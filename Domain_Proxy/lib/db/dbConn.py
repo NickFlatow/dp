@@ -46,7 +46,7 @@ class dbConn():
                 logging.info(e)
             finally:
                 self.cursor.close()
-    def getSasStage(self, cbsd):
+    def getSasStage(self, params=None):
         self.cursor = self.conn.cursor()
         sql = 'SELECT sasStage from dp_device_info where SN = %s'
         cursor.execute(sql, cbsd)
