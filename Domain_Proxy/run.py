@@ -1,7 +1,9 @@
+from Domain_Proxy.lib.error.error import error_test
 import requests
 import sys
 from lib.db.dbConn import dbConn
 from lib.log.log import logger
+import lib.error.error
 from test import app, runFlaskSever
 import json
 import flask
@@ -18,6 +20,8 @@ from flask_cors import CORS, cross_origin
 #init log class
 logger = logger()
 hbtimer = 0
+
+print(error_test())
 def test():
     pass
 @app.route('/', methods=['GET'])
@@ -28,18 +32,17 @@ def home():
 @app.route('/dp/v1/register', methods=['POST'])
 @cross_origin()
 def dp_register():
-    # cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
-    # deregistrationRequest(('abc123','DCE994613163'))
-    # print(f"{request.form['json']}")
-    SNlist = request.form['json']
-    SN_json_dict = json.loads(SNlist)
-    logging.info(f"{SN_json_dict.values()}")
-    SN_json_list = ",".join( map(str,SN_json_dict.values() ) )
-    logging.info(f"{SN_json_list}")
-    regRequest(list(SN_json_dict.values()))
 
-    # for val in SN_json_dict.values():
-    #     print("!!!!!!!!!!!!!!!!!!!!!\n" + val + "\n11111111111111111111\n")
+    #get cbsds from FeMS
+    SNlist = request.form['json']
+    print(f"this ist the test: {type(SNlist)}")
+    #convert to json
+    SN_json_dict = json.loads(SNlist)
+
+    # SN_json_list = ",".join( map(str,SN_json_dict.values() ) )
+    
+    #convert to list then send to regRequest
+    regRequest(list(SN_json_dict.values()))
         
     return SN_json_dict
 
@@ -124,8 +127,6 @@ def heartbeatResponse(cbsd):
         sql_select_all = "SELECT * FROM dp_device_info WHERE cbsdID = %s"
         #select everything from the database where cbsdID = cbsdId from heartbeat response
         cbsd_db = conn.select(sql_select_all,cbsd['heartbeatResponse'][i]['cbsdId'])
-        
-        
         
         
         #TODO WHAT IF NEW OPERATIONAL PARAMS(HANDLE THIS IN ERROR HANDLE MODULE)
@@ -295,7 +296,6 @@ def spectrumRequest():
         spec = {"spectrumInquiryRequest":[]}
 
         for i in range(len(cbsd)):
-            # logging.info(f"/////////////////////////SPECTRUM for {cbsd[i]['cbsdId']} \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
             #build json request for SAS
             spec["spectrumInquiryRequest"].append(
                 {
@@ -310,7 +310,6 @@ def spectrumRequest():
                     ]
                 }
             )
-            # logging.info(spec['spectrumInquiryRequest'][i]['cbsdId']+ ": Spec Request: " + str(spec['spectrumInquiryRequest'][i]))
         logger.log_json(spec,len(cbsd))
         #Send request to SAS server #contact SAS server
         response = contactSAS(spec,"spectrumInquiry")
@@ -390,7 +389,6 @@ def deregistrationRequest(cbsds_SN = None):
         #power off RF(How do I know if the CBSD turned off ADMIN_STATE check? do I still need to socket test?)
         cbsdAction(cbsd_db[i]['SN'],"RF_OFF",str(datetime.now()))
 
-
         #build json request for SAS
         dereg["deregistrationRequest"].append(
             {
@@ -412,7 +410,7 @@ def deregistrationResposne(response):
             errorModule(response['deregistrationResponse'][i])
 
 def grantRelinquishmentRequest(cbsd_SN_list):
-    #select all cbsds looking to have grant relinquished
+    #select all cbsds looking to have grant relinquished and updatea their status
     cbsds = query_update(cbsd_SN_list,'relinquish')
     
     #build reliquishment array
