@@ -1,8 +1,16 @@
 import logging
-# logging.basicConfig(filename='/tmp/dp_logs/dp.log', format='%(asctime)s - %(message)s', level=logging.DEBUG)
-logging.basicConfig(filename='/tmp/dp_logs/dp.log', format='%(message)s', level=logging.DEBUG)
 import json
 from datetime import datetime
+
+# logging.basicConfig(filename='/tmp/dp_logs/dp.log', format='%(asctime)s - %(message)s', level=logging.DEBUG)
+logging.basicConfig(filename='/tmp/dp_logs/dp.log', format='%(message)s', level=logging.DEBUG)
+
+#Test messages
+# logger.debug("Harmless debug Message")
+# logger.info("Just an information")
+# logger.warning("Its a Warning")
+# logger.error("Did you try to divide by zero")
+# logger.critical("Internet is down")
 
 
 class logger():
@@ -12,12 +20,7 @@ class logger():
         #Setting the threshold of logger to DEBUG
         self.logger.setLevel(logging.INFO)
 
-        # #Test messages
-        # logger.debug("Harmless debug Message")
-        # logger.info("Just an information")
-        # logger.warning("Its a Warning")
-        # logger.error("Did you try to divide by zero")
-        # logger.critical("Internet is down")
+ 
     def log_json(self,json_array,cbsds=None):
         # parsed_json = json.loads(json_array)
         self.logger.info(f"timestamp: {datetime.now()} UTC timestamp: {datetime.utcnow()}")

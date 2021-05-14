@@ -1,9 +1,8 @@
-from Domain_Proxy.lib.error.error import error_test
 import requests
 import sys
-from lib.db.dbConn import dbConn
-from lib.log.log import logger
-import lib.error.error
+from lib.dbConn import dbConn
+from lib.log import logger
+from lib import error
 from test import app, runFlaskSever
 import json
 import flask
@@ -21,7 +20,7 @@ from flask_cors import CORS, cross_origin
 logger = logger()
 hbtimer = 0
 
-print(error_test())
+
 def test():
     pass
 @app.route('/', methods=['GET'])
@@ -505,6 +504,7 @@ print(__name__)
     #Convert EARFCN into hz
 def registration():
     while True:
+        print(error.error_test())
         EARFCNtoMHZ()
         print("registartion")
         regRequest()
