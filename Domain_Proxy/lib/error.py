@@ -1,6 +1,6 @@
 def errorModule(reponseDict):
     pass
-    #error_response is a list of key value pairs where the key is the cbsdsn and the value is the numeric response code
+    #error_response is a list of key value pairs where the key is the cbsdsn and the value is the  resposne json
     
     #((CBSDSN, {resposne:{responseCode:200,responseMessage:"this is some thing"}}),(CBSDSN, {resposne .....}))
 

@@ -343,13 +343,13 @@ def regResponse(response):
             conn.update(sqlUpdate)
         else:
             pass
-            #errorDict[row[i]["SN"]] = error=code
-            
+            #errorDict[row[i]["SN"]] = error_code
+        
     #if mydict:
-        # error.errorModule(response['registrationResponse'][i])
+        # error.errorModule(errorDict)
     #close db connection
     conn.dbClose()
-    
+
 def regRequest(cbsds_SN = None):
     
     if cbsds_SN:
@@ -459,6 +459,12 @@ def grantRelinquishmentResponse(response):
         else:
             pass
             # error.errorModule(response['relinquishmentResponse'][i])
+
+
+def getResponseType(sasStage):
+    if sasStage == 'reg':
+        return 'registartionResponse'
+
 
 def query_update(cbsds_SN_list,sasStage):
     conn = dbConn("ACS_V1_1")
