@@ -215,38 +215,7 @@ def spectrumRequest():
     else:
         conn.dbClose()
 
-<<<<<<< HEAD
-def regResponse(response):
-    conn = dbConn("ACS_V1_1")
-    sql = 'SELECT SN,cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = \'reg\''
-    row = conn.select(sql)
-    #errorDict = {}
-
-    for i in range(len(response['registrationResponse'])):
-        logger.log_json(response,(len(response['registrationResponse'])))
-        # logging.info(row[i]["SN"] + ": REG Response : " + str(response['registrationResponse'][i]))
-        
-        #If there are no errors 
-        #error_code = response['registrationResponse'][i]['response']['responseCode']
-        #if error_code = 0
-        if response['registrationResponse'][i]['response']['responseCode'] == 0: 
-            #TODO Check for measurement Report
-
-            #Update cbsdID, SAS_STAGE in device info table
-            sqlUpdate = "UPDATE `dp_device_info` SET cbsdID=\""+response['registrationResponse'][i]['cbsdId']+"\",sasStage=\"spectrum\" WHERE SN=\'"+row[i]["SN"]+"\'"
-            conn.update(sqlUpdate)
-        else:
-            pass
-            #errorDict[row[i]["SN"]] = error_code
-        
-    #if mydict:
-        # error.errorModule(errorDict)
-    #close db connection
-    conn.dbClose()
-
-=======
     
->>>>>>> structure
 def regRequest(cbsds_SN = None):
     
     if cbsds_SN:
