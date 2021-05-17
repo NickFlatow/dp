@@ -1,2 +1,7 @@
 #program constants
-SPECTRUM = 'spectrum'
+REG = 'registration'
+SPECTRUM = 'spectrumInquiry'
+GRANT = 'grant'
+HEART = 'heartbeat'
+DEREG = 'deregistration'
+REL = 'relinquishment'
