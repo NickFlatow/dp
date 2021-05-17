@@ -3,6 +3,7 @@ import sys
 from lib.dbConn import dbConn
 from lib.log import logger
 from lib import error
+from lib import sasResponseHandler
 from test import app, runFlaskSever
 import json
 import flask
@@ -14,6 +15,7 @@ from datetime import timedelta
 import logging
 import socket
 import threading
+import lib.consts as consts
 from flask_cors import CORS, cross_origin
 
 #init log class
@@ -78,8 +80,8 @@ def EARFCNtoMHZ():
     # mhz plus 6 zeros
 
     conn = dbConn("ACS_V1_1")
-    sql = 'SELECT SN,cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = \'reg\''
-    response = conn.select(sql)
+    sql = 'SELECT SN,cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = %s'
+    response = conn.select(sql,consts.REG)
 
     for i in range(len(response)):
         logging.info("////////////////////////////////EARFCN CONVERTION "+ response[i]['SN']+"\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
@@ -114,49 +116,6 @@ def cbsdAction(cbsdSN,action,time):
     conn.update(sql_action)
     conn.dbClose()
 
-def heartbeatResponse(response):
-    # response is the response from the SAS for the preceding heartbeat request
-
-    print("hb response")
-
-    #add response heartbeat response to log file
-    logger.log_json(response,len(response['heartbeatResponse']))
-    for i in range(len(response['heartbeatResponse'])):
-        #Make connection to ACS_V1_1 database
-        conn = dbConn("ACS_V1_1")
-        sql_select_all = "SELECT * FROM dp_device_info WHERE cbsdID = %s"
-        #select everything from the database where cbsdID = cbsdId from heartbeat response
-        cbsd_db = conn.select(sql_select_all,response['heartbeatResponse'][i]['cbsdId'])
-        
-        
-        #TODO WHAT IF NEW OPERATIONAL PARAMS(HANDLE THIS IN ERROR HANDLE MODULE)
-
-        #if error code = 0 then process handle reply for response
-        if response['heartbeatResponse'][i]['response']['responseCode'] == 0: 
-        #TODO what if no reply... lost in the internet
-        #TODO check if reply is recieved from all cbsds
-        #TODO WHAT IF MEAS REPORT
-        #TODO
-            #update operational state to granted/ what if operational state is already authorized
-            update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
-            conn.update(update_operational_state)
-            #update transmist expire time
-            update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + response['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
-            conn.update(update_transmit_time)
-            conn.dbClose()
-
-            #collect SN from dp_device_info where cbsdId = $cbsdid
-            if cbsd_db[0]['operationalState'] == 'GRANTED':
-                print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
-                # turn on RF in cell
-                cbsdAction(cbsd_db[0]['SN'],"RF_ON",str(datetime.now()))
-    
-        else:
-            #close database
-            conn.dbClose()
-            #handle error
-
-        #if operational state  = gratned turn rf on
 
 def heartbeatRequest():
 
@@ -180,37 +139,9 @@ def heartbeatRequest():
         response = contactSAS(heartbeat,"heartbeat")
         conn.dbClose()
         if response != False:
-            heartbeatResponse(response.json())
+            sasResponseHandler.Handle_Response(response.json(),consts.HEART)
     else:
         conn.dbClose()
-
-def grantResponse(response):
-    #Make connection to ACS_V1_1 database
-    conn = dbConn("ACS_V1_1")
-    print("grant response")
-
-    #log reponse
-    logger.log_json(response,len(response['grantResponse']))
-
-    for i in range(len(response['grantResponse'])):
-        
-        #Check if responseCode is > 0 
-        if response['grantResponse'][i]['response']['responseCode'] == 0: 
-            #TODO Check for measurement Report
-
-            # sql_heartbeat_update = "REPLACE INTO dp_heartbeat (`cbsdID`, `grantID`, `renewGrant`,`measReport`,`operationalState`,`grantExpireTime`) VALUES ( \'" + response['grantResponse'][i]['cbsdId'] + "\' , \'" + response['grantResponse'][i]['grantId'] + "\' , \'false\' , \'false\', \'GRANTED\', \'" + response['grantResponse'][i]['grantExpireTime'] +"\')"
-            sql_update = "UPDATE `dp_device_info` SET `grantID` = %s , `grantExpireTime` = %s, `operationalState` = \'GRANTED\', `sasStage` = \'heartbeat\' WHERE `cbsdID` = %s"
-
-            conn.update(sql_update,(response['grantResponse'][i]['grantId'],response['grantResponse'][i]['grantExpireTime'],response['grantResponse'][i]['cbsdId']))
-            # sql_device_info_update = "update `dp_device_info` SET sasStage = 'heartbeat' where cbsdID= \'" + response['grantResponse'][i]['cbsdId'] +"\'"
-        else:
-            errorModule(response['grantResponse'][i])
-    #close db connection s
-
-    # hbtimer = response['grantResponse'][i]['heartbeatInterval']
-    # print(hbtimer)
-    conn.dbClose()
-    #start spectrum inquiry
 
 def grantRequest():
     #make connection to database
@@ -241,48 +172,10 @@ def grantRequest():
         response = contactSAS(grant,"grant")
        
         if response != False:
-            grantResponse(response.json())
+            sasResponseHandler.Handle_Response(response.json(),consts.GRANT)
         # logging.info("RESPONSE FROM grant REQUEST:" + response.json() )
     else:
         pass
-
-
-def spectrumResponse(response):
-    #make connection to domain proxy db
-    conn = dbConn("ACS_V1_1")
-    #for each resposne in resposne array
-    logger.log_json(response,len(response['spectrumInquiryResponse']))
-    for i in range(len(response['spectrumInquiryResponse'])):
-        
-        # logging.info(response['spectrumInquiryResponse'][i]['cbsdId'] + ": Spec Response : " + str(response['spectrumInquiryResponse'][i]))
-        
-        if response['spectrumInquiryResponse'][i]['response']['responseCode'] == 0:
-            # if high frequcy and low frequcy match value(convert to hz) for cbsdId in database then move to next
-
-            #TODO WHAT IF THE AVAIABLE CHANNEL ARRAY IS EMPTY
-            low = math.floor(response['spectrumInquiryResponse'][i]['availableChannel'][0]['frequencyRange']['lowFrequency']/1000000)
-            high = math.floor(response['spectrumInquiryResponse'][i]['availableChannel'][0]['frequencyRange']['highFrequency']/1000000)
-
-            sql = "SELECT `SN`,`lowFrequency`,`highFrequency` from dp_device_info where cbsdID = \'" + response['spectrumInquiryResponse'][i]['cbsdId'] + "\'"
- 
- 
-            #if the SAS sends back spectrum response with avaible channgel array outsid of the use values set on the cell. Use the values set by the spectrum response
-            
-            #select values currently used in the database per response
-            # cbsd_freq_values = conn.select(sql)
-            #  if cbsd_freq_values are outside of the range of low and high(set above) then use value inside the low and high range
-            #  cbsdaction(SN,setvalues,now)
-            #
- 
-
-            sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
-            conn.update(sqlUpdate)
-
-    
-    #TODO ADD ERROR HANDELING MODULE
-    
-    conn.dbClose()
-
 
 def spectrumRequest():
 
@@ -317,11 +210,12 @@ def spectrumRequest():
         conn.dbClose()
         #   pass response to spectrum response
         if response != False:
-            spectrumResponse(response.json())
+            sasResponseHandler.Handle_Response(response.json(),consts.SPECTRUM)
         # spectrumResponse(response)
     else:
         conn.dbClose()
 
+<<<<<<< HEAD
 def regResponse(response):
     conn = dbConn("ACS_V1_1")
     sql = 'SELECT SN,cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = \'reg\''
@@ -350,14 +244,17 @@ def regResponse(response):
     #close db connection
     conn.dbClose()
 
+=======
+    
+>>>>>>> structure
 def regRequest(cbsds_SN = None):
     
     if cbsds_SN:
-        row = query_update(cbsds_SN, 'reg')
+        row = query_update(cbsds_SN, consts.REG)
 
     else:
         conn = dbConn("ACS_V1_1")
-        sql = 'SELECT * FROM dp_device_info where sasStage = \'reg\''
+        sql = 'SELECT * FROM dp_device_info where sasStage = \'registration\''
         row = conn.select(sql)
         conn.dbClose()
 
@@ -377,7 +274,7 @@ def regRequest(cbsds_SN = None):
         response = contactSAS(reg,"registration")
         
         if response != False:
-            regResponse(response.json())
+            sasResponseHandler.Handle_Response(response.json(),consts.REG)
 
         # response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
     else:
@@ -402,18 +299,8 @@ def deregistrationRequest(cbsds_SN = None):
             }
         )
     logger.log_json(dereg,len(cbsd_db))
-    response = contactSAS(dereg,"deregistration")
-    deregistrationResposne(response.json())
-
-def deregistrationResposne(response):
-    logger.log_json(response,(len(response['deregistrationResponse'])))
-
-    for i in range(len(response['deregistrationResponse'])):
-        if response['deregistrationResponse'][i]['response']['responseCode'] == 0: 
-            pass
-            #do nothing
-        else:
-            errorModule(response['deregistrationResponse'][i])
+    response = contactSAS(dereg,consts.DEREG)
+    sasResponseHandler.Handle_Response(response.json(),consts.DEREG)
 
 def grantRelinquishmentRequest(cbsd_SN_list):
     #select all cbsds looking to have grant relinquished and updatea their status
@@ -440,25 +327,13 @@ def grantRelinquishmentRequest(cbsd_SN_list):
     conn.update(update_grantID)
     conn.dbClose()
     
-    
     #send request to SAS
     response = contactSAS(relinquish,"relinquishment")
     
     #process reponse
     if response != False:
-        grantRelinquishmentResponse(response.json())
+        sasResponseHandler.Handle_Response(response.json(),consts.REL)
 
-
-def grantRelinquishmentResponse(response):
-    logger.log_json(response,(len(response['relinquishmentResponse'])))
-
-    for i in range(len(response['relinquishmentResponse'])):
-        if response['relinquishmentResponse'][i]['response']['responseCode'] == 0: 
-            pass
-            #do nothing
-        else:
-            pass
-            # error.errorModule(response['relinquishmentResponse'][i])
 
 
 def getResponseType(sasStage):
@@ -544,14 +419,12 @@ def start():
 
 
 def test():
-    mysn1 = 'DCE994613163'
-    myjson2 = {"response": {"responseCode": 201}}
-    responseDict = {}
-    error.errorModule()
+    pass
+    # regRequest()
 
 
-# start()
-test()
+start()
+# test()
 
 # try:
 #     a_socket.connect(("192.168.4.5", 10500))
