@@ -80,8 +80,8 @@ def EARFCNtoMHZ():
     # mhz plus 6 zeros
 
     conn = dbConn("ACS_V1_1")
-    sql = 'SELECT SN,cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = \'reg\''
-    response = conn.select(sql)
+    sql = 'SELECT SN,cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = %s'
+    response = conn.select(sql,consts.REG)
 
     for i in range(len(response)):
         logging.info("////////////////////////////////EARFCN CONVERTION "+ response[i]['SN']+"\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
@@ -219,7 +219,7 @@ def spectrumRequest():
 def regRequest(cbsds_SN = None):
     
     if cbsds_SN:
-        row = query_update(cbsds_SN, 'reg')
+        row = query_update(cbsds_SN, consts.REG)
 
     else:
         conn = dbConn("ACS_V1_1")
@@ -271,16 +271,6 @@ def deregistrationRequest(cbsds_SN = None):
     response = contactSAS(dereg,consts.DEREG)
     sasResponseHandler.Handle_Response(response.json(),consts.DEREG)
 
-def deregistrationResposne(response):
-    logger.log_json(response,(len(response['deregistrationResponse'])))
-
-    for i in range(len(response['deregistrationResponse'])):
-        if response['deregistrationResponse'][i]['response']['responseCode'] == 0: 
-            pass
-            #do nothing
-        else:
-            errorModule(response['deregistrationResponse'][i])
-
 def grantRelinquishmentRequest(cbsd_SN_list):
     #select all cbsds looking to have grant relinquished and updatea their status
     cbsds = query_update(cbsd_SN_list,'relinquish')
@@ -313,17 +303,6 @@ def grantRelinquishmentRequest(cbsd_SN_list):
     if response != False:
         sasResponseHandler.Handle_Response(response.json(),consts.REL)
 
-
-def grantRelinquishmentResponse(response):
-    logger.log_json(response,(len(response['relinquishmentResponse'])))
-
-    for i in range(len(response['relinquishmentResponse'])):
-        if response['relinquishmentResponse'][i]['response']['responseCode'] == 0: 
-            pass
-            #do nothing
-        else:
-            pass
-            # error.errorModule(response['relinquishmentResponse'][i])
 
 def query_update(cbsds_SN_list,sasStage):
     conn = dbConn("ACS_V1_1")

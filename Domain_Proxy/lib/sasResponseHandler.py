@@ -77,10 +77,10 @@ def Handle_Response(response,typeOfCalling):
             conn.dbClose()
 
             #collect SN from dp_device_info where cbsdId = $cbsdid
-            if cbsd_list[0]['operationalState'] == 'GRANTED':
+            if cbsd_list[i]['operationalState'] == 'GRANTED':
                 print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
                 # turn on RF in cell
-                cbsdAction(cbsd_list[0]['SN'],"RF_ON",str(datetime.now()))
+                cbsdAction(cbsd_list[i]['SN'],"RF_ON",str(datetime.now()))
 
         elif typeOfCalling == consts.DEREG:
             pass
