@@ -1,10 +1,11 @@
-def errorModule(reponseDict):
-    pass
+def errorModule(responseDict):
+    print(responseDict)
     #error_response is a list of key value pairs where the key is the cbsdsn and the value is the numeric response code
     
     #((CBSDSN, {resposne:{responseCode:200,responseMessage:"this is some thing"}}),(CBSDSN, {resposne .....}))
 
     #determine error number
+
 
 
 

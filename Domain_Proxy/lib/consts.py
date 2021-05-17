@@ -1,0 +1,2 @@
+#program constants
+SPECTRUM = 'spectrum'

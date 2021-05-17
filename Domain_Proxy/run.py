@@ -3,6 +3,7 @@ import sys
 from lib.dbConn import dbConn
 from lib.log import logger
 from lib import error
+from lib import sasResponseHandler
 from test import app, runFlaskSever
 import json
 import flask
@@ -357,7 +358,7 @@ def regRequest(cbsds_SN = None):
 
     else:
         conn = dbConn("ACS_V1_1")
-        sql = 'SELECT * FROM dp_device_info where sasStage = \'reg\''
+        sql = 'SELECT * FROM dp_device_info where sasStage = \'registration\''
         row = conn.select(sql)
         conn.dbClose()
 
@@ -377,7 +378,7 @@ def regRequest(cbsds_SN = None):
         response = contactSAS(reg,"registration")
         
         if response != False:
-            regResponse(response.json())
+            sasResponseHandler.Handle_Response(response.json(),"registration")
 
         # response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
     else:
@@ -538,14 +539,11 @@ def start():
 
 
 def test():
-    mysn1 = 'DCE994613163'
-    myjson2 = {"response": {"responseCode": 201}}
-    responseDict = {}
-    error.errorModule()
+    regRequest()
 
 
-# start()
-test()
+start()
+# test()
 
 # try:
 #     a_socket.connect(("192.168.4.5", 10500))

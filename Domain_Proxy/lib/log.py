@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 
 # logging.basicConfig(filename='/tmp/dp_logs/dp.log', format='%(asctime)s - %(message)s', level=logging.DEBUG)
-logging.basicConfig(filename='/tmp/dp_logs/dp.log', format='%(message)s', level=logging.DEBUG)
+logging.basicConfig(filename='/tmp/dp.log', format='%(message)s', level=logging.DEBUG)
 
 #Test messages
 # logger.debug("Harmless debug Message")
@@ -26,3 +26,5 @@ class logger():
         self.logger.info(f"timestamp: {datetime.now()} UTC timestamp: {datetime.utcnow()}")
         self.logger.info(f"number of cbsds: {cbsds}")
         self.logger.info(json.dumps(json_array,indent=4, sort_keys=True))
+
+dpLogger = logger()
