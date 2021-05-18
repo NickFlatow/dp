@@ -27,5 +27,7 @@ class logger(object):
         self.logger.info(f"number of cbsds: {cbsds}")
         self.logger.info(json.dumps(json_array,indent=4, sort_keys=True))
 
+    def __getattr__(self, attr):
+        return getattr(self.logger, attr)
 
 dpLogger = logger()

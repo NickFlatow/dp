@@ -1,5 +1,17 @@
-def errorModule(responseDict):
-    print(responseDict)
+from datetime import datetime
+from lib.dbConn import dbConn
+
+
+def errorModule(errorDict,typeOfCalling):
+    for SN in errorDict:
+        #collect all cbsd data
+        conn = dbConn("ACS_V1_1")
+        cbsd_data = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SN)
+        conn.dbClose()
+
+        #pass cbsd_data and respose code and message to be logged to FeMS
+        log_error_to_FeMS_alarm(cbsd_data,errorDict[SN],typeOfCalling)
+
     #error_response is a list of key value pairs where the key is the cbsdsn and the value is the numeric response code
     
     #((CBSDSN, {resposne:{responseCode:200,responseMessage:"this is some thing"}}),(CBSDSN, {resposne .....}))
@@ -7,7 +19,17 @@ def errorModule(responseDict):
     #determine error number
 
 
+def log_error_to_FeMS_alarm(cbsd_data,response,typeOfCalling):
+    resposneMessageType = str(typeOfCalling +"Response")
+    errorCode = "SAS response error code: " + str(response['responseCode'])
+    #use cbsd data to populate apt_alarm_latest
+    print(f"cbsd data: {cbsd_data} \n\n response data: {response}")
+    conn = dbConn("ACS_V1_1")
+    conn.update("INSERT INTO apt_alarm_latest (updateTime,EventTime,SpecificProblem,ProbableCause) values(%s,%s,%s,%s)",(str(datetime.now()),str(datetime.now()),errorCode,"Invalid Value"))
+    conn.dbClose()
 
+    #include the response code and Message
+    pass
 
 def response_200():
     pass

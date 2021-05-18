@@ -1,6 +1,6 @@
 import math
 import logging
-import lib.error
+import lib.error as e
 import lib.consts as consts
 from lib.log import dpLogger
 from lib.dbConn import dbConn
@@ -24,8 +24,11 @@ def Handle_Response(response,typeOfCalling):
     
     for i in range(len(response[resposneMessageType])):
 
-        if response[resposneMessageType][i]['response']['responseCode'] != 0: 
-            print("error")
+        #check for errors in response
+        if response[resposneMessageType][i]['response']['responseCode'] != 0:
+            # errorList.append(response[resposneMessageType][i][response])
+        #    print(response[resposneMessageType][i]['response'])
+           errorDict[cbsd_list[i]['SN']] = response[resposneMessageType][i]['response']
 
         elif typeOfCalling == consts.REG:
 
@@ -84,11 +87,14 @@ def Handle_Response(response,typeOfCalling):
 
         elif typeOfCalling == consts.DEREG:
             pass
-            #do nothing for nwo =
+            #do nothing for now =
 
         elif typeOfCalling == consts.REL:
             pass
             #do nothing for now
+        
+    if bool(errorDict):
+        e.errorModule(errorDict,typeOfCalling)
 
 
 

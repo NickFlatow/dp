@@ -223,8 +223,8 @@ def regRequest(cbsds_SN = None):
 
     else:
         conn = dbConn("ACS_V1_1")
-        sql = 'SELECT * FROM dp_device_info where sasStage = \'registration\''
-        row = conn.select(sql)
+        sql = 'SELECT * FROM dp_device_info where sasStage = %s'
+        row = conn.select(sql,consts.REG)
         conn.dbClose()
 
     if row != ():
@@ -253,7 +253,7 @@ def deregistrationRequest(cbsds_SN = None):
     #send relinquishment
     grantRelinquishmentRequest(cbsds_SN)
 
-    cbsd_db = query_update(cbsds_SN,'dereg')
+    cbsd_db = query_update(cbsds_SN,consts.DEREG)
 
     #send deregistration
     dereg = {"deregistrationRequest":[]}
@@ -388,7 +388,9 @@ def start():
 
 
 def test():
-    pass
+    # error_resposne = {"registrationResponse": [{"response": {"responseCode": 200}},{"response": {"responseCode": 200}}]}
+    error_response =  {"registrationResponse": [{"response": {"responseCode": 200,"responseMessage": "A Category B device must be installed by a CPI"}}]}
+    sasResponseHandler.Handle_Response(error_response, consts.REG)
     # regRequest()
 
 
