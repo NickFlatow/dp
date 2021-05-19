@@ -3,7 +3,7 @@ import sys
 from lib.dbConn import dbConn
 from lib.log import logger
 from lib import error
-from lib import sasResponseHandler
+from lib import sasHandler
 from test import app, runFlaskSever
 import json
 import flask
@@ -139,7 +139,7 @@ def heartbeatRequest():
         response = contactSAS(heartbeat,"heartbeat")
         conn.dbClose()
         if response != False:
-            sasResponseHandler.Handle_Response(response.json(),consts.HEART)
+            sasHandler.Handle_Response(response.json(),consts.HEART)
     else:
         conn.dbClose()
 
@@ -172,7 +172,7 @@ def grantRequest():
         response = contactSAS(grant,"grant")
        
         if response != False:
-            sasResponseHandler.Handle_Response(response.json(),consts.GRANT)
+            sasHandler.Handle_Response(response.json(),consts.GRANT)
         # logging.info("RESPONSE FROM grant REQUEST:" + response.json() )
     else:
         pass
@@ -210,7 +210,7 @@ def spectrumRequest():
         conn.dbClose()
         #   pass response to spectrum response
         if response != False:
-            sasResponseHandler.Handle_Response(response.json(),consts.SPECTRUM)
+            sasHandler.Handle_Response(response.json(),consts.SPECTRUM)
         # spectrumResponse(response)
     else:
         conn.dbClose()
@@ -243,7 +243,7 @@ def regRequest(cbsds_SN = None):
         response = contactSAS(reg,"registration")
         
         if response != False:
-            sasResponseHandler.Handle_Response(response.json(),consts.REG)
+            sasHandler.Handle_Response(response.json(),consts.REG)
 
         # response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
     else:
@@ -269,7 +269,7 @@ def deregistrationRequest(cbsds_SN = None):
         )
     logger.log_json(dereg,len(cbsd_db))
     response = contactSAS(dereg,consts.DEREG)
-    sasResponseHandler.Handle_Response(response.json(),consts.DEREG)
+    sasHandler.Handle_Response(response.json(),consts.DEREG)
 
 def grantRelinquishmentRequest(cbsd_SN_list):
     #select all cbsds looking to have grant relinquished and updatea their status
@@ -301,7 +301,7 @@ def grantRelinquishmentRequest(cbsd_SN_list):
     
     #process reponse
     if response != False:
-        sasResponseHandler.Handle_Response(response.json(),consts.REL)
+        sasHandler.Handle_Response(response.json(),consts.REL)
 
 
 
@@ -390,7 +390,7 @@ def start():
 def test():
     # error_resposne = {"registrationResponse": [{"response": {"responseCode": 200}},{"response": {"responseCode": 200}}]}
     error_response =  {"registrationResponse": [{"response": {"responseCode": 200,"responseMessage": "A Category B device must be installed by a CPI"}}]}
-    sasResponseHandler.Handle_Response(error_response, consts.REG)
+    sasHandler.Handle_Response(error_response, consts.REG)
     # regRequest()
 
 
