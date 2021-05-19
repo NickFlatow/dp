@@ -3,13 +3,15 @@ from lib.dbConn import dbConn
 
 def errorModule(errorDict,typeOfCalling):
     for SN in errorDict:
-        #collect all cbsd data
+        #collect all cbsd data from database for each SN
         conn = dbConn("ACS_V1_1")
         cbsd_data = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SN)
         conn.dbClose()
 
         #pass cbsd_data and respose code and message to be logged to FeMS
-        log_error_to_FeMS_alarm(cbsd_data,errorDict[SN],typeOfCalling)
+
+        #Severity is CRITICAL OR WARNING
+        log_error_to_FeMS_alarm("WARNING",cbsd_data,errorDict[SN],typeOfCalling)
 
     #error_response is a list of key value pairs where the key is the cbsdsn and the value is the numeric response code
     
@@ -18,7 +20,7 @@ def errorModule(errorDict,typeOfCalling):
     #determine error number
 
 
-def log_error_to_FeMS_alarm(cbsd_data,response,typeOfCalling):
+def log_error_to_FeMS_alarm(severity,cbsd_data,response,typeOfCalling):
 
     # resposneMessageType = str(typeOfCalling +"Response")
     errorCode = "SAS error code: " + str(response['responseCode'])
@@ -29,7 +31,7 @@ def log_error_to_FeMS_alarm(cbsd_data,response,typeOfCalling):
     # print(f"cbsd data: {cbsd_data} \n\n response data: {response}")
 
 
-    #Severity is CRITICAL OR WARNING
+    
 
     if(hasAlarmIdentifier(alarmIdentifier)):
         conn = dbConn("ACS_V1_1")
@@ -37,7 +39,7 @@ def log_error_to_FeMS_alarm(cbsd_data,response,typeOfCalling):
         conn.dbClose()
     else: 
         conn = dbConn("ACS_V1_1")
-        conn.update("INSERT INTO apt_alarm_latest (CellIdentity,NotificationType,PerceivedSeverity,updateTime,EventTime,SpecificProblem,AlarmIdentifier,Status) values(%s,%s,%s,%s,%s,%s,%s,%s)",(cbsd_data[0]['CellIdentity'],"NewAlarm","WARNING",str(datetime.now()),str(datetime.now()),errorCode,alarmIdentifier,"New"))
+        conn.update("INSERT INTO apt_alarm_latest (CellIdentity,NotificationType,PerceivedSeverity,updateTime,EventTime,SpecificProblem,AlarmIdentifier,Status) values(%s,%s,%s,%s,%s,%s,%s,%s)",(cbsd_data[0]['CellIdentity'],"NewAlarm",severity,str(datetime.now()),str(datetime.now()),errorCode,alarmIdentifier,"New"))
         conn.dbClose()
 
 
