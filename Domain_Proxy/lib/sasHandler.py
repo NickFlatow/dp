@@ -96,7 +96,14 @@ def Handle_Response(response,typeOfCalling):
     if bool(errorDict):
         e.errorModule(errorDict,typeOfCalling)
 
+def request(typeOfCalling):
+    requestMessageType = str(typeOfCalling +"Request")
 
+    req = {requestMessageType:[]}
+
+    # for i in range(len(response[resposneMessageType])):
+    pass
+    #build header
 
 
 def cbsdAction(cbsdSN,action,time):
