@@ -1,7 +1,6 @@
 from datetime import datetime
 from lib.dbConn import dbConn
 
-
 def errorModule(errorDict,typeOfCalling):
     for SN in errorDict:
         #collect all cbsd data
@@ -20,16 +19,43 @@ def errorModule(errorDict,typeOfCalling):
 
 
 def log_error_to_FeMS_alarm(cbsd_data,response,typeOfCalling):
-    resposneMessageType = str(typeOfCalling +"Response")
-    errorCode = "SAS response error code: " + str(response['responseCode'])
-    #use cbsd data to populate apt_alarm_latest
-    print(f"cbsd data: {cbsd_data} \n\n response data: {response}")
+
+    # resposneMessageType = str(typeOfCalling +"Response")
+    errorCode = "SAS error code: " + str(response['responseCode'])
+
+    #alarmIdentity is SN, response code and the hour it was reported
+    alarmIdentifier = cbsd_data[0]['SN'] +"_"+ str(response['responseCode']) +"_"+ str(datetime.now().hour)
+    
+    # print(f"cbsd data: {cbsd_data} \n\n response data: {response}")
+
+
+    #Severity is CRITICAL OR WARNING
+
+    if(hasAlarmIdentifier(alarmIdentifier)):
+        conn = dbConn("ACS_V1_1")
+        conn.update("UPDATE apt_alarm_latest SET updateTime = %s,EventTime = %s WHERE AlarmIdentifier = %s" ,(str(datetime.now()),str(datetime.now()),alarmIdentifier ))
+        conn.dbClose()
+    else: 
+        conn = dbConn("ACS_V1_1")
+        conn.update("INSERT INTO apt_alarm_latest (CellIdentity,NotificationType,PerceivedSeverity,updateTime,EventTime,SpecificProblem,AlarmIdentifier,Status) values(%s,%s,%s,%s,%s,%s,%s,%s)",(cbsd_data[0]['CellIdentity'],"NewAlarm","WARNING",str(datetime.now()),str(datetime.now()),errorCode,alarmIdentifier,"New"))
+        conn.dbClose()
+
+
+def hasAlarmIdentifier(ai):
+    '''
+    checks if alarm already exisits in apt_alarm_latest
+    '''
+
     conn = dbConn("ACS_V1_1")
-    conn.update("INSERT INTO apt_alarm_latest (updateTime,EventTime,SpecificProblem,ProbableCause) values(%s,%s,%s,%s)",(str(datetime.now()),str(datetime.now()),errorCode,"Invalid Value"))
+    alarmIdentifier = conn.select('SELECT alarmIdentifier FROM apt_alarm_latest WHERE alarmIdentifier = %s',ai)
     conn.dbClose()
 
-    #include the response code and Message
-    pass
+    if alarmIdentifier == ():
+        return False
+    else:
+        return True
+
+
 
 def response_200():
     pass

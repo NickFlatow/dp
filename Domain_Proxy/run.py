@@ -369,7 +369,7 @@ def heartbeat():
             heartbeatRequest()
             #TODO dereg()
             #TODO reliquishment()
-            time.sleep(4)   
+            time.sleep(10)   
 
 def start():
     try:
