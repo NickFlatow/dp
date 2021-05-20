@@ -6,6 +6,10 @@ from lib.log import dpLogger
 from lib.dbConn import dbConn
 from datetime import datetime
 
+class sasHandler():
+    def __init__(self):
+        SQIarray = None
+
 
 def Handle_Response(response,typeOfCalling):
     #HTTP address that is in place e.g.(reg,spectrum,grant heartbeat)
