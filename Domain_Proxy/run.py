@@ -177,77 +177,7 @@ def grantRequest():
     else:
         pass
 
-def spectrumRequest():
 
-    #ADD form to the web interface to request specific spectrum in MHz. EX: 
-    #get EARFCNinUSE for each cbsdID in request (TODO how to change the database to make this query more convienient)
-    conn = dbConn("ACS_V1_1")
-    sql = 'SELECT cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = \'spectrum\''
-    response = conn.select(sql)
-
-    if response != ():
-        spec = {"spectrumInquiryRequest":[]}
-
-        for i in range(len(response)):
-            #build json request for SAS
-            spec["spectrumInquiryRequest"].append(
-                {
-                    "cbsdId":response[i]['cbsdId'],
-                    "inquiredSpectrum":[
-                        {
-                            "highFrequency":response[i]['highFrequency'] * 1000000,
-                            "lowFrequency":response[i]['lowFrequency']  * 1000000
-                            # "highFrequency":3700 * 1000000,
-                            # "lowFrequency":3590 * 1000000
-                        }
-                    ]
-                }
-            )
-        logger.log_json(spec,len(response))
-        #Send request to SAS server #contact SAS server
-        response = contactSAS(spec,"spectrumInquiry")
-        # response = {'spectrumInquiryResponse': [{'availableChannel': [{'channelType': 'GAA', 'ruleApplied': 'FCC_PART_96', 'frequencyRange': {'highFrequency': 3585000000, 'lowFrequency': 3565000000 } } ], 'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0} } ] }                                                                                                       
-        conn.dbClose()
-        #   pass response to spectrum response
-        if response != False:
-            sasHandler.Handle_Response(response.json(),consts.SPECTRUM)
-        # spectrumResponse(response)
-    else:
-        conn.dbClose()
-
-    
-def regRequest(cbsds_SN = None):
-    
-    if cbsds_SN:
-        row = query_update(cbsds_SN, consts.REG)
-
-    else:
-        conn = dbConn("ACS_V1_1")
-        sql = 'SELECT * FROM dp_device_info where sasStage = %s'
-        row = conn.select(sql,consts.REG)
-        conn.dbClose()
-
-    if row != ():
-        reg = {"registrationRequest":[]}
-        
-        for i in range(len(row)):
-            reg['registrationRequest'].append(
-                    {
-                        "cbsdSerialNumber": str(row[i]["SN"]),
-                        "fccId": row[i]["fccID"],
-                        "cbsdCategory": str(row[i]["cbsdCategory"]),
-                        "userId": str(row[i]["userID"])
-                    }
-            )
-        logger.log_json(reg,len(row))
-        response = contactSAS(reg,"registration")
-        
-        if response != False:
-            sasHandler.Handle_Response(response.json(),consts.REG)
-
-        # response = {'registrationResponse': [{'cbsdId': 'FoxconnMock-SASDCE994613163', 'response': {'responseCode': 0}}]}
-    else:
-        pass
 def deregistrationRequest(cbsds_SN = None):
 
     #send relinquishment
@@ -354,27 +284,25 @@ print(__name__)
     
     #Convert EARFCN into hz
 def registration():
-    #meth = [conts.REG,conts.SPECTRUM,conts.GRANT,]
+    meth = [consts.REG,consts.SPECTRUM,consts.GRANT]
+
     while True:
-        #for m in meth: or just conts.REG
-        #cbsd_list = conn.select(SELECT * FROM dp_device_info WHERE sasStage = %s,m)
-        #if cbsd_list != ()
-            #sasHandler.req(cbsd_list,m)
-            #time.sleep(10)
-        # print(error.error_test())
-        EARFCNtoMHZ()
-        print("registartion")
-        regRequest()
-        spectrumRequest()
-        grantRequest()
+        for m in meth:
+            conn = dbConn("ACS_V1_1")
+            cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',m)
+            conn.dbClose()
+            if cbsd_list !=():
+                sasHandler.Handle_Request(cbsd_list, m)
+
         time.sleep(10)
 
 def heartbeat():
         while True:
-            print("heartbeat")
-            heartbeatRequest()
-            #TODO dereg()
-            #TODO reliquishment()
+            conn = dbConn("ACS_V1_1")
+            cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.HEART)
+            conn.dbClose()
+            if cbsd_list !=():
+                sasHandler.Handle_Request(cbsd_list,consts.HEART)
             time.sleep(10)   
 
 def start():
@@ -397,7 +325,7 @@ def test():
     # error_resposne = {"registrationResponse": [{"response": {"responseCode": 200}},{"response": {"responseCode": 200}}]}
     # error_response =  {"registrationResponse": [{"response": {"responseCode": 200,"responseMessage": "A Category B device must be installed by a CPI"}}]}
 
-    meth = [consts.REG,consts.SPECTRUM,consts.GRANT,]
+    meth = [consts.REG,consts.SPECTRUM,consts.GRANT]
 
     while True:
         for m in meth:
@@ -407,7 +335,7 @@ def test():
             if cbsd_list !=():
                 sasHandler.Handle_Request(cbsd_list, m)
 
-        # time.sleep(20)
+        time.sleep(20)
         # regRequest()
 
 

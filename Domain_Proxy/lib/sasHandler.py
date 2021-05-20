@@ -133,7 +133,30 @@ def Handle_Request(cbsd_list,typeOfCalling):
                     ]
                 }
             )
+        
+        elif typeOfCalling == consts.GRANT:
             
+            req[requestMessageType].append(
+                    {
+                        "cbsdId":cbsd['cbsdID'],
+                        "operationParam":{
+                            # grab antennaGain from web interface
+                            "maxEirp":int(cbsd['TxPower'] + cbsd['antennaGain']),
+                            "operationFrequencyRange":{
+                                "lowFrequency":cbsd['lowFrequency'] * 1000000,
+                                "highFrequency":cbsd['highFrequency'] * 1000000
+                            }
+                        }
+                    }
+                )
+        elif typeOfCalling == consts.HEART:
+            req[requestMessageType].append(
+                                    {
+                        "cbsdId":cbsd['cbsdID'],
+                        "grantId":cbsd['grantID'],
+                        "operationState":cbsd['operationalState']
+                    }
+                )
 
 
     dpLogger.log_json(req,len(cbsd_list))
@@ -194,7 +217,7 @@ def EARFCNtoMHZ(cbsd_SN):
     sql = "UPDATE `dp_device_info` SET lowFrequency=\'"+str(L_frq)+"\', highFrequency=\'"+str(H_frq)+"\' WHERE SN = \'"+str(cbsd[0]['SN'])+"\'"
     conn.update(sql)        
     conn.dbClose()
-    
+
     freqDict['lowFreq'] = L_frq
     freqDict['highFreq'] = H_frq
     return freqDict
