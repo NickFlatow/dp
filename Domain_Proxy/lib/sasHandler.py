@@ -1,21 +1,18 @@
 import math
 import logging
+import requests
 import lib.error as e
 import lib.consts as consts
 from lib.log import dpLogger
 from lib.dbConn import dbConn
 from datetime import datetime
-
-class sasHandler():
-    def __init__(self):
-        SQIarray = None
-
+from test import app
 
 def Handle_Response(response,typeOfCalling):
     #HTTP address that is in place e.g.(reg,spectrum,grant heartbeat)
     resposneMessageType = str(typeOfCalling +"Response")
     
-    # select all cbsd that are in current step for typeOf Calling
+    # select all cbsd that are in current step for typeOfCalling
     conn = dbConn("ACS_V1_1")
     sql = 'SELECT * FROM dp_device_info where sasStage = %s' 
     cbsd_list = conn.select(sql,typeOfCalling)
@@ -32,12 +29,12 @@ def Handle_Response(response,typeOfCalling):
         if response[resposneMessageType][i]['response']['responseCode'] != 0:
             # errorList.append(response[resposneMessageType][i][response])
         #    print(response[resposneMessageType][i]['response'])
-           errorDict[cbsd_list[i]['SN']] = response[resposneMessageType][i]['response']
+            errorDict[cbsd_list[i]['SN']] = response[resposneMessageType][i]['response']
 
         elif typeOfCalling == consts.REG:
 
             conn = dbConn("ACS_V1_1")
-            sqlUpdate = "UPDATE `dp_device_info` SET cbsdID=\""+response['registrationResponse'][i]['cbsdId']+"\",sasStage=\"spectrum\" WHERE SN=\'"+cbsd_list[i]["SN"]+"\'"
+            sqlUpdate = "UPDATE `dp_device_info` SET cbsdID=\""+response['registrationResponse'][i]['cbsdId']+"\",sasStage=\"spectrumInquiry\" WHERE SN=\'"+cbsd_list[i]["SN"]+"\'"
             conn.update(sqlUpdate)
 
         elif typeOfCalling == consts.SPECTRUM:
@@ -49,7 +46,7 @@ def Handle_Response(response,typeOfCalling):
             high = math.floor(response['spectrumInquiryResponse'][i]['availableChannel'][0]['frequencyRange']['highFrequency']/1000000)
 
             sql = "SELECT `SN`,`lowFrequency`,`highFrequency` from dp_device_info where cbsdID = \'" + response['spectrumInquiryResponse'][i]['cbsdId'] + "\'"
- 
+
             #if the SAS sends back spectrum response with avaible channgel array outsid of the use values set on the cell. Use the values set by the spectrum response
             
             #select values currently used in the database per response
@@ -100,15 +97,64 @@ def Handle_Response(response,typeOfCalling):
     if bool(errorDict):
         e.errorModule(errorDict,typeOfCalling)
 
-def request(typeOfCalling):
+
+def Handle_Request(cbsd_list,typeOfCalling):
+    '''
+    handles all requests send to SAS
+    '''
     requestMessageType = str(typeOfCalling +"Request")
 
     req = {requestMessageType:[]}
 
-    # for i in range(len(response[resposneMessageType])):
-    pass
-    #build header
+    for cbsd in cbsd_list:
 
+        if typeOfCalling == consts.REG:
+            req[requestMessageType].append(
+                {
+                    "cbsdSerialNumber": cbsd["SN"],
+                    "fccId": cbsd["fccID"],
+                    "cbsdCategory": cbsd["cbsdCategory"],
+                    "userId": cbsd["userID"]
+                }
+            )
+        
+        elif typeOfCalling == consts.SPECTRUM:
+            
+            FreqDict = EARFCNtoMHZ(cbsd['SN'])
+
+            req[requestMessageType].append(
+                {
+                    "cbsdId":cbsd['cbsdID'],
+                    "inquiredSpectrum":[
+                        {
+                            "highFrequency":FreqDict['highFreq'] * 1000000,
+                            "lowFrequency":FreqDict['lowFreq']  * 1000000
+                        }
+                    ]
+                }
+            )
+            
+
+
+    dpLogger.log_json(req,len(cbsd_list))
+    SASresponse = contactSAS(req,typeOfCalling)
+
+    if SASresponse != False:
+        Handle_Response(SASresponse.json(),typeOfCalling)
+
+def contactSAS(request,method):
+    # Function to contact the SAS server
+    # request - json array to pass to SAS
+    # method - which method SAS you would like to contact registration, spectrum, grant, heartbeat 
+    # logger.info(f"{app.config['SAS']}  {method}")
+    try:
+        return requests.post(app.config['SAS']+method, 
+        cert=('/home/gtadmin/dp/Domain_Proxy/certs/client.cert','/home/gtadmin/dp/Domain_Proxy/certs/client.key'),
+        verify=('/home/gtadmin/dp/Domain_Proxy/certs/ca.cert'),
+        json=request)
+    except Exception as e:
+        print(f"your connection has failed: {e}")
+        return False
 
 def cbsdAction(cbsdSN,action,time):
     logging.critical("Triggering CBSD action")
@@ -117,4 +163,38 @@ def cbsdAction(cbsdSN,action,time):
     logging.critical(cbsdSN + " : SQL cmd " + sql_action)
     conn.update(sql_action)
     conn.dbClose()
+
+def EARFCNtoMHZ(cbsd_SN):
+    # Function to convert frequency from EARFCN  to MHz 3660 - 3700
+    # mhz plus 6 zeros
+    freqDict = {}
+    conn = dbConn("ACS_V1_1")
+    sql = 'SELECT SN,cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where SN = %s'
+    cbsd = conn.select(sql,cbsd_SN)
+
     
+    logging.info("////////////////////////////////EARFCN CONVERTION "+ cbsd[0]['SN']+"\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+    print("EARFCN: " + str(cbsd[0]['EARFCN']))
+    if int(cbsd[0]['EARFCN']) > 56739 or int(cbsd[0]['EARFCN']) < 55240:
+        logging.info("SPECTRUM IS OUTSIDE OF BOUNDS")
+        L_frq = 0
+        H_frq = 0
+    elif cbsd[0]['EARFCN'] == 55240:
+        L_frq = 3550
+        H_frq = 3570
+    elif cbsd[0]['EARFCN'] == 56739:
+        L_frq = 3680
+        H_frq = 3700
+    else:
+        F = math.ceil(3550 + (0.1 * (int(cbsd[0]['EARFCN']) - 55240)))
+        L_frq = F - 10
+        H_frq = F + 10
+
+
+    sql = "UPDATE `dp_device_info` SET lowFrequency=\'"+str(L_frq)+"\', highFrequency=\'"+str(H_frq)+"\' WHERE SN = \'"+str(cbsd[0]['SN'])+"\'"
+    conn.update(sql)        
+    conn.dbClose()
+    
+    freqDict['lowFreq'] = L_frq
+    freqDict['highFreq'] = H_frq
+    return freqDict

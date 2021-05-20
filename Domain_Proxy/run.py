@@ -354,7 +354,13 @@ print(__name__)
     
     #Convert EARFCN into hz
 def registration():
+    #meth = [conts.REG,conts.SPECTRUM,conts.GRANT,]
     while True:
+        #for m in meth: or just conts.REG
+        #cbsd_list = conn.select(SELECT * FROM dp_device_info WHERE sasStage = %s,m)
+        #if cbsd_list != ()
+            #sasHandler.req(cbsd_list,m)
+            #time.sleep(10)
         # print(error.error_test())
         EARFCNtoMHZ()
         print("registartion")
@@ -389,13 +395,24 @@ def start():
 
 def test():
     # error_resposne = {"registrationResponse": [{"response": {"responseCode": 200}},{"response": {"responseCode": 200}}]}
-    error_response =  {"registrationResponse": [{"response": {"responseCode": 200,"responseMessage": "A Category B device must be installed by a CPI"}}]}
-    sasHandler.Handle_Response(error_response, consts.REG)
-    # regRequest()
+    # error_response =  {"registrationResponse": [{"response": {"responseCode": 200,"responseMessage": "A Category B device must be installed by a CPI"}}]}
+
+    meth = [consts.REG,consts.SPECTRUM,consts.GRANT,]
+
+    while True:
+        for m in meth:
+            conn = dbConn("ACS_V1_1")
+            cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',m)
+            conn.dbClose()
+            if cbsd_list !=():
+                sasHandler.Handle_Request(cbsd_list, m)
+
+        # time.sleep(20)
+        # regRequest()
 
 
-start()
-# test()
+# start()
+test()
 
 # try:
 #     a_socket.connect(("192.168.4.5", 10500))
