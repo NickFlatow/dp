@@ -17,6 +17,7 @@ import socket
 import threading
 import lib.consts as consts
 from flask_cors import CORS, cross_origin
+from itertools import filterfalse
 
 #init log class
 logger = logger()
@@ -33,7 +34,40 @@ def home():
 @app.route('/dp/v1/register', methods=['POST'])
 @cross_origin()
 def dp_register():
+    
+    
+    # cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
+    # deregistrationRequest(('abc123','DCE994613163'))
+    
+    SNlist = request.form['json']
+    # print(f"SNList: {SNlist}")
+    # print(type(SNlist))
+    # print(SNlist[0])
+    
+    # print(SNlist)
+    SN_json_dict = json.loads(SNlist)
+    # print(SN_json_dict)
 
+
+    SNlist = list(SN_json_dict.values())
+    print(SNlist)
+    conn = dbConn("ACS_V1_1")
+    # conn.updateSasStage(consts.REG,SNlist)
+    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
+    
+    cbsd_list = conn.select(sql,SNlist)
+
+
+
+
+    #convert to list then send to regRequest
+    # print(cbsd_list)
+    sasHandler.Handle_Request(cbsd_list,consts.REG)
+    return "success"
+
+@app.route('/dp/v1/test', methods=['POST'])
+@cross_origin()
+def dp_test():
     #get cbsds from FeMS
     SNlist = request.form['json']
     print(f"this ist the test: {type(SNlist)}")
@@ -41,141 +75,12 @@ def dp_register():
     SN_json_dict = json.loads(SNlist)
 
     # SN_json_list = ",".join( map(str,SN_json_dict.values() ) )
-    
+    print(SN_json_dict)
     #convert to list then send to regRequest
-    regRequest(list(SN_json_dict.values()))
-        
-    return SN_json_dict
+    print(list(SN_json_dict.values()))
 
-@app.route('/dp/v1/test', methods=['POST'])
-@cross_origin()
-def dp_test():
-    # cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
-    # deregistrationRequest(('abc123','DCE994613163'))
-    
-    SNlist = request.form['json']
-    SN_json_dict = json.loads(SNlist)
-    deregistrationRequest(tuple(SN_json_dict.values()))
+    return "success"
 
-    #     print("!!!!!!!!!!!!!!!!!!!!!\n" + val + "\n11111111111111111111\n")
-    
-    return SN_json_dict
-
-def contactSAS(request,method):
-    # Function to contact the SAS server
-    # request - json array to pass to SAS
-    # method - which method SAS you would like to contact registration, spectrum, grant, heartbeat 
-    # logger.info(f"{app.config['SAS']}  {method}")
-    try:
-        return requests.post(app.config['SAS']+method, 
-        cert=('/home/gtadmin/dp/Domain_Proxy/certs/client.cert','/home/gtadmin/dp/Domain_Proxy/certs/client.key'),
-        verify=('/home/gtadmin/dp/Domain_Proxy/certs/ca.cert'),
-        json=request)
-    except Exception as e:
-        print(f"your connection has failed: {e}")
-        return False
-  
-def EARFCNtoMHZ():
-    # Function to convert frequency from EARFCN  to MHz 3660 - 3700
-    # mhz plus 6 zeros
-
-    conn = dbConn("ACS_V1_1")
-    sql = 'SELECT SN,cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where sasStage = %s'
-    response = conn.select(sql,consts.REG)
-
-    for i in range(len(response)):
-        logging.info("////////////////////////////////EARFCN CONVERTION "+ response[i]['SN']+"\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
-        print("EARFCN: " + str(response[i]['EARFCN']))
-        if int(response[i]['EARFCN']) > 56739 or int(response[i]['EARFCN']) < 55240:
-            logging.info("SPECTRUM IS OUTSIDE OF BOUNDS")
-            L_frq = 0
-            H_frq = 0
-        elif response[i]['EARFCN'] == 55240:
-            L_frq = 3550
-            H_frq = 3570
-        elif response[i]['EARFCN'] == 56739:
-            L_frq = 3680
-            H_frq = 3700
-        else:
-            F = math.ceil(3550 + (0.1 * (int(response[i]['EARFCN']) - 55240)))
-            L_frq = F - 10
-            H_frq = F + 10
-    
-        # print(L_frq,H_frq)
-        
-        sql = "UPDATE `dp_device_info` SET lowFrequency=\'"+str(L_frq)+"\', highFrequency=\'"+str(H_frq)+"\' WHERE SN = \'"+str(response[i]['SN'])+"\'"
-        conn.update(sql)        
-
-    conn.dbClose()
-
-def cbsdAction(cbsdSN,action,time):
-    logging.critical("Triggering CBSD action")
-    conn = dbConn("ACS_V1_1")
-    sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+cbsdSN+"\',\'"+action+"\',\'"+time+"\')"
-    logging.critical(cbsdSN + " : SQL cmd " + sql_action)
-    conn.update(sql_action)
-    conn.dbClose()
-
-
-def heartbeatRequest():
-
-    conn = dbConn("ACS_V1_1")
-    sql_select = "SELECT * FROM dp_device_info WHERE sasStage = \'heartbeat\'"
-    response = conn.select(sql_select)
-
-    if response != ():
-        heartbeat = {"heartbeatRequest":[]}
-        print("hb request")
-        for i in range(len(response)):
-            heartbeat['heartbeatRequest'].append(
-                    {
-                        "cbsdId":response[i]['cbsdID'],
-                        "grantId":response[i]['grantID'],
-                        "operationState":response[i]['operationalState']
-                    }
-                )
-        logger.log_json(heartbeat,len(response))
-        
-        response = contactSAS(heartbeat,"heartbeat")
-        conn.dbClose()
-        if response != False:
-            sasHandler.Handle_Response(response.json(),consts.HEART)
-    else:
-        conn.dbClose()
-
-def grantRequest():
-    #make connection to database
-    conn = dbConn("ACS_V1_1")
-    #select eveything where sasStage = grant
-    sql_select = "select * from dp_device_info WHERE sasStage = \'grant\'"
-    response = conn.select(sql_select)
-    conn.dbClose()
-
-    if response != ():
-        grant = {"grantRequest":[]}
-        print("grant request")
-        for i in range(len(response)):
-            grant['grantRequest'].append(
-                    {
-                        "cbsdId":response[i]['cbsdID'],
-                        "operationParam":{
-                            # grab antennaGain from web interface
-                            "maxEirp":int(response[i]['TxPower'] + response[i]['antennaGain']),
-                            "operationFrequencyRange":{
-                                "lowFrequency":response[i]['lowFrequency'] * 1000000,
-                                "highFrequency":response[i]['highFrequency'] * 1000000
-                            }
-                        }
-                    }
-                )
-        logger.log_json(grant,len(response))
-        response = contactSAS(grant,"grant")
-       
-        if response != False:
-            sasHandler.Handle_Response(response.json(),consts.GRANT)
-        # logging.info("RESPONSE FROM grant REQUEST:" + response.json() )
-    else:
-        pass
 
 
 def deregistrationRequest(cbsds_SN = None):
@@ -287,14 +192,14 @@ def registration():
     meth = [consts.REG,consts.SPECTRUM,consts.GRANT]
 
     while True:
-        for m in meth:
-            conn = dbConn("ACS_V1_1")
-            cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',m)
-            conn.dbClose()
-            if cbsd_list !=():
-                sasHandler.Handle_Request(cbsd_list, m)
+        # for m in meth:
+        conn = dbConn("ACS_V1_1")
+        cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.REG)
+        conn.dbClose()
+        if cbsd_list !=():
+            sasHandler.Handle_Request(cbsd_list, consts.REG)
 
-        time.sleep(10)
+        time.sleep(30)
 
 def heartbeat():
         while True:
@@ -303,7 +208,8 @@ def heartbeat():
             conn.dbClose()
             if cbsd_list !=():
                 sasHandler.Handle_Request(cbsd_list,consts.HEART)
-            time.sleep(10)   
+           
+            time.sleep(20)   
 
 def start():
     try:
@@ -338,9 +244,45 @@ def test():
         time.sleep(20)
         # regRequest()
 
+def test2():
+    SNlist = str({"SN1":"DCE994613163","SN2":"abc123"})
 
-# start()
-test()
+    # print(SNlist)
+    # SN_json_dict = json.loads(SNlist)
+    # print(SN_json_dict)
+
+    SN_json_dict = {'SN1': 'DCE994613163', 'SN2': 'abc123'}
+
+
+    conn = dbConn("ACS_V1_1")
+    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(list(SN_json_dict.values()))))
+    cbsd_list = conn.select(sql,list(SN_json_dict.values()))
+
+    # sasHandler.Handle_Request(cbsd_list,consts.REG)
+    print(type(cbsd_list))
+
+def test3():
+    erroDict = {'DCE994613163': "has error", 'abc123': "has error"}
+
+    conn = dbConn("ACS_V1_1")
+    cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s","NONE")
+    cbsd_list[:] = [cbsd for cbsd in cbsd_list if not hasError(cbsd,erroDict)]
+
+    print(bool(cbsd_list))
+
+
+def hasError(cbsd,errorDict):
+    if cbsd['SN'] in errorDict:
+        return True
+    else:
+        return False
+
+
+
+start()
+# test()
+# test2()
+# test3()
 
 # try:
 #     a_socket.connect(("192.168.4.5", 10500))

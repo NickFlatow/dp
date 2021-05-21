@@ -8,15 +8,15 @@ from lib.dbConn import dbConn
 from datetime import datetime
 from test import app
 
-def Handle_Response(response,typeOfCalling):
+def Handle_Response(cbsd_list,response,typeOfCalling):
     #HTTP address that is in place e.g.(reg,spectrum,grant heartbeat)
     resposneMessageType = str(typeOfCalling +"Response")
     
     # select all cbsd that are in current step for typeOfCalling
-    conn = dbConn("ACS_V1_1")
-    sql = 'SELECT * FROM dp_device_info where sasStage = %s' 
-    cbsd_list = conn.select(sql,typeOfCalling)
-    conn.dbClose()
+    # conn = dbConn("ACS_V1_1")
+    # sql = 'SELECT * FROM dp_device_info where sasStage = %s' 
+    # cbsd_list = conn.select(sql,typeOfCalling)
+    # conn.dbClose()
 
     #init dict to pass to error module
     errorDict = {}
@@ -36,6 +36,8 @@ def Handle_Response(response,typeOfCalling):
             conn = dbConn("ACS_V1_1")
             sqlUpdate = "UPDATE `dp_device_info` SET cbsdID=\""+response['registrationResponse'][i]['cbsdId']+"\",sasStage=\"spectrumInquiry\" WHERE SN=\'"+cbsd_list[i]["SN"]+"\'"
             conn.update(sqlUpdate)
+
+            #nextCalling = conts.SPECTRUM
 
         elif typeOfCalling == consts.SPECTRUM:
             conn = dbConn("ACS_V1_1")
@@ -57,6 +59,8 @@ def Handle_Response(response,typeOfCalling):
             sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
             conn.update(sqlUpdate)
 
+            #nextCalling = consts.GRANT
+
         elif typeOfCalling == consts.GRANT:
             #TODO Check for measurement Report
             
@@ -64,6 +68,8 @@ def Handle_Response(response,typeOfCalling):
             sql_update = "UPDATE `dp_device_info` SET `grantID` = %s , `grantExpireTime` = %s, `operationalState` = \'GRANTED\', `sasStage` = \'heartbeat\' WHERE `cbsdID` = %s"
             conn.update(sql_update,(response['grantResponse'][i]['grantId'],response['grantResponse'][i]['grantExpireTime'],response['grantResponse'][i]['cbsdId']))
             conn.dbClose()
+
+            #nextCalling = consts.HEART
 
         elif typeOfCalling == consts.HEART: 
                         #TODO what if no reply... lost in the internet
@@ -93,10 +99,15 @@ def Handle_Response(response,typeOfCalling):
         elif typeOfCalling == consts.REL:
             pass
             #do nothing for now
-        
+
+
     if bool(errorDict):
         e.errorModule(errorDict,typeOfCalling)
+        cbsd_list[:] = [cbsd for cbsd in cbsd_list if not hasError(cbsd,errorDict)]
 
+    if bool(cbsd_list):
+        nextCalling = getNextCalling(typeOfCalling)
+        Handle_Request(cbsd_list,nextCalling)
 
 def Handle_Request(cbsd_list,typeOfCalling):
     '''
@@ -151,19 +162,46 @@ def Handle_Request(cbsd_list,typeOfCalling):
                 )
         elif typeOfCalling == consts.HEART:
             req[requestMessageType].append(
-                                    {
+                    {
                         "cbsdId":cbsd['cbsdID'],
                         "grantId":cbsd['grantID'],
                         "operationState":cbsd['operationalState']
                     }
                 )
+        elif typeOfCalling == consts.DEREG:
+
+            #send relinquishment
+            # grantRelinquishmentRequest(cbsds_SN)
+
+            #how to determine if action was complete
+            cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
+
+            req[requestMessageType].append(
+                    {
+                        "cbsdId":cbsd['cbsdID'],
+                    }
+                )
+
+        elif typeOfCalling == consts.REL:
+            req[requestMessageType].append(
+                {
+                    "cbsdId":cbsd['cbsdID'],
+                    "grantId":cbsd['grantID']
+                }
+            )
+            #set grant IDs to NULL
+            conn = dbConn("ACS_V1_1")
+            update_grantID = "UPDATE dp_device_info SET grantID = NULL WHERE SN = %s "
+            conn.update(update_grantID,cbsd['SN'])
+            conn.dbClose()
+
 
 
     dpLogger.log_json(req,len(cbsd_list))
     SASresponse = contactSAS(req,typeOfCalling)
 
     if SASresponse != False:
-        Handle_Response(SASresponse.json(),typeOfCalling)
+        Handle_Response(cbsd_list,SASresponse.json(),typeOfCalling)
 
 def contactSAS(request,method):
     # Function to contact the SAS server
@@ -221,3 +259,19 @@ def EARFCNtoMHZ(cbsd_SN):
     freqDict['lowFreq'] = L_frq
     freqDict['highFreq'] = H_frq
     return freqDict
+
+def hasError(cbsd,errorDict):
+    if cbsd['SN'] in errorDict:
+        return True
+    else:
+        return False
+
+def getNextCalling(typeOfCalling):
+    if typeOfCalling == consts.REG:
+        return consts.SPECTRUM
+    if typeOfCalling == consts.SPECTRUM:
+        return consts.GRANT
+    if typeOfCalling == consts.GRANT:
+        return consts.HEART
+    if typeOfCalling == consts.HEART:
+        return consts.HEART
