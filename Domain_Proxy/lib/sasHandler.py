@@ -1,13 +1,16 @@
 import math
 import logging
 import requests
+import time
 import lib.error as e
 import lib.consts as consts
 from lib.log import dpLogger
 from lib.dbConn import dbConn
 from datetime import datetime
 from test import app
-
+class sasHandler():
+    def __init__(self,cbsd_list):
+        pass
 def Handle_Response(cbsd_list,response,typeOfCalling):
     #HTTP address that is in place e.g.(reg,spectrum,grant heartbeat)
     resposneMessageType = str(typeOfCalling +"Response")
@@ -107,7 +110,13 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
     if bool(cbsd_list):
         nextCalling = getNextCalling(typeOfCalling)
-        Handle_Request(cbsd_list,nextCalling)
+        #should rather make cbsd a class
+        #update cbsd list properties
+        conn = dbConn("ACS_V1_1")
+        updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",nextCalling)
+        if nextCalling == consts.HEART and updated_cbsd_list[0]['operationalState'] == "AUTHORIZED":
+            time.sleep(30)
+        Handle_Request(updated_cbsd_list,nextCalling)
 
 def Handle_Request(cbsd_list,typeOfCalling):
     '''

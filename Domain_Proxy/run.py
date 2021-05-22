@@ -57,9 +57,6 @@ def dp_register():
     
     cbsd_list = conn.select(sql,SNlist)
 
-
-
-
     #convert to list then send to regRequest
     # print(cbsd_list)
     sasHandler.Handle_Request(cbsd_list,consts.REG)
@@ -203,11 +200,11 @@ def registration():
 
 def heartbeat():
         while True:
-            conn = dbConn("ACS_V1_1")
-            cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.HEART)
-            conn.dbClose()
-            if cbsd_list !=():
-                sasHandler.Handle_Request(cbsd_list,consts.HEART)
+            # conn = dbConn("ACS_V1_1")
+            # cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.HEART)
+            # conn.dbClose()
+            # if cbsd_list !=():
+            #     sasHandler.Handle_Request(cbsd_list,consts.HEART)
            
             time.sleep(20)   
 
