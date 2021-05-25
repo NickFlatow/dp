@@ -34,51 +34,46 @@ def home():
 @app.route('/dp/v1/register', methods=['POST'])
 @cross_origin()
 def dp_register():
-    
-    
-    # cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
-    # deregistrationRequest(('abc123','DCE994613163'))
-    
+    #Get cbsd SNs from FeMS    
     SNlist = request.form['json']
-    # print(f"SNList: {SNlist}")
-    # print(type(SNlist))
-    # print(SNlist[0])
-    
-    # print(SNlist)
+
+    #convert to json
     SN_json_dict = json.loads(SNlist)
-    # print(SN_json_dict)
 
-
+    #select only the values
     SNlist = list(SN_json_dict.values())
     print(SNlist)
+
+    #collect all values from databse
     conn = dbConn("ACS_V1_1")
-    # conn.updateSasStage(consts.REG,SNlist)
     sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
-    
     cbsd_list = conn.select(sql,SNlist)
 
-    #convert to list then send to regRequest
-    # print(cbsd_list)
     sasHandler.Handle_Request(cbsd_list,consts.REG)
     return "success"
 
 @app.route('/dp/v1/test', methods=['POST'])
 @cross_origin()
-def dp_test():
-    #get cbsds from FeMS
+def dp_deregister():
+    #Get cbsd SNs from FeMS    
     SNlist = request.form['json']
-    print(f"this ist the test: {type(SNlist)}")
+
     #convert to json
     SN_json_dict = json.loads(SNlist)
 
-    # SN_json_list = ",".join( map(str,SN_json_dict.values() ) )
-    print(SN_json_dict)
-    #convert to list then send to regRequest
-    print(list(SN_json_dict.values()))
+    #select only the values
+    SNlist = list(SN_json_dict.values())
+    # print(SNlist)
 
+    #collect all values from databse
+    conn = dbConn("ACS_V1_1")
+    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
+    cbsd_list = conn.select(sql,SNlist)
+
+    print(cbsd_list)
+    sasHandler.Handle_Request(cbsd_list,consts.REL)
+    sasHandler.Handle_Request(cbsd_list,consts.DEREG)
     return "success"
-
-
 
 def deregistrationRequest(cbsds_SN = None):
 
@@ -266,6 +261,18 @@ def test3():
     cbsd_list[:] = [cbsd for cbsd in cbsd_list if not hasError(cbsd,erroDict)]
 
     print(bool(cbsd_list))
+
+def test4():
+    
+    SNlist = ['abc123','DCE994613163']
+
+    conn = dbConn("ACS_V1_1")
+    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
+    cbsd_list = conn.select(sql,SNlist)
+
+    print(cbsd_list)
+    sasHandler.Handle_Request(cbsd_list,consts.REL)
+    sasHandler.Handle_Request(cbsd_list,consts.DEREG)
 
 
 def hasError(cbsd,errorDict):

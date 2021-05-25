@@ -86,6 +86,7 @@ def Handle_Request(cbsd_list,typeOfCalling):
                 )
 
         elif typeOfCalling == consts.REL:
+            print("REL")
             req[requestMessageType].append(
                 {
                     "cbsdId":cbsd['cbsdID'],
@@ -191,12 +192,17 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
                 cbsdAction(cbsd_list[i]['SN'],"RF_ON",str(datetime.now()))
 
         elif typeOfCalling == consts.DEREG:
-            pass
-            #do nothing for now =
+            #update sasStage
+            conn = dbConn("ACS_V1_1")
+            conn.update("UPDATE dp_device_info SET sasStage = %s",consts.DEREG)
+            conn.dbClose()
+
 
         elif typeOfCalling == consts.REL:
-            pass
-            #do nothing for now
+            #update sasStage
+            conn = dbConn("ACS_V1_1")
+            conn.update("UPDATE dp_device_info SET sasStage = %s",consts.REL)
+            conn.dbClose()
 
 
     if bool(errorDict):
