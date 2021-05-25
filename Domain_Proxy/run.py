@@ -200,13 +200,13 @@ def registration():
 
 def heartbeat():
         while True:
-            # conn = dbConn("ACS_V1_1")
-            # cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.HEART)
-            # conn.dbClose()
-            # if cbsd_list !=():
-            #     sasHandler.Handle_Request(cbsd_list,consts.HEART)
+            conn = dbConn("ACS_V1_1")
+            cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.HEART)
+            conn.dbClose()
+            if cbsd_list !=():
+                sasHandler.Handle_Request(cbsd_list,consts.HEART)
            
-            time.sleep(20)   
+            time.sleep(4)   
 
 def start():
     try:

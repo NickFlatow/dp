@@ -8,9 +8,104 @@ from lib.log import dpLogger
 from lib.dbConn import dbConn
 from datetime import datetime
 from test import app
-class sasHandler():
-    def __init__(self,cbsd_list):
-        pass
+# class sasHandler():
+#     def __init__(self,cbsd_list):
+#         pass
+
+def Handle_Request(cbsd_list,typeOfCalling):
+    '''
+    handles all requests send to SAS
+    '''
+    requestMessageType = str(typeOfCalling +"Request")
+
+    req = {requestMessageType:[]}
+
+    for cbsd in cbsd_list:
+
+        if typeOfCalling == consts.REG:
+            req[requestMessageType].append(
+                {
+                    "cbsdSerialNumber": cbsd["SN"],
+                    "fccId": cbsd["fccID"],
+                    "cbsdCategory": cbsd["cbsdCategory"],
+                    "userId": cbsd["userID"]
+                }
+            )
+        
+        elif typeOfCalling == consts.SPECTRUM:
+            
+            FreqDict = EARFCNtoMHZ(cbsd['SN'])
+
+            req[requestMessageType].append(
+                {
+                    "cbsdId":cbsd['cbsdID'],
+                    "inquiredSpectrum":[
+                        {
+                            "highFrequency":FreqDict['highFreq'] * 1000000,
+                            "lowFrequency":FreqDict['lowFreq']  * 1000000
+                        }
+                    ]
+                }
+            )
+        
+        elif typeOfCalling == consts.GRANT:
+            
+            req[requestMessageType].append(
+                    {
+                        "cbsdId":cbsd['cbsdID'],
+                        "operationParam":{
+                            # grab antennaGain from web interface
+                            "maxEirp":int(cbsd['TxPower'] + cbsd['antennaGain']),
+                            "operationFrequencyRange":{
+                                "lowFrequency":cbsd['lowFrequency'] * 1000000,
+                                "highFrequency":cbsd['highFrequency'] * 1000000
+                            }
+                        }
+                    }
+                )
+        elif typeOfCalling == consts.HEART:
+            req[requestMessageType].append(
+                    {
+                        "cbsdId":cbsd['cbsdID'],
+                        "grantId":cbsd['grantID'],
+                        "operationState":cbsd['operationalState']
+                    }
+                )
+        elif typeOfCalling == consts.DEREG:
+
+            #send relinquishment
+            # grantRelinquishmentRequest(cbsds_SN)
+
+            #how to determine if action was complete
+            cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
+
+            req[requestMessageType].append(
+                    {
+                        "cbsdId":cbsd['cbsdID'],
+                    }
+                )
+
+        elif typeOfCalling == consts.REL:
+            req[requestMessageType].append(
+                {
+                    "cbsdId":cbsd['cbsdID'],
+                    "grantId":cbsd['grantID']
+                }
+            )
+            #set grant IDs to NULL
+            conn = dbConn("ACS_V1_1")
+            update_grantID = "UPDATE dp_device_info SET grantID = NULL WHERE SN = %s "
+            conn.update(update_grantID,cbsd['SN'])
+            conn.dbClose()
+
+
+    dpLogger.log_json(req,len(cbsd_list))
+    SASresponse = contactSAS(req,typeOfCalling)
+
+    if SASresponse != False:
+        Handle_Response(cbsd_list,SASresponse.json(),typeOfCalling)
+
+
 def Handle_Response(cbsd_list,response,typeOfCalling):
     #HTTP address that is in place e.g.(reg,spectrum,grant heartbeat)
     resposneMessageType = str(typeOfCalling +"Response")
@@ -112,105 +207,12 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
         nextCalling = getNextCalling(typeOfCalling)
         #should rather make cbsd a class
         #update cbsd list properties
-        conn = dbConn("ACS_V1_1")
-        updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",nextCalling)
-        if nextCalling == consts.HEART and updated_cbsd_list[0]['operationalState'] == "AUTHORIZED":
-            time.sleep(30)
-        Handle_Request(updated_cbsd_list,nextCalling)
-
-def Handle_Request(cbsd_list,typeOfCalling):
-    '''
-    handles all requests send to SAS
-    '''
-    requestMessageType = str(typeOfCalling +"Request")
-
-    req = {requestMessageType:[]}
-
-    for cbsd in cbsd_list:
-
-        if typeOfCalling == consts.REG:
-            req[requestMessageType].append(
-                {
-                    "cbsdSerialNumber": cbsd["SN"],
-                    "fccId": cbsd["fccID"],
-                    "cbsdCategory": cbsd["cbsdCategory"],
-                    "userId": cbsd["userID"]
-                }
-            )
         
-        elif typeOfCalling == consts.SPECTRUM:
-            
-            FreqDict = EARFCNtoMHZ(cbsd['SN'])
-
-            req[requestMessageType].append(
-                {
-                    "cbsdId":cbsd['cbsdID'],
-                    "inquiredSpectrum":[
-                        {
-                            "highFrequency":FreqDict['highFreq'] * 1000000,
-                            "lowFrequency":FreqDict['lowFreq']  * 1000000
-                        }
-                    ]
-                }
-            )
-        
-        elif typeOfCalling == consts.GRANT:
-            
-            req[requestMessageType].append(
-                    {
-                        "cbsdId":cbsd['cbsdID'],
-                        "operationParam":{
-                            # grab antennaGain from web interface
-                            "maxEirp":int(cbsd['TxPower'] + cbsd['antennaGain']),
-                            "operationFrequencyRange":{
-                                "lowFrequency":cbsd['lowFrequency'] * 1000000,
-                                "highFrequency":cbsd['highFrequency'] * 1000000
-                            }
-                        }
-                    }
-                )
-        elif typeOfCalling == consts.HEART:
-            req[requestMessageType].append(
-                    {
-                        "cbsdId":cbsd['cbsdID'],
-                        "grantId":cbsd['grantID'],
-                        "operationState":cbsd['operationalState']
-                    }
-                )
-        elif typeOfCalling == consts.DEREG:
-
-            #send relinquishment
-            # grantRelinquishmentRequest(cbsds_SN)
-
-            #how to determine if action was complete
-            cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
-
-            req[requestMessageType].append(
-                    {
-                        "cbsdId":cbsd['cbsdID'],
-                    }
-                )
-
-        elif typeOfCalling == consts.REL:
-            req[requestMessageType].append(
-                {
-                    "cbsdId":cbsd['cbsdID'],
-                    "grantId":cbsd['grantID']
-                }
-            )
-            #set grant IDs to NULL
+        if (nextCalling != False):
             conn = dbConn("ACS_V1_1")
-            update_grantID = "UPDATE dp_device_info SET grantID = NULL WHERE SN = %s "
-            conn.update(update_grantID,cbsd['SN'])
-            conn.dbClose()
+            updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",nextCalling)
+            Handle_Request(updated_cbsd_list,nextCalling)
 
-
-
-    dpLogger.log_json(req,len(cbsd_list))
-    SASresponse = contactSAS(req,typeOfCalling)
-
-    if SASresponse != False:
-        Handle_Response(cbsd_list,SASresponse.json(),typeOfCalling)
 
 def contactSAS(request,method):
     # Function to contact the SAS server
@@ -283,4 +285,8 @@ def getNextCalling(typeOfCalling):
     if typeOfCalling == consts.GRANT:
         return consts.HEART
     if typeOfCalling == consts.HEART:
-        return consts.HEART
+        return False
+    if typeOfCalling == consts.REL:
+        return False
+    if typeOfCalling == consts.DEREG:
+        return False
