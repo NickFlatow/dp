@@ -34,6 +34,7 @@ def Handle_Request(cbsd_list,typeOfCalling):
         
         elif typeOfCalling == consts.SPECTRUM:
             
+            #calculate MHz and MaxEirp
             FreqDict = EARFCNtoMHZ(cbsd['SN'])
 
             req[requestMessageType].append(
@@ -55,7 +56,7 @@ def Handle_Request(cbsd_list,typeOfCalling):
                         "cbsdId":cbsd['cbsdID'],
                         "operationParam":{
                             # grab antennaGain from web interface
-                            "maxEirp":int(cbsd['TxPower'] + cbsd['antennaGain']),
+                            "maxEirp":cbsd['maxEIRP'],
                             "operationFrequencyRange":{
                                 "lowFrequency":cbsd['lowFrequency'] * 1000000,
                                 "highFrequency":cbsd['highFrequency'] * 1000000
@@ -103,8 +104,11 @@ def Handle_Request(cbsd_list,typeOfCalling):
     dpLogger.log_json(req,len(cbsd_list))
     SASresponse = contactSAS(req,typeOfCalling)
 
+    # if SASresponse != False:
+    #     Handle_Response(cbsd_list,SASresponse.json(),typeOfCalling)
+
     if SASresponse != False:
-        Handle_Response(cbsd_list,SASresponse.json(),typeOfCalling)
+        Handle_Response(cbsd_list,SASresponse,typeOfCalling)
 
 
 def Handle_Response(cbsd_list,response,typeOfCalling):
@@ -142,6 +146,18 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             conn = dbConn("ACS_V1_1")
             # if high frequcy and low frequcy match value(convert to hz) for cbsdId in database then move to next
 
+
+            #check maxEirp if higher change
+
+            print(len(response['spectrumInquiryResponse'][i]['availableChannel']))
+
+            for channel in response['spectrumInquiryResponse'][i]['availableChannel']:
+                 if channel['channelType'] == 'GAA':
+                    if channel['maxEirp'] <= cbsd_list[i]['maxEIRP']:
+                        print("over")
+                    print(channel['frequencyRange']['lowFrequency'],channel['frequencyRange']['highFrequency'])
+                       
+               
             #TODO WHAT IF THE AVAIABLE CHANNEL ARRAY IS EMPTY
             low = math.floor(response['spectrumInquiryResponse'][i]['availableChannel'][0]['frequencyRange']['lowFrequency']/1000000)
             high = math.floor(response['spectrumInquiryResponse'][i]['availableChannel'][0]['frequencyRange']['highFrequency']/1000000)
@@ -209,15 +225,15 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
         e.errorModule(errorDict,typeOfCalling)
         cbsd_list[:] = [cbsd for cbsd in cbsd_list if not hasError(cbsd,errorDict)]
 
-    if bool(cbsd_list):
-        nextCalling = getNextCalling(typeOfCalling)
-        #should rather make cbsd a class
-        #update cbsd list properties
+    # if bool(cbsd_list):
+    #     nextCalling = getNextCalling(typeOfCalling)
+    #     #should rather make cbsd a class
+    #     #update cbsd list properties
         
-        if (nextCalling != False):
-            conn = dbConn("ACS_V1_1")
-            updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",nextCalling)
-            Handle_Request(updated_cbsd_list,nextCalling)
+    #     if (nextCalling != False):
+    #         conn = dbConn("ACS_V1_1")
+    #         updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",nextCalling)
+    #         Handle_Request(updated_cbsd_list,nextCalling)
 
 
 def contactSAS(request,method):
@@ -225,14 +241,17 @@ def contactSAS(request,method):
     # request - json array to pass to SAS
     # method - which method SAS you would like to contact registration, spectrum, grant, heartbeat 
     # logger.info(f"{app.config['SAS']}  {method}")
-    try:
-        return requests.post(app.config['SAS']+method, 
-        cert=('/home/gtadmin/dp/Domain_Proxy/certs/client.cert','/home/gtadmin/dp/Domain_Proxy/certs/client.key'),
-        verify=('/home/gtadmin/dp/Domain_Proxy/certs/ca.cert'),
-        json=request)
-    except Exception as e:
-        print(f"your connection has failed: {e}")
-        return False
+
+
+    # try:
+    #     return requests.post(app.config['SAS']+method, 
+    #     cert=('/home/gtadmin/dp/Domain_Proxy/certs/client.cert','/home/gtadmin/dp/Domain_Proxy/certs/client.key'),
+    #     verify=('/home/gtadmin/dp/Domain_Proxy/certs/ca.cert'),
+    #     json=request)
+    # except Exception as e:
+    #     print(f"your connection has failed: {e}")
+    #     return False
+    return consts.FS1
 
 def cbsdAction(cbsdSN,action,time):
     logging.critical("Triggering CBSD action")
@@ -247,7 +266,7 @@ def EARFCNtoMHZ(cbsd_SN):
     # mhz plus 6 zeros
     freqDict = {}
     conn = dbConn("ACS_V1_1")
-    sql = 'SELECT SN,cbsdId, EARFCN,lowFrequency,highFrequency FROM dp_device_info where SN = %s'
+    sql = 'SELECT * FROM dp_device_info where SN = %s'
     cbsd = conn.select(sql,cbsd_SN)
 
     
@@ -268,9 +287,8 @@ def EARFCNtoMHZ(cbsd_SN):
         L_frq = F - 10
         H_frq = F + 10
 
-
-    sql = "UPDATE `dp_device_info` SET lowFrequency=\'"+str(L_frq)+"\', highFrequency=\'"+str(H_frq)+"\' WHERE SN = \'"+str(cbsd[0]['SN'])+"\'"
-    conn.update(sql)        
+    sql = "UPDATE `dp_device_info` SET lowFrequency= %s, highFrequency=%s, maxEIRP= %s WHERE SN = %s"
+    conn.update(sql,(str(L_frq),str(H_frq),int(cbsd[0]['TxPower'] + cbsd[0]['antennaGain']), str(cbsd[0]['SN'])))        
     conn.dbClose()
 
     freqDict['lowFreq'] = L_frq

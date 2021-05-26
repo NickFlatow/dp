@@ -274,6 +274,15 @@ def test4():
     sasHandler.Handle_Request(cbsd_list,consts.REL)
     sasHandler.Handle_Request(cbsd_list,consts.DEREG)
 
+def test5():
+    
+    SNlist = ['DCE994613163']
+
+    conn = dbConn("ACS_V1_1")
+    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
+    cbsd_list = conn.select(sql,SNlist)
+
+    sasHandler.Handle_Request(cbsd_list,consts.SPECTRUM)
 
 def hasError(cbsd,errorDict):
     if cbsd['SN'] in errorDict:
@@ -283,10 +292,11 @@ def hasError(cbsd,errorDict):
 
 
 
-start()
+# start()
 # test()
 # test2()
 # test3()
+test5()
 
 # try:
 #     a_socket.connect(("192.168.4.5", 10500))

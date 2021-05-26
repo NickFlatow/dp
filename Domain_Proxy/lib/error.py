@@ -30,9 +30,6 @@ def log_error_to_FeMS_alarm(severity,cbsd_data,response,typeOfCalling):
     
     # print(f"cbsd data: {cbsd_data} \n\n response data: {response}")
 
-
-    
-
     if(hasAlarmIdentifier(alarmIdentifier)):
         conn = dbConn("ACS_V1_1")
         conn.update("UPDATE apt_alarm_latest SET updateTime = %s,EventTime = %s WHERE AlarmIdentifier = %s" ,(str(datetime.now()),str(datetime.now()),alarmIdentifier ))
