@@ -1,6 +1,7 @@
 import pymysql
 from test import app
 import logging
+import lib.consts as consts
 
 class dbConn():
     def __init__(self,db):

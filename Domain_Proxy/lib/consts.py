@@ -5,6 +5,14 @@ GRANT = 'grant'
 HEART = 'heartbeat'
 DEREG = 'deregistration'
 REL = 'relinquishment'
+
+#DATA MODEL PATHS
+TXPOWER_PATH = 'Device.X_FOXCONN_FAP.CellConfig.SonMaxTxPower_Max' 
+EARFCN_LIST = 'Device.X_FOXCONN_FAP.CellConfig.EUTRACarrierARFCNDL'
+EARFCN_IN_USE = 'Device.X_FOXCONN_FAP.CellConfig.EUTRACarrierARFCNULInUse'
+
+
+DB = 'ACS_V1_1'
 FS = {
   "spectrumInquiryResponse": [
     {

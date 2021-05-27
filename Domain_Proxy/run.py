@@ -180,6 +180,7 @@ print(__name__)
     # EARFCNtoMHZ([{'EARFCN':55240},{'EARFCN':55990},{'EARFCN':56739}])
     
     #Convert EARFCN into hz
+
 def registration():
     meth = [consts.REG,consts.SPECTRUM,consts.GRANT]
 
@@ -283,7 +284,9 @@ def test5():
     cbsd_list = conn.select(sql,SNlist)
 
     sasHandler.Handle_Request(cbsd_list,consts.SPECTRUM)
-
+def test6():
+    sasHandler.setParameterValue("DCE994613163",consts.TXPOWER_PATH,"int",5)
+    
 def hasError(cbsd,errorDict):
     if cbsd['SN'] in errorDict:
         return True
@@ -296,7 +299,9 @@ def hasError(cbsd,errorDict):
 # test()
 # test2()
 # test3()
-test5()
+# test5()
+# test5()
+test6()
 
 # try:
 #     a_socket.connect(("192.168.4.5", 10500))

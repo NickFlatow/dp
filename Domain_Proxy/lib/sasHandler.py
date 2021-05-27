@@ -314,3 +314,32 @@ def getNextCalling(typeOfCalling):
         return False
     if typeOfCalling == consts.DEREG:
         return False
+
+def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue):
+    #purge last action
+    conn = dbConn("ACS_V1_1")
+    conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd_SN)
+
+    #insert SN, data_model_path and value into FeMS_spv
+    conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd_SN,1,data_model_path,setValueType,setValue))
+    conn.dbClose()
+    #call cbsdAction with action as 'Set Parameter Value'
+    cbsdAction(cbsd_SN,'Set Parameter Value',str(datetime.now()))
+    
+
+def getParameterValue():
+    pass
+    #check if action is already being executed
+    # $sqlQueryStr = "SELECT `Note` FROM `apt_action_queue` WHERE `Action`='".$In_Action."' AND `SN`='".$In_SN."'";
+    # $sqlQueryResult = mysql_query($sqlQueryStr);
+    # if(mysql_num_rows($sqlQueryResult) != 0)
+    # {
+    #     $note = mysql_result($sqlQueryResult, 0);
+    #     if (!empty($note) && ($note == 'EXEC')) /* block replacement if action is executing */
+    #     {
+    #         echo '<script language="javascript">alert("Previous GPV is running, please retry later");top.location.href=\'deviceList.php\';</script>';
+    #         exit();                
+    #     }
+    # }
+
+    #if no action purge last action
