@@ -2,13 +2,12 @@ import math
 import logging
 import requests
 import time
+import lib.error as e
 import lib.consts as consts
 from lib.log import dpLogger
 from lib.dbConn import dbConn
-from lib import error as e
 from datetime import datetime
 from test import app
-
 # class sasHandler():
 #     def __init__(self,cbsd_list):
 #         pass
@@ -105,11 +104,11 @@ def Handle_Request(cbsd_list,typeOfCalling):
     dpLogger.log_json(req,len(cbsd_list))
     SASresponse = contactSAS(req,typeOfCalling)
 
-    if SASresponse != False:
-        Handle_Response(cbsd_list,SASresponse.json(),typeOfCalling)
-
     # if SASresponse != False:
-    #     Handle_Response(cbsd_list,SASresponse,typeOfCalling)
+    #     Handle_Response(cbsd_list,SASresponse.json(),typeOfCalling)
+
+    if SASresponse != False:
+        Handle_Response(cbsd_list,SASresponse,typeOfCalling)
 
 
 def Handle_Response(cbsd_list,response,typeOfCalling):
@@ -226,15 +225,15 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
         e.errorModule(errorDict,typeOfCalling)
         cbsd_list[:] = [cbsd for cbsd in cbsd_list if not hasError(cbsd,errorDict)]
 
-    if bool(cbsd_list):
-        nextCalling = getNextCalling(typeOfCalling)
-        #should rather make cbsd a class
-        #update cbsd list properties
+    # if bool(cbsd_list):
+    #     nextCalling = getNextCalling(typeOfCalling)
+    #     #should rather make cbsd a class
+    #     #update cbsd list properties
         
-        if (nextCalling != False):
-            conn = dbConn("ACS_V1_1")
-            updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",nextCalling)
-            Handle_Request(updated_cbsd_list,nextCalling)
+    #     if (nextCalling != False):
+    #         conn = dbConn("ACS_V1_1")
+    #         updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",nextCalling)
+    #         Handle_Request(updated_cbsd_list,nextCalling)
 
 
 def contactSAS(request,method):
@@ -244,15 +243,15 @@ def contactSAS(request,method):
     # logger.info(f"{app.config['SAS']}  {method}")
 
 
-    try:
-        return requests.post(app.config['SAS']+method, 
-        cert=('/home/gtadmin/dp/Domain_Proxy/certs/client.cert','/home/gtadmin/dp/Domain_Proxy/certs/client.key'),
-        verify=('/home/gtadmin/dp/Domain_Proxy/certs/ca.cert'),
-        json=request)
-    except Exception as e:
-        print(f"your connection has failed: {e}")
-        return False
-    # return consts.FS1
+    # try:
+    #     return requests.post(app.config['SAS']+method, 
+    #     cert=('/home/gtadmin/dp/Domain_Proxy/certs/client.cert','/home/gtadmin/dp/Domain_Proxy/certs/client.key'),
+    #     verify=('/home/gtadmin/dp/Domain_Proxy/certs/ca.cert'),
+    #     json=request)
+    # except Exception as e:
+    #     print(f"your connection has failed: {e}")
+    #     return False
+    return consts.FS1
 
 def cbsdAction(cbsdSN,action,time):
     logging.critical("Triggering CBSD action")
