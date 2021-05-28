@@ -3,3 +3,6 @@
 *.log
 *.sql
 *.sqlite
+
+python3-virtualenv/
+venv/
