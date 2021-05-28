@@ -202,7 +202,7 @@ def heartbeat():
             if cbsd_list !=():
                 sasHandler.Handle_Request(cbsd_list,consts.HEART)
            
-            time.sleep(4)   
+            time.sleep(5)   
 
 def start():
     try:
@@ -263,7 +263,7 @@ def test3():
 
     print(bool(cbsd_list))
 
-def test4():
+def test4(): 
     
     SNlist = ['abc123','DCE994613163']
 
@@ -285,13 +285,13 @@ def test5():
 
     sasHandler.Handle_Request(cbsd_list,consts.SPECTRUM)
 def test6():
+
     sasHandler.setParameterValue("DCE994613163",consts.TXPOWER_PATH,"int",5)
-    
-def hasError(cbsd,errorDict):
-    if cbsd['SN'] in errorDict:
-        return True
-    else:
-        return False
+
+def test_105_error():
+    errorDict = {'DCE994613163': {'responseCode': 105}}
+    error.errorModule(errorDict,consts.REG)
+
 
 
 
@@ -302,6 +302,7 @@ start()
 # test5()
 # test5()
 # test6()
+# test_105_error()
 
 # try:
 #     a_socket.connect(("192.168.4.5", 10500))

@@ -5,10 +5,11 @@ from lib.dbConn import dbConn
 
 
 def errorModule(errorDict,typeOfCalling):
+    send_to_request_list = []
+    reReg = False
     for SN in errorDict:
         #collect all cbsd data from database for each SN
         conn = dbConn("ACS_V1_1")
-        #alll cbsd data from dp database
         cbsd_data = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SN)
         conn.dbClose()
 
@@ -16,14 +17,22 @@ def errorModule(errorDict,typeOfCalling):
 
         if errorCode == 105:
             sasHandler.Handle_Request(cbsd_data,consts.DEREG)
-            sasHandler.Handle_Request(cbsd_data,consts.REG)
+            send_to_request_list.append(SN)
+            reReg = True
+            # sasHandler.Handle_Request(cbsd_data,consts.REG)
 
             #update SAS stage to register
+        elif errorCode == 501:
+            log_error_to_FeMS_alarm("CRITICAL",cbsd_data,errorDict[SN],typeOfCalling)
+            print("I'm an error")
         else:
             #Severity is CRITICAL OR WARNING
             log_error_to_FeMS_alarm("WARNING",cbsd_data,errorDict[SN],typeOfCalling)
 
         #cbsd_data = ((CBSDSN, {resposne:{responseCode:200,responseMessage:"this is some thing"}}),(CBSDSN, {resposne .....}))
+    if bool(send_to_request_list) and bool(reReg):
+        update_sas_stage(send_to_request_list,consts.REG)
+
 
 
 def log_error_to_FeMS_alarm(severity,cbsd_data,response,typeOfCalling):
@@ -63,6 +72,12 @@ def hasAlarmIdentifier(ai):
 def response_200():
     pass
     #200
+
+def update_sas_stage(cbsds_SN_list,typeOfCalling):
+    conn = dbConn("ACS_V1_1")
+    conn.updateSasStage(typeOfCalling,cbsds_SN_list)
+    pass
+
 
     # reposne 200 example
     # REQUEST TIMESTAMP: 2021-05-06T19:14:50 (UTC: 2021-05-07T00:14:50)
