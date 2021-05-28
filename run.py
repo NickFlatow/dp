@@ -196,13 +196,14 @@ def registration():
 
 def heartbeat():
         while True:
+            print("heartbeat")
             conn = dbConn("ACS_V1_1")
             cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.HEART)
             conn.dbClose()
             if cbsd_list !=():
                 sasHandler.Handle_Request(cbsd_list,consts.HEART)
            
-            time.sleep(5)   
+            time.sleep(1)   
 
 def start():
     try:
@@ -292,6 +293,14 @@ def test_105_error():
     errorDict = {'DCE994613163': {'responseCode': 105}}
     error.errorModule(errorDict,consts.REG)
 
+def test_501_error_module():
+    SNlist = ['DCE994613163']
+
+    conn = dbConn("ACS_V1_1")
+    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
+    cbsd_list = conn.select(sql,SNlist)
+    sasHandler.Handle_Response(cbsd_list,consts.HBE,consts.HEART)
+
 
 
 
@@ -303,6 +312,7 @@ start()
 # test5()
 # test6()
 # test_105_error()
+# test_501_error_module()
 
 # try:
 #     a_socket.connect(("192.168.4.5", 10500))

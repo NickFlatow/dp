@@ -6,7 +6,7 @@ import lib.consts as consts
 from lib.log import dpLogger
 from lib.dbConn import dbConn
 from lib import error as e
-from datetime import datetime
+from datetime import datetime, timedelta
 from test import app
 
 # class sasHandler():
@@ -73,6 +73,8 @@ def Handle_Request(cbsd_list,typeOfCalling):
                         "operationState":cbsd['operationalState']
                     }
                 )
+                
+
         elif typeOfCalling == consts.DEREG:
             
 
@@ -136,7 +138,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
         if response[resposneMessageType][i]['response']['responseCode'] != 0:
             # errorList.append(response[resposneMessageType][i][response])
         #    print(response[resposneMessageType][i]['response'])
-            errorDict[cbsd_list[i]['SN']] = response[resposneMessageType][i]['response']
+            errorDict[cbsd_list[i]['SN']] = response[resposneMessageType][i]
 
         elif typeOfCalling == consts.REG:
 
@@ -191,15 +193,17 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #nextCalling = consts.HEART
 
         elif typeOfCalling == consts.HEART: 
-                        #TODO what if no reply... lost in the internet
+            #TODO what if no reply... lost in the internet
             #TODO check if reply is recieved from all cbsds
             #TODO WHAT IF MEAS REPORT
             #TODO
 
             conn = dbConn("ACS_V1_1")
             #update operational state to granted/ what if operational state is already authorized
-            update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
-            conn.update(update_operational_state)
+            if not expired(response['heartbeatResponse'][i]['transmitExpireTime']):
+                update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
+                conn.update(update_operational_state)
+            
             #update transmist expire time
             update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + response['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
             conn.update(update_transmit_time)
@@ -247,10 +251,16 @@ def contactSAS(request,method):
     # logger.info(f"{app.config['SAS']}  {method}")
 
     try:
-        return requests.post(app.config['SAS']+method, 
+        a = requests.post(app.config['SAS']+method, 
         cert=('certs/client.cert','certs/client.key'),
         verify=('certs/ca.cert'),
-        json=request)
+        json=request,
+        timeout=1.5)
+
+        print(a)
+        return a
+    except requests.ConnectionError:
+        print("tragic")
     except Exception as e:
         print(f"your connection has failed: {e}")
         return False
@@ -349,3 +359,32 @@ def getParameterValue():
     # }
 
     #if no action purge last action
+def expired(transmitExpireTime):
+    #convert transmitExpireTime string to datetime
+    expireTime = datetime.strptime(transmitExpireTime,"%Y-%m-%dT%H:%M:%SZ")
+
+    if datetime.utcnow() > expireTime:
+        return True
+    else:
+        return False
+
+def expired_1(transmiteExpireTime):
+    #convert sting to datetime and compare to current time.
+    
+    #time of which grant or transmit will expire
+    expireTime = datetime.strptime(time,"%Y-%m-%dT%H:%M:%SZ")
+    print(expireTime)
+    timeChange = expireTime + timedelta(seconds=hbinterval)
+    print(datetime.now())
+    print(timeChange)
+    #if the current time is less than the expire time plus the heartbeat interval
+    if timeChange > datetime.now():
+        try:
+            conn = dbConn("ACS_V1_1")
+            sql = "UPDATE `dp_device_info` SET `sasStage` = 'dereg' where `cbsdID` = 'FoxconnMock-SASDCE994613163'"
+            conn.cursor.execute(sql)
+            cbsdAction("DCE994613163","RF_OFF",str(datetime.now()))
+        except Exception as e:
+            print(e)
+    else:
+        return False

@@ -13,21 +13,30 @@ def errorModule(errorDict,typeOfCalling):
         cbsd_data = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SN)
         conn.dbClose()
 
-        errorCode = errorDict[SN]['responseCode']
+        errorCode = errorDict[SN]['response']['responseCode']
 
         if errorCode == 105:
             sasHandler.Handle_Request(cbsd_data,consts.DEREG)
-            send_to_request_list.append(SN)
+            send_to_request_list.append(SN) 
             reReg = True
             # sasHandler.Handle_Request(cbsd_data,consts.REG)
 
             #update SAS stage to register
         elif errorCode == 501:
-            log_error_to_FeMS_alarm("CRITICAL",cbsd_data,errorDict[SN],typeOfCalling)
+            if sasHandler.expired(errorDict[SN]['transmitExpireTime']):
+                    sasHandler.cbsdAction(SN,"RF_OFF,",str(datetime.now()))
+                    
+                    #put cbsd in granted state but still heartbeating
+                    conn = dbConn("ACS_V1_1")
+                    conn.update("UPDATE dp_device_info SET operationalState = 'GRANTED' WHERE SN = %s",SN)
+                    conn.dbClose()
+                    log_error_to_FeMS_alarm("CRITICAL",cbsd_data,errorDict[SN]['response'],typeOfCalling)
+            else:
+                log_error_to_FeMS_alarm("CRITICAL",cbsd_data,errorDict[SN]['response'],typeOfCalling)
             print("I'm an error")
         else:
             #Severity is CRITICAL OR WARNING
-            log_error_to_FeMS_alarm("WARNING",cbsd_data,errorDict[SN],typeOfCalling)
+            log_error_to_FeMS_alarm("WARNING",cbsd_data,errorDict[SN]['resposne'],typeOfCalling)
 
         #cbsd_data = ((CBSDSN, {resposne:{responseCode:200,responseMessage:"this is some thing"}}),(CBSDSN, {resposne .....}))
     if bool(send_to_request_list) and bool(reReg):

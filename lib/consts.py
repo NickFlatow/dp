@@ -208,3 +208,17 @@ FS1 = {
     }
   ]
 }
+HBE = {
+    "heartbeatResponse": [
+        {
+            "cbsdId": "FoxconnMock-SASDCE994613163",
+            "grantId": "438285164",
+            "response": {
+                "responseCode": 501
+            },
+            "transmitExpireTime": "2021-05-28T19:18:33Z"
+        }
+    ]
+}
+
+HBE2 =  hbresponse = {'heartbeatResponse': [{'grantId': '578807884', 'cbsdId': 'FoxconnMock-SASDCE994613163', 'transmitExpireTime': '2021-04-9T18:01:48Z', 'response': {'responseCode': 0}}, {'grantId': '32288332', 'cbsdId': 'FoxconMock-SAS1111', 'transmitExpireTime': '2021-03-26T21:30:48Z', 'response': {'responseCode': 0}}]}
