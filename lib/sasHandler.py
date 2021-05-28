@@ -2,12 +2,13 @@ import math
 import logging
 import requests
 import time
-import lib.error as e
 import lib.consts as consts
 from lib.log import dpLogger
 from lib.dbConn import dbConn
+from lib import error as e
 from datetime import datetime
 from test import app
+
 # class sasHandler():
 #     def __init__(self,cbsd_list):
 #         pass
@@ -73,12 +74,15 @@ def Handle_Request(cbsd_list,typeOfCalling):
                     }
                 )
         elif typeOfCalling == consts.DEREG:
+            
 
-            #send relinquishment
-            # grantRelinquishmentRequest(cbsds_SN)
-
-            #how to determine if action was complete
+            #how to determine if action was complete?
             cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
+            
+            #if grantID != NULL
+            # call grant relinquish
+
+
 
             req[requestMessageType].append(
                     {
@@ -104,11 +108,11 @@ def Handle_Request(cbsd_list,typeOfCalling):
     dpLogger.log_json(req,len(cbsd_list))
     SASresponse = contactSAS(req,typeOfCalling)
 
-    # if SASresponse != False:
-    #     Handle_Response(cbsd_list,SASresponse.json(),typeOfCalling)
-
     if SASresponse != False:
-        Handle_Response(cbsd_list,SASresponse,typeOfCalling)
+        Handle_Response(cbsd_list,SASresponse.json(),typeOfCalling)
+
+    # if SASresponse != False:
+    #     Handle_Response(cbsd_list,SASresponse,typeOfCalling)
 
 
 def Handle_Response(cbsd_list,response,typeOfCalling):
@@ -149,13 +153,13 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
             #check maxEirp if higher change
 
-            print(len(response['spectrumInquiryResponse'][i]['availableChannel']))
+            # print(len(response['spectrumInquiryResponse'][i]['availableChannel']))
 
-            for channel in response['spectrumInquiryResponse'][i]['availableChannel']:
-                 if channel['channelType'] == 'GAA':
-                    if channel['maxEirp'] <= cbsd_list[i]['maxEIRP']:
-                        print("over")
-                    print(channel['frequencyRange']['lowFrequency'],channel['frequencyRange']['highFrequency'])
+            # for channel in response['spectrumInquiryResponse'][i]['availableChannel']:
+            #      if channel['channelType'] == 'GAA':
+            #         if channel['maxEirp'] <= cbsd_list[i]['maxEIRP']:
+            #             print("over")
+            #         print(channel['frequencyRange']['lowFrequency'],channel['frequencyRange']['highFrequency'])
                        
                
             #TODO WHAT IF THE AVAIABLE CHANNEL ARRAY IS EMPTY
@@ -225,15 +229,15 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
         e.errorModule(errorDict,typeOfCalling)
         cbsd_list[:] = [cbsd for cbsd in cbsd_list if not hasError(cbsd,errorDict)]
 
-    # if bool(cbsd_list):
-    #     nextCalling = getNextCalling(typeOfCalling)
-    #     #should rather make cbsd a class
-    #     #update cbsd list properties
+    if bool(cbsd_list):
+        nextCalling = getNextCalling(typeOfCalling)
+        #should rather make cbsd a class
+        #update cbsd list properties
         
-    #     if (nextCalling != False):
-    #         conn = dbConn("ACS_V1_1")
-    #         updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",nextCalling)
-    #         Handle_Request(updated_cbsd_list,nextCalling)
+        if (nextCalling != False):
+            conn = dbConn("ACS_V1_1")
+            updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",nextCalling)
+            Handle_Request(updated_cbsd_list,nextCalling)
 
 
 def contactSAS(request,method):
@@ -242,18 +246,20 @@ def contactSAS(request,method):
     # method - which method SAS you would like to contact registration, spectrum, grant, heartbeat 
     # logger.info(f"{app.config['SAS']}  {method}")
 
-
-    # try:
-    #     return requests.post(app.config['SAS']+method, 
-    #     cert=('/home/gtadmin/dp/Domain_Proxy/certs/client.cert','/home/gtadmin/dp/Domain_Proxy/certs/client.key'),
-    #     verify=('/home/gtadmin/dp/Domain_Proxy/certs/ca.cert'),
-    #     json=request)
-    # except Exception as e:
-    #     print(f"your connection has failed: {e}")
-    #     return False
-    return consts.FS1
+    try:
+        return requests.post(app.config['SAS']+method, 
+        cert=('certs/client.cert','certs/client.key'),
+        verify=('certs/ca.cert'),
+        json=request)
+    except Exception as e:
+        print(f"your connection has failed: {e}")
+        return False
+    # return consts.FS1
 
 def cbsdAction(cbsdSN,action,time):
+
+    #check note field for EXEC
+
     logging.critical("Triggering CBSD action")
     conn = dbConn("ACS_V1_1")
     sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+cbsdSN+"\',\'"+action+"\',\'"+time+"\')"

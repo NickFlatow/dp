@@ -295,13 +295,13 @@ def hasError(cbsd,errorDict):
 
 
 
-# start()
+start()
 # test()
 # test2()
 # test3()
 # test5()
 # test5()
-test6()
+# test6()
 
 # try:
 #     a_socket.connect(("192.168.4.5", 10500))

@@ -1,23 +1,29 @@
+import lib.consts as consts
 from datetime import datetime
+from lib import sasHandler
 from lib.dbConn import dbConn
+
 
 def errorModule(errorDict,typeOfCalling):
     for SN in errorDict:
         #collect all cbsd data from database for each SN
         conn = dbConn("ACS_V1_1")
+        #alll cbsd data from dp database
         cbsd_data = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SN)
         conn.dbClose()
 
-        #pass cbsd_data and respose code and message to be logged to FeMS
+        errorCode = errorDict[SN]['responseCode']
 
-        #Severity is CRITICAL OR WARNING
-        log_error_to_FeMS_alarm("WARNING",cbsd_data,errorDict[SN],typeOfCalling)
+        if errorCode == 105:
+            sasHandler.Handle_Request(cbsd_data,consts.DEREG)
+            sasHandler.Handle_Request(cbsd_data,consts.REG)
 
-    #error_response is a list of key value pairs where the key is the cbsdsn and the value is the numeric response code
-    
-    #((CBSDSN, {resposne:{responseCode:200,responseMessage:"this is some thing"}}),(CBSDSN, {resposne .....}))
+            #update SAS stage to register
+        else:
+            #Severity is CRITICAL OR WARNING
+            log_error_to_FeMS_alarm("WARNING",cbsd_data,errorDict[SN],typeOfCalling)
 
-    #determine error number
+        #cbsd_data = ((CBSDSN, {resposne:{responseCode:200,responseMessage:"this is some thing"}}),(CBSDSN, {resposne .....}))
 
 
 def log_error_to_FeMS_alarm(severity,cbsd_data,response,typeOfCalling):
@@ -53,8 +59,6 @@ def hasAlarmIdentifier(ai):
         return False
     else:
         return True
-
-
 
 def response_200():
     pass
