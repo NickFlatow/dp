@@ -66,11 +66,19 @@ def Handle_Request(cbsd_list,typeOfCalling):
                     }
                 )
         elif typeOfCalling == consts.HEART:
+            if expired(str(cbsd['transmitExpireTime'])):
+                opState = 'GRANTED'
+                conn = dbConn("ACS_V1_1")
+                conn.update('UPDATE dp_device_info SET operationalState = GRANTED')
+                conn.dbClose()
+            else:
+                opState = 'AUTHORIZED'
+
             req[requestMessageType].append(
                     {
                         "cbsdId":cbsd['cbsdID'],
                         "grantId":cbsd['grantID'],
-                        "operationState":cbsd['operationalState']
+                        "operationState":opState
                     }
                 )
                 
