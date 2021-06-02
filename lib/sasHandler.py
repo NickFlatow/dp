@@ -66,14 +66,13 @@ def Handle_Request(cbsd_list,typeOfCalling):
                     }
                 )
         elif typeOfCalling == consts.HEART:
-            if expired(str(cbsd['transmitExpireTime'])):
-                opState = 'GRANTED'
-                conn = dbConn("ACS_V1_1")
-                conn.update('UPDATE dp_device_info SET operationalState = GRANTED')
-                conn.dbClose()
-            else:
-                opState = 'AUTHORIZED'
+            print(cbsd['transmitExpireTime'])
 
+            if cbsd['operationalState'] == 'AUTHORIZED':
+                #in the case of no reply from SAS continue to check transmit expire time and switch opState to granted and turn off RF if we exceed transmit time
+                opState = getOpState(cbsd)
+            else:
+                opState = 'GRANTED'
             req[requestMessageType].append(
                     {
                         "cbsdId":cbsd['cbsdID'],
@@ -81,19 +80,12 @@ def Handle_Request(cbsd_list,typeOfCalling):
                         "operationState":opState
                     }
                 )
-                
-
         elif typeOfCalling == consts.DEREG:
-            
-
             #how to determine if action was complete?
             cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
             
             #if grantID != NULL
             # call grant relinquish
-
-
-
             req[requestMessageType].append(
                     {
                         "cbsdId":cbsd['cbsdID'],
@@ -113,7 +105,6 @@ def Handle_Request(cbsd_list,typeOfCalling):
             update_grantID = "UPDATE dp_device_info SET grantID = NULL WHERE SN = %s "
             conn.update(update_grantID,cbsd['SN'])
             conn.dbClose()
-
 
     dpLogger.log_json(req,len(cbsd_list))
     SASresponse = contactSAS(req,typeOfCalling)
@@ -207,6 +198,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #TODO
 
             conn = dbConn("ACS_V1_1")
+            print(response['heartbeatResponse'][i]['transmitExpireTime'])
             #update operational state to granted/ what if operational state is already authorized
             if not expired(response['heartbeatResponse'][i]['transmitExpireTime']):
                 update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
@@ -273,11 +265,23 @@ def contactSAS(request,method):
         print(f"your connection has failed: {e}")
         return False
     # return consts.FS1
+def getOpState(cbsd):
+
+    if expired(cbsd['transmitExpireTime'] ):
+        opState = 'GRANTED'
+        conn = dbConn("ACS_V1_1")
+        conn.update("UPDATE dp_device_info SET operationalState = 'GRANTED' WHERE SN = %s",cbsd['SN'])
+        conn.dbClose()
+        #turn RF Off
+        cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
+    else:
+        opState = 'AUTHORIZED'
+
+    return opState
 
 def cbsdAction(cbsdSN,action,time):
 
     #check note field for EXEC
-
     logging.critical("Triggering CBSD action")
     conn = dbConn("ACS_V1_1")
     sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+cbsdSN+"\',\'"+action+"\',\'"+time+"\')"
