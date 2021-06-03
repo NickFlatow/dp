@@ -66,18 +66,26 @@ def Handle_Request(cbsd_list,typeOfCalling):
                     }
                 )
         elif typeOfCalling == consts.HEART:
-            print(cbsd['transmitExpireTime'])
 
+            grantRenew = False
+            #check if grant is expired
+            if expired(cbsd['grantExpireTime']):
+                grantRenew = True
+            
+
+            #check if we are transmiting with an expired heartbeat
             if cbsd['operationalState'] == 'AUTHORIZED':
                 #in the case of no reply from SAS continue to check transmit expire time and switch opState to granted and turn off RF if we exceed transmit time
                 opState = getOpState(cbsd)
             else:
                 opState = 'GRANTED'
+            
             req[requestMessageType].append(
                     {
                         "cbsdId":cbsd['cbsdID'],
                         "grantId":cbsd['grantID'],
-                        "operationState":opState
+                        "operationState":opState,
+                        "grantRenew":grantRenew
                     }
                 )
         elif typeOfCalling == consts.DEREG:
@@ -198,7 +206,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #TODO
 
             conn = dbConn("ACS_V1_1")
-            print(response['heartbeatResponse'][i]['transmitExpireTime'])
+            print(f"resposne transmist expire time {response['heartbeatResponse'][i]['transmitExpireTime']}")
             #update operational state to granted/ what if operational state is already authorized
             if not expired(response['heartbeatResponse'][i]['transmitExpireTime']):
                 update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
