@@ -203,7 +203,7 @@ def heartbeat():
             if cbsd_list !=():
                 sasHandler.Handle_Request(cbsd_list,consts.HEART)
            
-            time.sleep(1)   
+            time.sleep(30)   
 
 def start():
     try:
@@ -301,10 +301,17 @@ def test_501_error_module():
     cbsd_list = conn.select(sql,SNlist)
     sasHandler.Handle_Response(cbsd_list,consts.HBE,consts.HEART)
 
+def testUpdateGrantTime():
 
+    conn = dbConn("ACS_V1_1")
+    cbsd = conn.select("select * from dp_device_info WHERE fccID = 'FOXCONN'")
+    conn.dbClose()
 
+    # sasHandler.Handle_Response(cbsd,consts.HBGR,consts.HEART)
+    sasHandler.grantExpired(cbsd[0]['grantExpireTime'])
 
 start()
+# testUpdateGrantTime()
 # test()
 # test2()
 # test3()

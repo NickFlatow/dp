@@ -222,3 +222,17 @@ HBE = {
 }
 
 HBE2 =  hbresponse = {'heartbeatResponse': [{'grantId': '578807884', 'cbsdId': 'FoxconnMock-SASDCE994613163', 'transmitExpireTime': '2021-04-9T18:01:48Z', 'response': {'responseCode': 0}}, {'grantId': '32288332', 'cbsdId': 'FoxconMock-SAS1111', 'transmitExpireTime': '2021-03-26T21:30:48Z', 'response': {'responseCode': 0}}]}
+
+HBGR = {
+    "heartbeatResponse": [
+        {
+            "cbsdId": "FoxconnMock-SASDCE994613163",
+            "grantExpireTime": "2021-06-03T18:54:05Z",
+            "grantId": "296455749",
+            "response": {
+                "responseCode": 0
+            },
+            "transmitExpireTime": "2021-06-03T18:51:25Z"
+        }
+    ]
+}

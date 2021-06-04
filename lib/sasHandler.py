@@ -1,3 +1,4 @@
+from config.default import SAS
 import math
 import logging
 import requests
@@ -69,10 +70,14 @@ def Handle_Request(cbsd_list,typeOfCalling):
 
             grantRenew = False
             #check if grant is expired
-            if expired(cbsd['grantExpireTime']):
-                grantRenew = True
-            
 
+            
+            logging.info(f"GRANT EXPIRE TIME: {cbsd['grantExpireTime']}")
+            
+            #add grantExpireTime plus hbinterval? 
+            if expired(cbsd['grantExpireTime'],True):
+                grantRenew = True 
+            
             #check if we are transmiting with an expired heartbeat
             if cbsd['operationalState'] == 'AUTHORIZED':
                 #in the case of no reply from SAS continue to check transmit expire time and switch opState to granted and turn off RF if we exceed transmit time
@@ -84,7 +89,7 @@ def Handle_Request(cbsd_list,typeOfCalling):
                     {
                         "cbsdId":cbsd['cbsdID'],
                         "grantId":cbsd['grantID'],
-                        "operationState":opState,
+                        "operationState":cbsd['operationalState'],
                         "grantRenew":grantRenew
                     }
                 )
@@ -206,7 +211,8 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #TODO
 
             conn = dbConn("ACS_V1_1")
-            print(f"resposne transmist expire time {response['heartbeatResponse'][i]['transmitExpireTime']}")
+            # print(f"resposne transmist expire time {response['heartbeatResponse'][i]['transmitExpireTime']}")
+            
             #update operational state to granted/ what if operational state is already authorized
             if not expired(response['heartbeatResponse'][i]['transmitExpireTime']):
                 update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
@@ -222,6 +228,10 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
                 print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
                 # turn on RF in cell
                 cbsdAction(cbsd_list[i]['SN'],"RF_ON",str(datetime.now()))
+
+            #if response has new grantTime update databas
+            if 'grantExpireTime' in response['heartbeatResponse'][i]:
+                updateGrantTime(response['heartbeatResponse'][i]['grantExpireTime'],cbsd_list[i]['SN'])
 
         elif typeOfCalling == consts.DEREG:
             #update sasStage
@@ -252,6 +262,13 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             Handle_Request(updated_cbsd_list,nextCalling)
 
 
+
+def updateGrantTime(grantExpireTime,SN):
+    conn = dbConn("ACS_V1_1")
+    conn.update("UPDATE dp_device_info SET grantExpireTime = %s WHERE SN = %s",(grantExpireTime,SN))
+    conn.dbClose()
+
+
 def contactSAS(request,method):
     # Function to contact the SAS server
     # request - json array to pass to SAS
@@ -259,16 +276,12 @@ def contactSAS(request,method):
     # logger.info(f"{app.config['SAS']}  {method}")
 
     try:
-        a = requests.post(app.config['SAS']+method, 
+        return requests.post(app.config['SAS']+method, 
         cert=('certs/client.cert','certs/client.key'),
         verify=('certs/ca.cert'),
         json=request,
         timeout=1.5)
-
-        print(a)
-        return a
-    except requests.ConnectionError:
-        print("tragic")
+        
     except Exception as e:
         print(f"your connection has failed: {e}")
         return False
@@ -379,15 +392,28 @@ def getParameterValue():
     # }
 
     #if no action purge last action
-def expired(transmitExpireTime):
+def expired(transmitExpireTime, grantRenew = False):
     #convert transmitExpireTime string to datetime
     expireTime = datetime.strptime(transmitExpireTime,"%Y-%m-%dT%H:%M:%SZ")
 
+    if grantRenew:
+        expireTime = expireTime - timedelta(seconds=280)
+    # logging.info(f"expire time: {expireTime} grantRenew: {grantRenew}")
     if datetime.utcnow() > expireTime:
         return True
     else:
         return False
 
+def grantExpired(transmitExpireTime):
+    #convert transmitExpireTime string to datetime
+    expireTime = datetime.strptime(transmitExpireTime,"%Y-%m-%dT%H:%M:%SZ")
+
+    expireTime = expireTime + timedelta(seconds=280)
+
+    if datetime.utcnow() > expireTime:
+        return True
+    else:
+        return False
 def expired_1(transmiteExpireTime):
     #convert sting to datetime and compare to current time.
     
