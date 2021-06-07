@@ -11,35 +11,73 @@ def errorModule(errorDict,typeOfCalling):
         #collect all cbsd data from database for each SN
         conn = dbConn("ACS_V1_1")
         cbsd_data = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SN)
-        conn.dbClose()
+        conn.dbClose() 
 
         errorCode = errorDict[SN]['response']['responseCode']
 
-        if errorCode == 105:
+        if errorCode == 100:
+            #dereg and stop trying to register
+            conn = dbConn("ACS_V1_1")
+            cbsd_data = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SN)
+            conn.dbClose() 
+
+            #log error to FeMS
+            log_error_to_FeMS_alarm("CRITICAL",cbsd_data,errorDict[SN]['response'],typeOfCalling)
+
+        if errorCode == 101:
+
+            #IF GRANTS R E L I N Q U I S H ANY GRANTS
+            if cbsd_data[0]['grantID'] != None:
+                sasHandler.Handle_Request(cbsd_data,consts.REL)
+            #DEREGISTER FROM SAS
+            sasHandler.Handle_Request(cbsd_data,consts.DEREG)
+            #LOG ERROR TO FeMS ALARM TABLE
+            log_error_to_FeMS_alarm("CRITICAL",cbsd_data,errorDict[SN]['response'],typeOfCalling)
+
+        elif errorCode == 103:
+            
+            #if the domain proxy still has a grant with SAS relinquish and reapply
+            if cbsd_data[0]['grantID'] != None:
+                #stop transmitting
+                sasHandler.setParameterValue(cbsd_data[0]['SN'],consts.ADMIN_STATE,'boolean','false')
+
+
+                #relinquish grant
+                sasHandler.Handle_Request(cbsd_data,consts.REL)
+                #reapply
+                sasHandler.Handle_Request(cbsd_data,consts.GRANT)
+
+            #during the reg process just place error in FeMS and deregister to stop trying
+            else:
+                sasHandler.Handle_Request(cbsd_data,consts.DEREG)
+    
+
+        elif errorCode == 105:
             sasHandler.Handle_Request(cbsd_data,consts.DEREG)
             send_to_request_list.append(SN) 
             reReg = True
             # sasHandler.Handle_Request(cbsd_data,consts.REG)
 
-            #update SAS stage to register
+        #update SAS stage to register
         elif errorCode == 501:
             if sasHandler.expired(errorDict[SN]['transmitExpireTime']):
-                    sasHandler.cbsdAction(SN,"RF_OFF,",str(datetime.now()))
                     
+                    sasHandler.cbsdAction(SN,"RF_OFF,",str(datetime.now()))
+
                     #put cbsd in granted state but still heartbeating
                     conn = dbConn("ACS_V1_1")
                     conn.update("UPDATE dp_device_info SET operationalState = 'GRANTED' WHERE SN = %s",SN)
                     conn.dbClose()
-                    log_error_to_FeMS_alarm("CRITICAL",cbsd_data,errorDict[SN]['response'],typeOfCalling)
-            else:
-                log_error_to_FeMS_alarm("CRITICAL",cbsd_data,errorDict[SN]['response'],typeOfCalling)
-            print("I'm an error")
-        else:
+            
+            log_error_to_FeMS_alarm("CRITICAL",cbsd_data,errorDict[SN]['response'],typeOfCalling)
+
+        else: #error code 102, 200, 201
             #Severity is CRITICAL OR WARNING
-            log_error_to_FeMS_alarm("WARNING",cbsd_data,errorDict[SN]['resposne'],typeOfCalling)
+            log_error_to_FeMS_alarm("WARNING",cbsd_data,errorDict[SN]['response'],typeOfCalling)
 
         #cbsd_data = ((CBSDSN, {resposne:{responseCode:200,responseMessage:"this is some thing"}}),(CBSDSN, {resposne .....}))
-    if bool(send_to_request_list) and bool(reReg):
+
+    if bool(send_to_request_list):
         update_sas_stage(send_to_request_list,consts.REG)
 
 
@@ -77,10 +115,6 @@ def hasAlarmIdentifier(ai):
         return False
     else:
         return True
-
-def response_200():
-    pass
-    #200
 
 def update_sas_stage(cbsds_SN_list,typeOfCalling):
     conn = dbConn("ACS_V1_1")

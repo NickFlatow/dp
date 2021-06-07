@@ -10,9 +10,6 @@ from lib import error as e
 from datetime import datetime, timedelta
 from test import app
 
-# class sasHandler():
-#     def __init__(self,cbsd_list):
-#         pass
 
 def Handle_Request(cbsd_list,typeOfCalling):
     '''
@@ -54,7 +51,7 @@ def Handle_Request(cbsd_list,typeOfCalling):
         elif typeOfCalling == consts.GRANT:
             
             req[requestMessageType].append(
-                    {
+                    { 
                         "cbsdId":cbsd['cbsdID'],
                         "operationParam":{
                             # grab antennaGain from web interface
@@ -70,7 +67,6 @@ def Handle_Request(cbsd_list,typeOfCalling):
 
             grantRenew = False
             #check if grant is expired
-
             
             logging.info(f"GRANT EXPIRE TIME: {cbsd['grantExpireTime']}")
             
@@ -94,7 +90,7 @@ def Handle_Request(cbsd_list,typeOfCalling):
                     }
                 )
         elif typeOfCalling == consts.DEREG:
-            #how to determine if action was complete?
+            
             cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
             
             #if grantID != NULL
@@ -106,7 +102,6 @@ def Handle_Request(cbsd_list,typeOfCalling):
                 )
 
         elif typeOfCalling == consts.REL:
-            print("REL")
             req[requestMessageType].append(
                 {
                     "cbsdId":cbsd['cbsdID'],
@@ -115,7 +110,7 @@ def Handle_Request(cbsd_list,typeOfCalling):
             )
             #set grant IDs to NULL
             conn = dbConn("ACS_V1_1")
-            update_grantID = "UPDATE dp_device_info SET grantID = NULL WHERE SN = %s "
+            update_grantID = "UPDATE dp_device_info SET grantID = NULL, SET operationalState = NULL, SET grantExpireTime = NULL, SET transmitExpireTime = NULL WHERE SN = %s "
             conn.update(update_grantID,cbsd['SN'])
             conn.dbClose()
 
@@ -236,14 +231,14 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
         elif typeOfCalling == consts.DEREG:
             #update sasStage
             conn = dbConn("ACS_V1_1")
-            conn.update("UPDATE dp_device_info SET sasStage = %s",consts.DEREG)
+            conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.DEREG,cbsd_list[i]['SN']))
             conn.dbClose()
 
 
         elif typeOfCalling == consts.REL:
             #update sasStage
             conn = dbConn("ACS_V1_1")
-            conn.update("UPDATE dp_device_info SET sasStage = %s",consts.REL)
+            conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REL,cbsd_list[i]['SN']))
             conn.dbClose()
 
 
@@ -378,7 +373,7 @@ def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue):
 
 def getParameterValue():
     pass
-    #check if action is already being executed
+    # check if action is already being executed
     # $sqlQueryStr = "SELECT `Note` FROM `apt_action_queue` WHERE `Action`='".$In_Action."' AND `SN`='".$In_SN."'";
     # $sqlQueryResult = mysql_query($sqlQueryStr);
     # if(mysql_num_rows($sqlQueryResult) != 0)
@@ -401,36 +396,5 @@ def expired(transmitExpireTime, grantRenew = False):
     # logging.info(f"expire time: {expireTime} grantRenew: {grantRenew}")
     if datetime.utcnow() > expireTime:
         return True
-    else:
-        return False
-
-def grantExpired(transmitExpireTime):
-    #convert transmitExpireTime string to datetime
-    expireTime = datetime.strptime(transmitExpireTime,"%Y-%m-%dT%H:%M:%SZ")
-
-    expireTime = expireTime + timedelta(seconds=280)
-
-    if datetime.utcnow() > expireTime:
-        return True
-    else:
-        return False
-def expired_1(transmiteExpireTime):
-    #convert sting to datetime and compare to current time.
-    
-    #time of which grant or transmit will expire
-    expireTime = datetime.strptime(time,"%Y-%m-%dT%H:%M:%SZ")
-    print(expireTime)
-    timeChange = expireTime + timedelta(seconds=hbinterval)
-    print(datetime.now())
-    print(timeChange)
-    #if the current time is less than the expire time plus the heartbeat interval
-    if timeChange > datetime.now():
-        try:
-            conn = dbConn("ACS_V1_1")
-            sql = "UPDATE `dp_device_info` SET `sasStage` = 'dereg' where `cbsdID` = 'FoxconnMock-SASDCE994613163'"
-            conn.cursor.execute(sql)
-            cbsdAction("DCE994613163","RF_OFF",str(datetime.now()))
-        except Exception as e:
-            print(e)
     else:
         return False

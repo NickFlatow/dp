@@ -75,78 +75,6 @@ def dp_deregister():
     sasHandler.Handle_Request(cbsd_list,consts.DEREG)
     return "success"
 
-def deregistrationRequest(cbsds_SN = None):
-
-    #send relinquishment
-    grantRelinquishmentRequest(cbsds_SN)
-
-    cbsd_db = query_update(cbsds_SN,consts.DEREG)
-
-    #send deregistration
-    dereg = {"deregistrationRequest":[]}
-    for i in range(len(cbsd_db)):
-        #power off RF(How do I know if the CBSD turned off ADMIN_STATE check? do I still need to socket test?)
-        cbsdAction(cbsd_db[i]['SN'],"RF_OFF",str(datetime.now()))
-
-        #build json request for SAS
-        dereg["deregistrationRequest"].append(
-            {
-                "cbsdId":cbsd_db[i]['cbsdID'],
-            }
-        )
-    logger.log_json(dereg,len(cbsd_db))
-    response = contactSAS(dereg,consts.DEREG)
-    sasHandler.Handle_Response(response.json(),consts.DEREG)
-
-def grantRelinquishmentRequest(cbsd_SN_list):
-    #select all cbsds looking to have grant relinquished and updatea their status
-    cbsds = query_update(cbsd_SN_list,'relinquish')
-    
-    #build reliquishment array
-    relinquish = {"relinquishmentRequest":[]}
-    for response in cbsds:
-        # print(response['userID'])
-        relinquish["relinquishmentRequest"].append(
-            {
-                "cbsdId":response['cbsdID'],
-                "grantId":response['grantID']
-            }
-        )
-    
-    logger.log_json(relinquish,len(cbsds))
-    
-    #set grant IDs to NULL
-    conn = dbConn("ACS_V1_1")
-    update_grantID = "UPDATE dp_device_info SET grantID = NULL WHERE SN in" + str(cbsd_SN_list) + ";"
-    
-    logging.info(f"\n grant ID = NULL: {update_grantID} ")
-    conn.update(update_grantID)
-    conn.dbClose()
-    
-    #send request to SAS
-    response = contactSAS(relinquish,"relinquishment")
-    
-    #process reponse
-    if response != False:
-        sasHandler.Handle_Response(response.json(),consts.REL)
-
-
-
-def getResponseType(sasStage):
-    if sasStage == 'reg':
-        return 'registartionResponse'
-
-
-def query_update(cbsds_SN_list,sasStage):
-    conn = dbConn("ACS_V1_1")
-    sql_select = 'SELECT * FROM dp_device_info WHERE SN IN ({})'.format(','.join(['%s'] * len(cbsds_SN_list)))
-    rows = conn.select(sql_select,cbsds_SN_list)
-    print(rows)
-    conn.updateSasStage(sasStage,cbsds_SN_list)
-    conn.dbClose()
-    return rows
-
-
 def expired(time):
     #convert sting to datetime and compare to current time.
     hbinterval = 60
@@ -203,9 +131,13 @@ def heartbeat():
             if cbsd_list !=():
                 sasHandler.Handle_Request(cbsd_list,consts.HEART)
            
-            time.sleep(30)   
+            time.sleep(1)   
 
 def start():
+    conn = dbConn("ACS_V1_1")
+    conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE fccID = 'FOXCONN'")
+    conn.dbClose()
+
     try:
         #if using args a comma for tuple is needed 
         thread = threading.Thread(target=registration, args=())
@@ -218,7 +150,7 @@ def start():
         thread.start()
     except Exception as e:
         print(f"Heartbeat thread failed reason: {e}")
-    runFlaskSever()
+    runFlaskSever() 
 
 
 def test():
@@ -307,9 +239,11 @@ def testUpdateGrantTime():
     cbsd = conn.select("select * from dp_device_info WHERE fccID = 'FOXCONN'")
     conn.dbClose()
 
-    # sasHandler.Handle_Response(cbsd,consts.HBGR,consts.HEART)
-    sasHandler.grantExpired(cbsd[0]['grantExpireTime'])
+def on():
+    # sasHandler.cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
+    sasHandler.setParameterValue('DCE994613163','Device.Services.FAPService.1.FAPControl.LTE.AdminState','boolean','false')
 
+# on()
 start()
 # testUpdateGrantTime()
 # test()

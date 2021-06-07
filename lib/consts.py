@@ -10,6 +10,7 @@ REL = 'relinquishment'
 TXPOWER_PATH = 'Device.X_FOXCONN_FAP.CellConfig.SonMaxTxPower_Max' 
 EARFCN_LIST = 'Device.X_FOXCONN_FAP.CellConfig.EUTRACarrierARFCNDL'
 EARFCN_IN_USE = 'Device.X_FOXCONN_FAP.CellConfig.EUTRACarrierARFCNULInUse'
+ADMIN_STATE = 'Device.Services.FAPService.1.FAPControl.LTE.AdminState'
 
 
 DB = 'ACS_V1_1'
