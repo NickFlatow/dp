@@ -114,6 +114,7 @@ def registration():
 
     while True:
         # for m in meth:
+        print("registration")
         conn = dbConn("ACS_V1_1")
         cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.REG)
         conn.dbClose()
@@ -131,7 +132,7 @@ def heartbeat():
             if cbsd_list !=():
                 sasHandler.Handle_Request(cbsd_list,consts.HEART)
            
-            time.sleep(1)   
+            time.sleep(1)    
 
 def start():
     conn = dbConn("ACS_V1_1")
@@ -242,6 +243,7 @@ def testUpdateGrantTime():
 def on():
     # sasHandler.cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
     sasHandler.setParameterValue('DCE994613163','Device.Services.FAPService.1.FAPControl.LTE.AdminState','boolean','false')
+    # sasHandler.setParameterValue('DCE994613163','Device.Services.FAPService.1.FAPControl.LTE.AdminState','boolean','false')
 
 # on()
 start()

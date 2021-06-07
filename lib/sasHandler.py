@@ -66,11 +66,11 @@ def Handle_Request(cbsd_list,typeOfCalling):
         elif typeOfCalling == consts.HEART:
 
             grantRenew = False
-            #check if grant is expired
+           
             
             logging.info(f"GRANT EXPIRE TIME: {cbsd['grantExpireTime']}")
             
-            #add grantExpireTime plus hbinterval? 
+            #check if grant is expired
             if expired(cbsd['grantExpireTime'],True):
                 grantRenew = True 
             
@@ -85,13 +85,18 @@ def Handle_Request(cbsd_list,typeOfCalling):
                     {
                         "cbsdId":cbsd['cbsdID'],
                         "grantId":cbsd['grantID'],
-                        "operationState":cbsd['operationalState'],
+                        "operationState":opState,
                         "grantRenew":grantRenew
                     }
                 )
         elif typeOfCalling == consts.DEREG:
             
-            cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
+            #if adminstate is on turn off.
+
+            #get parameter value
+            # cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
+            if cbsd['AdminState'] == 1:
+                setParameterValue(cbsd['SN'],consts.ADMIN_STATE,'boolean','false')
             
             #if grantID != NULL
             # call grant relinquish
@@ -102,6 +107,12 @@ def Handle_Request(cbsd_list,typeOfCalling):
                 )
 
         elif typeOfCalling == consts.REL:
+
+            #Set small cell admin state to false
+            if cbsd['AdminState'] == 1:
+                setParameterValue(cbsd['SN'],consts.ADMIN_STATE,'boolean','false')
+            
+            
             req[requestMessageType].append(
                 {
                     "cbsdId":cbsd['cbsdID'],
@@ -136,6 +147,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
     #init dict to pass to error module
     errorDict = {}
+    errorList = []
     
     dpLogger.log_json(response,(len(response[resposneMessageType])))
     
@@ -143,9 +155,22 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
         #check for errors in response
         if response[resposneMessageType][i]['response']['responseCode'] != 0:
-            # errorList.append(response[resposneMessageType][i][response])
-        #    print(response[resposneMessageType][i]['response'])
-            errorDict[cbsd_list[i]['SN']] = response[resposneMessageType][i]
+
+            errorCode = response[resposneMessageType][i]['response']['responseCode']
+            
+            #if key in dict
+            if errorCode in errorDict:
+                #append list
+                errorDict[errorCode].append(cbsd_list[i])
+            else:
+                #create key and list
+                errorDict[errorCode] = []
+                errorDict[errorCode].append(cbsd_list[i])
+                # append list
+
+            errorList.append(cbsd_list[i]['SN'])
+            
+            # errorDict[cbsd_list[i]['SN']] = response[resposneMessageType][i]
 
         elif typeOfCalling == consts.REG:
 
@@ -222,7 +247,8 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             if cbsd_list[i]['operationalState'] == 'GRANTED':
                 print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
                 # turn on RF in cell
-                cbsdAction(cbsd_list[i]['SN'],"RF_ON",str(datetime.now()))
+                # cbsdAction(cbsd_list[i]['SN'],"RF_ON",str(datetime.now()))
+                setParameterValue(cbsd_list[i]['SN'],consts.ADMIN_STATE,'boolean','true')
 
             #if response has new grantTime update databas
             if 'grantExpireTime' in response['heartbeatResponse'][i]:
@@ -230,7 +256,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
         elif typeOfCalling == consts.DEREG:
             #update sasStage
-            conn = dbConn("ACS_V1_1")
+            conn = dbConn("ACS_V1_1") 
             conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.DEREG,cbsd_list[i]['SN']))
             conn.dbClose()
 
@@ -244,7 +270,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
     if bool(errorDict):
         e.errorModule(errorDict,typeOfCalling)
-        cbsd_list[:] = [cbsd for cbsd in cbsd_list if not hasError(cbsd,errorDict)]
+        cbsd_list[:] = [cbsd for cbsd in cbsd_list if not hasError(cbsd,errorList)]
 
     if bool(cbsd_list):
         nextCalling = getNextCalling(typeOfCalling)
@@ -289,7 +315,8 @@ def getOpState(cbsd):
         conn.update("UPDATE dp_device_info SET operationalState = 'GRANTED' WHERE SN = %s",cbsd['SN'])
         conn.dbClose()
         #turn RF Off
-        cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
+        # cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
+        setParameterValue(cbsd['SN'],consts.ADMIN_STATE,'boolean','false')
     else:
         opState = 'AUTHORIZED'
 
@@ -339,8 +366,8 @@ def EARFCNtoMHZ(cbsd_SN):
     freqDict['highFreq'] = H_frq
     return freqDict
 
-def hasError(cbsd,errorDict):
-    if cbsd['SN'] in errorDict:
+def hasError(cbsd,errorList):
+    if cbsd['SN'] in errorList:
         return True
     else:
         return False
@@ -364,6 +391,15 @@ def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue):
     conn = dbConn("ACS_V1_1")
     conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd_SN)
 
+    #update Adminstate in DB
+    if data_model_path == consts.ADMIN_STATE and setValue == 'false':
+        logging.info("Turn RF OFF for %s",cbsd_SN)
+        conn.update("UPDATE dp_device_info SET AdminState = 0 WHERE SN = %s",cbsd_SN)
+
+    if data_model_path == consts.ADMIN_STATE and setValue == 'true':
+        logging.info("Turn RF ON for %s",cbsd_SN)
+        conn.update("UPDATE dp_device_info SET AdminState = 1 WHERE SN = %s",cbsd_SN)
+
     #insert SN, data_model_path and value into FeMS_spv
     conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd_SN,1,data_model_path,setValueType,setValue))
     conn.dbClose()
@@ -374,7 +410,7 @@ def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue):
 def getParameterValue():
     pass
     # check if action is already being executed
-    # $sqlQueryStr = "SELECT `Note` FROM `apt_action_queue` WHERE `Action`='".$In_Action."' AND `SN`='".$In_SN."'";
+    # sqlQueryStr = "SELECT `Note` FROM `apt_action_queue` WHERE `Action`='".$In_Action."' AND `SN`='".$In_SN."'";
     # $sqlQueryResult = mysql_query($sqlQueryStr);
     # if(mysql_num_rows($sqlQueryResult) != 0)
     # {
@@ -387,14 +423,18 @@ def getParameterValue():
     # }
 
     #if no action purge last action
+
 def expired(transmitExpireTime, grantRenew = False):
     #convert transmitExpireTime string to datetime
+    if transmitExpireTime == None:
+        return False
+    
     expireTime = datetime.strptime(transmitExpireTime,"%Y-%m-%dT%H:%M:%SZ")
 
     if grantRenew:
         expireTime = expireTime - timedelta(seconds=280)
-    # logging.info(f"expire time: {expireTime} grantRenew: {grantRenew}")
+   
     if datetime.utcnow() > expireTime:
         return True
-    else:
+    else: 
         return False
