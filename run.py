@@ -71,6 +71,8 @@ def dp_deregister():
     cbsd_list = conn.select(sql,SNlist)
 
     print(cbsd_list)
+    #for cbsd in cbsd_list
+        #if grantId
     sasHandler.Handle_Request(cbsd_list,consts.REL)
     sasHandler.Handle_Request(cbsd_list,consts.DEREG)
     return "success"
@@ -132,7 +134,7 @@ def heartbeat():
             if cbsd_list !=():
                 sasHandler.Handle_Request(cbsd_list,consts.HEART)
            
-            time.sleep(1)    
+            time.sleep(3)    
 
 def start():
     conn = dbConn("ACS_V1_1")
@@ -241,9 +243,22 @@ def testUpdateGrantTime():
     conn.dbClose()
 
 def on():
+    conn = dbConn("ACS_V1_1")
+    cbsd = conn.select("select * from dp_device_info WHERE fccID = 'FOXCONN'")
+    conn.dbClose()
     # sasHandler.cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
-    sasHandler.setParameterValue('DCE994613163','Device.Services.FAPService.1.FAPControl.LTE.AdminState','boolean','false')
     # sasHandler.setParameterValue('DCE994613163','Device.Services.FAPService.1.FAPControl.LTE.AdminState','boolean','false')
+    # sasHandler.setParameterValue('DCE994613163','Device.Services.FAPService.1.FAPControl.LTE.AdminState','boolean','false')
+    dict = {}
+    dict[500] = []
+    dict[500].append(cbsd[0])
+    dict[500].append(cbsd[1])
+
+    for cbsd in dict[500]:
+        print(cbsd)
+
+    print("one")
+
 
 # on()
 start()

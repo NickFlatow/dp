@@ -7,8 +7,7 @@ from lib.dbConn import dbConn
 def errorModule(errorDict,typeOfCalling):
 
     for errorCode in errorDict:
-        
-        
+
         if errorCode == 100: 
             #dereg and stop trying to register
             conn = dbConn("ACS_V1_1") 
@@ -21,37 +20,40 @@ def errorModule(errorDict,typeOfCalling):
 
         if errorCode == 101:
             relinquish = []
-
             #loop for here
             for cbsd in errorDict[errorCode]:
-            #IF GRANTS R E L I N Q U I S H ANY GRANTS
+                #IF GRANTS R E L I N Q U I S H ANY GRANTS
                 if cbsd['grantID'] != None:
                     relinquish.append(cbsd)
                 #LOG ERROR TO FeMS ALARM TABLE
                 log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
 
             #reliquish cbsd with grants
-            sasHandler.Handle_Request(relinquish,consts.REL)
+            if bool(relinquish):
+                sasHandler.Handle_Request(relinquish,consts.REL)
             #deregister all cbsds
             sasHandler.Handle_Request(errorDict[errorCode],consts.DEREG)
 
         elif errorCode == 103:
+            rel = []
+            dereg = []
             #loop for here
             for cbsd in errorDict[errorCode]:
             #if the domain proxy still has a grant with SAS relinquish and reapply
                 if cbsd['grantID'] != None:
-                    #stop transmitting
-                    # sasHandler.setParameterValue(cbsd['SN'],consts.ADMIN_STATE,'boolean','false')
-
-                    #relinquish grant
-                    sasHandler.Handle_Request(cbsd,consts.REL)
-                    #reapply
-                    sasHandler.Handle_Request(cbsd,consts.GRANT)
-
-                    
+                    rel.append(cbsd)
                 else:
                     #during the reg process just place error in FeMS and deregister to stop trying
-                    sasHandler.Handle_Request(cbsd,consts.DEREG)
+                    dereg.append(cbsd)
+                    
+                if bool(rel):
+                    #relinquish grant
+                    sasHandler.Handle_Request(rel,consts.REL)
+                    #reapply
+                    sasHandler.Handle_Request(rel,consts.GRANT)
+                
+                if bool(dereg):
+                    sasHandler.Handle_Request(dereg,consts.DEREG)
         
 
         elif errorCode == 105:
@@ -82,7 +84,7 @@ def errorModule(errorDict,typeOfCalling):
 
         elif errorCode == 501:
             for cbsd in errorDict[errorCode]:
-
+        
                 if sasHandler.expired(cbsd['transmitExpireTime']):
   
                     if cbsd['AdminState'] == 1:

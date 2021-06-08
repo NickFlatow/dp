@@ -157,16 +157,18 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
         if response[resposneMessageType][i]['response']['responseCode'] != 0:
 
             errorCode = response[resposneMessageType][i]['response']['responseCode']
-            
-            #if key in dict
-            if errorCode in errorDict:
-                #append list
-                errorDict[errorCode].append(cbsd_list[i])
+
+            #if transmit expire in response
+            if 'transmitExpireTime' in response[resposneMessageType][i]:
+                conn = dbConn("ACS_V1_1")
+                #update transmit expire in the database for cbsd_list[i]
+                conn.update("UPDATE dp_device_info SET transmitExpireTime = %s WHERE SN = %s",(response[resposneMessageType][i]['transmitExpireTime'],cbsd_list[i]['SN']))
+                #get new data from databbase for cbsd
+                cbsd = conn.select("SELECT * from dp_device_info WHERE SN = %s",cbsd_list[i]['SN'])
+                #pass to addErrordict
+                addErrorDict(errorCode,errorDict,cbsd[0])
             else:
-                #create key and list
-                errorDict[errorCode] = []
-                errorDict[errorCode].append(cbsd_list[i])
-                # append list
+                addErrorDict(errorCode,errorDict,cbsd_list[i])
 
             errorList.append(cbsd_list[i]['SN'])
             
@@ -248,7 +250,8 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
                 print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
                 # turn on RF in cell
                 # cbsdAction(cbsd_list[i]['SN'],"RF_ON",str(datetime.now()))
-                setParameterValue(cbsd_list[i]['SN'],consts.ADMIN_STATE,'boolean','true')
+                if cbsd_list[i]['AdminState'] != 1:
+                    setParameterValue(cbsd_list[i]['SN'],consts.ADMIN_STATE,'boolean','true')
 
             #if response has new grantTime update databas
             if 'grantExpireTime' in response['heartbeatResponse'][i]:
@@ -438,3 +441,14 @@ def expired(transmitExpireTime, grantRenew = False):
         return True
     else: 
         return False
+
+def addErrorDict(errorCode,errorDict,cbsd):
+    #if key in dict
+    if errorCode in errorDict:
+        #append list
+        errorDict[errorCode].append(cbsd)
+    else:
+        #create key and list
+        errorDict[errorCode] = []
+        errorDict[errorCode].append(cbsd)
+        # append list
