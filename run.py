@@ -246,22 +246,30 @@ def on():
     conn = dbConn("ACS_V1_1")
     cbsd = conn.select("select * from dp_device_info WHERE fccID = 'FOXCONN'")
     conn.dbClose()
-    # sasHandler.cbsdAction('DCE994613163',"RF_ON",str(datetime.now()))
-    # sasHandler.setParameterValue('DCE994613163','Device.Services.FAPService.1.FAPControl.LTE.AdminState','boolean','false')
-    # sasHandler.setParameterValue('DCE994613163','Device.Services.FAPService.1.FAPControl.LTE.AdminState','boolean','false')
-    dict = {}
-    dict[500] = []
-    dict[500].append(cbsd[0])
-    dict[500].append(cbsd[1])
-
-    for cbsd in dict[500]:
-        print(cbsd)
-
-    print("one")
 
 
-# on()
-start()
+    EARFCN = sasHandler.MHZtoEARFCN(cbsd[0])
+    print(EARFCN)
+
+    pDict = {}
+    pDict[cbsd[0]['SN']] = []
+    pDict[cbsd[0]['SN']].append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':EARFCN})
+    pDict[cbsd[0]['SN']].append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':5})
+
+    # for dict in pDict[cbsd[0]['SN']]:
+        # print(dict)
+
+    sasHandler.setParameterValues(pDict,cbsd[0]['SN'])
+    # sasHandler.setParameterValue(cbsd[0]['SN'],consts.EARFCN_LIST,'string',EARFCN,1)
+    # sasHandler.setParameterValue(cbsd[0]['SN'],consts.TXPOWER_PATH,'int',0,2)
+    # MHz = 3585
+
+    # EARFCN = ((MHz - 3550)/0.1) + 55240
+
+    # print(EARFCN)
+
+on()
+# start()
 # testUpdateGrantTime()
 # test()
 # test2()

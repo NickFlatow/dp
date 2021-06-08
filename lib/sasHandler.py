@@ -134,7 +134,6 @@ def Handle_Request(cbsd_list,typeOfCalling):
     # if SASresponse != False:
     #     Handle_Response(cbsd_list,SASresponse,typeOfCalling)
 
-
 def Handle_Response(cbsd_list,response,typeOfCalling):
     #HTTP address that is in place e.g.(reg,spectrum,grant heartbeat)
     resposneMessageType = str(typeOfCalling +"Response")
@@ -335,6 +334,17 @@ def cbsdAction(cbsdSN,action,time):
     conn.update(sql_action)
     conn.dbClose()
 
+def MHZtoEARFCN(cbsd):
+    
+
+    #take low freq in MHz and 10(to get the middle freq)
+    MHz = int(cbsd['lowFrequency']) + 10
+
+    #then convert to EARFCN
+    EARFCN = math.ceil(((MHz - 3550)/0.1) + 55240)
+
+    return EARFCN
+
 def EARFCNtoMHZ(cbsd_SN):
     # Function to convert frequency from EARFCN  to MHz 3660 - 3700
     # mhz plus 6 zeros
@@ -389,7 +399,7 @@ def getNextCalling(typeOfCalling):
     if typeOfCalling == consts.DEREG:
         return False
 
-def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue):
+def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue,index = 1):
     #purge last action
     conn = dbConn("ACS_V1_1")
     conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd_SN)
@@ -404,10 +414,26 @@ def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue):
         conn.update("UPDATE dp_device_info SET AdminState = 1 WHERE SN = %s",cbsd_SN)
 
     #insert SN, data_model_path and value into FeMS_spv
-    conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd_SN,1,data_model_path,setValueType,setValue))
+    conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd_SN,index,data_model_path,setValueType,setValue))
     conn.dbClose()
     #call cbsdAction with action as 'Set Parameter Value'
     cbsdAction(cbsd_SN,'Set Parameter Value',str(datetime.now()))
+
+
+def setParameterValues(pDict,cbsd_SN):
+    p = pDict[cbsd_SN]
+    #purge last action(s)
+    conn = dbConn("ACS_V1_1")
+    conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd_SN)
+
+    for i in range(len(p)):
+        conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd_SN,i,p[i]['data_path'],p[i]['data_type'],p[i]['data_value']))
+    
+    conn.dbClose()
+    #call cbsdAction with action as 'Set Parameter Value'
+    cbsdAction(cbsd_SN,'Set Parameter Value',str(datetime.now()))
+
+
     
 
 def getParameterValue():
