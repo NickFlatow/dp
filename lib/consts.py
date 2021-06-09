@@ -12,8 +12,11 @@ EARFCN_LIST = 'Device.X_FOXCONN_FAP.CellConfig.EUTRACarrierARFCNDL'
 EARFCN_IN_USE = 'Device.X_FOXCONN_FAP.CellConfig.EUTRACarrierARFCNULInUse'
 ADMIN_STATE = 'Device.Services.FAPService.1.FAPControl.LTE.AdminState'
 
+ADMIN_POWER_OFF = {'data_path':ADMIN_STATE,'data_type':'boolean','data_value':'false'}
+ADMIN_POWER_ON  = {'data_path':ADMIN_STATE,'data_type':'boolean','data_value':'true'}
 
 DB = 'ACS_V1_1'
+
 FS = {
   "spectrumInquiryResponse": [
     {
@@ -144,16 +147,17 @@ FS = {
           "channelType": "GAA",
           "ruleApplied": "FCC_PART_96",
           "maxEirp": 30
-        },
-        {
-          "frequencyRange": {
-            "lowFrequency": 3570000000,
-            "highFrequency": 3580000000
-          },
-          "channelType": "GAA",
-          "ruleApplied": "FCC_PART_96",
-          "maxEirp": 30
         }
+        # ,
+        # {
+        #   "frequencyRange": {
+        #     "lowFrequency": 3570000000,
+        #     "highFrequency": 3580000000
+        #   },
+        #   "channelType": "GAA",
+        #   "ruleApplied": "FCC_PART_96",
+        #   "maxEirp": 30
+        # }
       ],
       "response": {
         "responseCode": 0

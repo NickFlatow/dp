@@ -134,7 +134,7 @@ def heartbeat():
             if cbsd_list !=():
                 sasHandler.Handle_Request(cbsd_list,consts.HEART)
            
-            time.sleep(3)    
+            time.sleep(45)    
 
 def start():
     conn = dbConn("ACS_V1_1")
@@ -242,7 +242,7 @@ def testUpdateGrantTime():
     cbsd = conn.select("select * from dp_device_info WHERE fccID = 'FOXCONN'")
     conn.dbClose()
 
-def on():
+def setParameterValues_Test():
     conn = dbConn("ACS_V1_1")
     cbsd = conn.select("select * from dp_device_info WHERE fccID = 'FOXCONN'")
     conn.dbClose()
@@ -253,13 +253,24 @@ def on():
 
     pDict = {}
     pDict[cbsd[0]['SN']] = []
-    pDict[cbsd[0]['SN']].append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':EARFCN})
-    pDict[cbsd[0]['SN']].append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':5})
+    pDict[cbsd[0]['SN']].append(consts.ADMIN_POWER_OFF)
+    # pDict[cbsd[0]['SN']].append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':EARFCN})
+    # pDict[cbsd[0]['SN']].append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':23})
+
+    # pDict[cbsd[0]['SN']].append({'dtat_path':})
+    #add 
 
     # for dict in pDict[cbsd[0]['SN']]:
         # print(dict)
 
     sasHandler.setParameterValues(pDict,cbsd[0]['SN'])
+
+    time.sleep(10)
+    aDict = {}
+    aDict[cbsd[0]['SN']] = []
+    aDict[cbsd[0]['SN']].append(consts.ADMIN_POWER_ON)
+
+    sasHandler.setParameterValues(aDict,cbsd[0]['SN'])
     # sasHandler.setParameterValue(cbsd[0]['SN'],consts.EARFCN_LIST,'string',EARFCN,1)
     # sasHandler.setParameterValue(cbsd[0]['SN'],consts.TXPOWER_PATH,'int',0,2)
     # MHz = 3585
@@ -268,8 +279,64 @@ def on():
 
     # print(EARFCN)
 
-on()
+
+def hb_op_params_test():
+    pass
+
+def spectrum_test():
+
+    channels = consts.FS['spectrumInquiryResponse'][0]['availableChannel']
+
+    for channel in channels:
+        # for i in range(len(channel))
+        print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
+        # print(f"")
+
+    pref = 3580000000 #middle of low and high freq from database lowFrequency + 10
+    low = False
+    high = False
+    
+    print('\n\n\n')
+    #To convert dBm/MHz to dBm/10MHz => 37 dBm/MHz = 37 + 10 * log(10) dBm/10MHz = 47 dBm/10MHz.
+
+    #check if 20MHz is avaiable
+    searching = True
+    while searching:
+        if select_frequency(pref,channels):
+            searching = False
+            print("found")
+        print("still searching increase by 10 Mhz")
+        pref = pref + 10000000
+        
+        if pref ==  3690000000:
+            pref = 3560000000
+        #we have come around again and must end the loop because there is no specturm for you
+    
+def select_frequency(pref, channels):
+    low = False
+    high = False
+
+    for channel in channels:
+        if pref == channel['frequencyRange']['lowFrequency']:
+            print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
+            print("low")
+            low = True
+        if pref == channel['frequencyRange']['highFrequency']:
+            print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
+            print("high")
+            high = True
+    
+        if low and high: 
+            return True
+
+    return False
+
+
+
+
 # start()
+spectrum_test()
+# setParameterValues_Test()
 # testUpdateGrantTime()
 # test()
 # test2()

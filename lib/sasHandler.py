@@ -427,6 +427,17 @@ def setParameterValues(pDict,cbsd_SN):
     conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd_SN)
 
     for i in range(len(p)):
+        
+        #update Adminstate in DB
+        if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'false':
+            logging.info("Turn RF OFF for %s",cbsd_SN)
+            conn.update("UPDATE dp_device_info SET AdminState = 0 WHERE SN = %s",cbsd_SN)
+
+        if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'true':
+            logging.info("Turn RF ON for %s",cbsd_SN)
+            conn.update("UPDATE dp_device_info SET AdminState = 1 WHERE SN = %s",cbsd_SN)
+
+    
         conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd_SN,i,p[i]['data_path'],p[i]['data_type'],p[i]['data_value']))
     
     conn.dbClose()
