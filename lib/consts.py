@@ -241,3 +241,49 @@ HBGR = {
         }
     ]
 }
+
+
+SPEC_EIRP = {
+    "spectrumInquiryResponse": [
+        {
+            "availableChannel": [
+                {
+                    "channelType": "GAA",
+                    "frequencyRange": {
+                        "highFrequency": 3630000000,
+                        "lowFrequency": 3620000000
+                    },
+                    "maxEirp": 13,
+                    "ruleApplied": "FCC_PART_96"
+                },
+                {
+                    "channelType": "GAA",
+                    "frequencyRange": {
+                        "highFrequency": 3640000000,
+                        "lowFrequency": 3630000000
+                    },
+                    "maxEirp": 13,
+                    "ruleApplied": "FCC_PART_96"
+                }
+            ],
+            "cbsdId": "2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982",
+            "response": {
+                "responseCode": 0
+            }
+        }
+    ]
+}
+GRANT_EIRP = {
+    "grantRequest": [
+        {
+            "cbsdId": "2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982",
+            "operationParam": {
+                "maxEirp": 25,
+                "operationFrequencyRange": {
+                    "highFrequency": 3640000000,
+                    "lowFrequency": 3620000000
+                }
+            }
+        }
+    ]
+}

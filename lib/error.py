@@ -1,3 +1,4 @@
+import time
 import lib.consts as consts
 from datetime import datetime
 from lib import sasHandler
@@ -29,7 +30,7 @@ def errorModule(errorDict,typeOfCalling):
                 log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
 
             #reliquish cbsd with grants
-            if bool(relinquish):
+            if bool(relinquish) and typeOfCalling != consts.REL:
                 sasHandler.Handle_Request(relinquish,consts.REL)
             #deregister all cbsds
             sasHandler.Handle_Request(errorDict[errorCode],consts.DEREG)
@@ -53,7 +54,8 @@ def errorModule(errorDict,typeOfCalling):
                     sasHandler.Handle_Request(rel,consts.GRANT)
                 
                 if bool(dereg):
-                    sasHandler.Handle_Request(dereg,consts.DEREG)
+                    if typeOfCalling != consts.DEREG:
+                        sasHandler.Handle_Request(dereg,consts.DEREG)
         
 
         elif errorCode == 105:
@@ -61,6 +63,13 @@ def errorModule(errorDict,typeOfCalling):
             sasHandler.Handle_Request(errorDict[errorCode],consts.DEREG)
             #try to reregister
             sasHandler.Handle_Request(errorDict[errorCode],consts.REG)
+
+        elif errorCode == 106:
+
+            log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
+
+            time.sleep(30)
+            sasHandler.Handle_Request(errorDict[errorCode])
 
         elif errorCode == 400:
             pass

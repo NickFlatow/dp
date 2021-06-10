@@ -300,10 +300,11 @@ def contactSAS(request,method):
 
     try:
         return requests.post(app.config['SAS']+method, 
-        cert=('certs/client.cert','certs/client.key'),
-        verify=('certs/ca.cert'),
-        json=request,
-        timeout=1.5)
+        cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+        verify=('googleCerts/ca.cert'),
+        json=request)
+
+        # timeout=5
         
     except Exception as e:
         print(f"your connection has failed: {e}")

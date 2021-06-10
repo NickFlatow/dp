@@ -138,7 +138,7 @@ def heartbeat():
 
 def start():
     conn = dbConn("ACS_V1_1")
-    conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE fccID = 'FOXCONN'")
+    conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE fccID = '2AQ68T99B226'")
     conn.dbClose()
 
     try:
@@ -334,8 +334,8 @@ def select_frequency(pref, channels):
 
 
 
-# start()
-spectrum_test()
+start()
+# spectrum_test()
 # setParameterValues_Test()
 # testUpdateGrantTime()
 # test()
