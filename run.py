@@ -331,10 +331,38 @@ def select_frequency(pref, channels):
 
     return False
 
+def change_EIRP():
+    # print(consts.SPEC_EIRP)
+
+    conn = dbConn(consts.DB)
+    cbsd = conn.select("SELECT * FROM dp_device_info")
+    conn.dbClose()
+
+    channels = consts.SPEC_EIRP['spectrumInquiryResponse'][0]['availableChannel']
+
+    for channel in channels:
+        # print(channel['lowFre'])
+        if channel['frequencyRange']['lowFrequency'] == 3630000000:
+            if channel['maxEirp'] < cbsd[0]['maxEIRP']:
+                txPower = channel['maxEirp'] - cbsd[0]['antennaGain']
+                print(txPower)
+                pDict = {}
+                pDict[cbsd[0]['SN']] = []
+                pDict[cbsd[0]['SN']].append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txPower})
+
+
+                sasHandler.setParameterValues(pDict,cbsd[0])
+         
+
+                
+                print("send grant request")
+
+            #SET PARAMETER VALUES SET TX POWER MAXEIRP - ANTENNA GAIN
 
 
 
-start()
+# start()
+change_EIRP()
 # spectrum_test()
 # setParameterValues_Test()
 # testUpdateGrantTime()

@@ -421,29 +421,39 @@ def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue,index = 1):
     cbsdAction(cbsd_SN,'Set Parameter Value',str(datetime.now()))
 
 
-def setParameterValues(pDict,cbsd_SN):
-    p = pDict[cbsd_SN]
+def setParameterValues(pDict,cbsd):
+    p = pDict[cbsd['SN']]
     #purge last action(s)
     conn = dbConn("ACS_V1_1")
-    conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd_SN)
+    conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd)['SN']
 
     for i in range(len(p)):
         
         #update Adminstate in DB
         if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'false':
-            logging.info("Turn RF OFF for %s",cbsd_SN)
-            conn.update("UPDATE dp_device_info SET AdminState = 0 WHERE SN = %s",cbsd_SN)
+            logging.info("Turn RF OFF for %s",cbsd['SN'])
+            conn.update("UPDATE dp_device_info SET AdminState = 0 WHERE SN = %s",cbsd['SN'])
 
         if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'true':
-            logging.info("Turn RF ON for %s",cbsd_SN)
-            conn.update("UPDATE dp_device_info SET AdminState = 1 WHERE SN = %s",cbsd_SN)
+            logging.info("Turn RF ON for %s",cbsd['SN'])
+            conn.update("UPDATE dp_device_info SET AdminState = 1 WHERE SN = %s",cbsd['SN'])
 
     
-        conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd_SN,i,p[i]['data_path'],p[i]['data_type'],p[i]['data_value']))
+        conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd['SN'],i,p[i]['data_path'],p[i]['data_type'],p[i]['data_value']))
     
     conn.dbClose()
     #call cbsdAction with action as 'Set Parameter Value'
-    cbsdAction(cbsd_SN,'Set Parameter Value',str(datetime.now()))
+
+    with socket.socket() as s:
+        try:
+            s.connect((cbsd['IPAddress'], 10500))
+            print(f"connected to ip: 192.168.4.17")
+            cbsdAction(cbsd['SN'],'Set Parameter Value',str(datetime.now()))
+        except Exception as e:
+            print(f"Connection failed reason: {e}")
+        s.close()
+        print("finished")
+    
 
 
     

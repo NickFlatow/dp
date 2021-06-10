@@ -53,8 +53,7 @@ def errorModule(errorDict,typeOfCalling):
                     #reapply
                     sasHandler.Handle_Request(rel,consts.GRANT)
                 
-                if bool(dereg):
-                    if typeOfCalling != consts.DEREG:
+                if bool(dereg) and typeOfCalling != consts.DEREG:
                         sasHandler.Handle_Request(dereg,consts.DEREG)
         
 
