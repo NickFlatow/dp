@@ -2,6 +2,7 @@ from config.default import SAS
 import math
 import logging
 import requests
+import socket
 import time
 import lib.consts as consts
 from lib.log import dpLogger
@@ -126,7 +127,8 @@ def Handle_Request(cbsd_list,typeOfCalling):
             conn.dbClose()
 
     dpLogger.log_json(req,len(cbsd_list))
-    SASresponse = contactSAS(req,typeOfCalling)
+    # SASresponse = contactSAS(req,typeOfCalling)
+    SASresponse = False
 
     if SASresponse != False:
         Handle_Response(cbsd_list,SASresponse.json(),typeOfCalling)
@@ -421,13 +423,20 @@ def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue,index = 1):
     cbsdAction(cbsd_SN,'Set Parameter Value',str(datetime.now()))
 
 
-def setParameterValues(pDict,cbsd):
+def setParameterValues(pDict,cbsd,typeOfCalling = None):
     p = pDict[cbsd['SN']]
+
+    #add perodic inform to 1 second 
+    p.append(consts.PERIODIC_ONE)
+
     #purge last action(s)
     conn = dbConn("ACS_V1_1")
-    conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd)['SN']
+    conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd['SN'])
 
     for i in range(len(p)):
+
+
+        #if EARFCN update low and high freq
         
         #update Adminstate in DB
         if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'false':
@@ -441,23 +450,32 @@ def setParameterValues(pDict,cbsd):
     
         conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd['SN'],i,p[i]['data_path'],p[i]['data_type'],p[i]['data_value']))
     
-    conn.dbClose()
+    
     #call cbsdAction with action as 'Set Parameter Value'
 
     with socket.socket() as s:
         try:
             s.connect((cbsd['IPAddress'], 10500))
-            print(f"connected to ip: 192.168.4.17")
+            print(f"connected to ip: 192.168.4.17 {datetime.now()}")
             cbsdAction(cbsd['SN'],'Set Parameter Value',str(datetime.now()))
         except Exception as e:
-            print(f"Connection failed reason: {e}")
+            print(f"Connection to {cbsd['IPAddress']} failed reason: {e}")
         s.close()
-        print("finished")
-    
-
+        print(f"finished {datetime.now()}")
 
     
+    #wait until parameters are set
+    settingParameters = True
+    while settingParameters:
+        print("settingParameters")
+        database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",cbsd['SN'])
+        
+        if database == ():
+            settingParameters = False
+        time.sleep(10)
 
+    conn.dbClose()
+    
 def getParameterValue():
     pass
     # check if action is already being executed

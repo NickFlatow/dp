@@ -7,11 +7,13 @@ DEREG = 'deregistration'
 REL = 'relinquishment'
 
 #DATA MODEL PATHS
-TXPOWER_PATH = 'Device.X_FOXCONN_FAP.CellConfig.SonMaxTxPower_Max'  
-EARFCN_LIST = 'Device.X_FOXCONN_FAP.CellConfig.EUTRACarrierARFCNDL'
+TXPOWER_PATH  = 'Device.X_FOXCONN_FAP.CellConfig.SonMaxTxPower_Max'  
+EARFCN_LIST   = 'Device.X_FOXCONN_FAP.CellConfig.EUTRACarrierARFCNDL'
 EARFCN_IN_USE = 'Device.X_FOXCONN_FAP.CellConfig.EUTRACarrierARFCNULInUse'
-ADMIN_STATE = 'Device.Services.FAPService.1.FAPControl.LTE.AdminState'
+ADMIN_STATE   = 'Device.Services.FAPService.1.FAPControl.LTE.AdminState'
+PERIODIC      = 'Device.ManagementServer.PeriodicInformInterval' 
 
+PERIODIC_ONE    = {'data_path':PERIODIC,'data_type':'unsignedInt','data_value':1}
 ADMIN_POWER_OFF = {'data_path':ADMIN_STATE,'data_type':'boolean','data_value':'false'}
 ADMIN_POWER_ON  = {'data_path':ADMIN_STATE,'data_type':'boolean','data_value':'true'}
 

@@ -336,7 +336,7 @@ def change_EIRP():
 
     conn = dbConn(consts.DB)
     cbsd = conn.select("SELECT * FROM dp_device_info")
-    conn.dbClose()
+    
 
     channels = consts.SPEC_EIRP['spectrumInquiryResponse'][0]['availableChannel']
 
@@ -345,21 +345,30 @@ def change_EIRP():
         if channel['frequencyRange']['lowFrequency'] == 3630000000:
             if channel['maxEirp'] < cbsd[0]['maxEIRP']:
                 txPower = channel['maxEirp'] - cbsd[0]['antennaGain']
+                
                 print(txPower)
+
                 pDict = {}
                 pDict[cbsd[0]['SN']] = []
-                pDict[cbsd[0]['SN']].append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txPower})
-
+                pDict[cbsd[0]['SN']].append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':23})
+                # pDict[cbsd[0]['SN']].append(consts.ADMIN_POWER_ON)
+                pDict[cbsd[0]['SN']].append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':55590})
 
                 sasHandler.setParameterValues(pDict,cbsd[0])
-         
 
+                sasHandler.EARFCNtoMHZ(cbsd[0]['SN'])
+                
+                testCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",cbsd[0]['SN'])
                 
                 print("send grant request")
+                print(datetime.now())
+                sasHandler.Handle_Request(testCbsd,consts.GRANT)
+
+                
 
             #SET PARAMETER VALUES SET TX POWER MAXEIRP - ANTENNA GAIN
 
-
+    conn.dbClose()
 
 # start()
 change_EIRP()
