@@ -287,43 +287,43 @@ def spectrum_test():
 
     channels = consts.FS['spectrumInquiryResponse'][0]['availableChannel']
 
+    #show all channels
     for channel in channels:
         # for i in range(len(channel))
         print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
         # print(f"")
 
     pref = 3580000000 #middle of low and high freq from database lowFrequency + 10
-    low = False
-    high = False
     
+
     print('\n\n\n')
     #To convert dBm/MHz to dBm/10MHz => 37 dBm/MHz = 37 + 10 * log(10) dBm/10MHz = 47 dBm/10MHz.
-
+    freqArray = [3560000000,3570000000,3580000000,3590000000,3600000000,3610000000,3620000000,3630000000,3640000000,3650000000.3660000000,3670000000,3680000000,3690000000]
     #check if 20MHz is avaiable
     searching = True
     while searching:
         if select_frequency(pref,channels):
             searching = False
             print("found")
-        print("still searching increase by 10 Mhz")
+        print("still searching, increase pref by 10 Mhz")
         pref = pref + 10000000
         
-        if pref ==  3690000000:
-            pref = 3560000000
+        # if pref ==  3690000000:
+        #     pref = 3560000000
         #we have come around again and must end the loop because there is no specturm for you
     
 def select_frequency(pref, channels):
     low = False
     high = False
-
+    
     for channel in channels:
         if pref == channel['frequencyRange']['lowFrequency']:
+            print(f"matched low value missing high value:")
             print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
-            print("low")
             low = True
         if pref == channel['frequencyRange']['highFrequency']:
+            print("matched high value missing low value:")
             print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
-            print("high")
             high = True
     
         if low and high: 
@@ -350,9 +350,9 @@ def change_EIRP():
 
                 pDict = {}
                 pDict[cbsd[0]['SN']] = []
-                pDict[cbsd[0]['SN']].append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':23})
-                # pDict[cbsd[0]['SN']].append(consts.ADMIN_POWER_ON)
-                pDict[cbsd[0]['SN']].append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':55590})
+                pDict[cbsd[0]['SN']].append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':0})
+                pDict[cbsd[0]['SN']].append(consts.ADMIN_POWER_OFF)
+                pDict[cbsd[0]['SN']].append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':56240})
 
                 sasHandler.setParameterValues(pDict,cbsd[0])
 
@@ -371,8 +371,8 @@ def change_EIRP():
     conn.dbClose()
 
 # start()
-change_EIRP()
-# spectrum_test()
+# change_EIRP()
+spectrum_test()
 # setParameterValues_Test()
 # testUpdateGrantTime()
 # test()

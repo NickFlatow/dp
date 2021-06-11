@@ -185,18 +185,17 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
         elif typeOfCalling == consts.SPECTRUM:
             conn = dbConn("ACS_V1_1")
-            # if high frequcy and low frequcy match value(convert to hz) for cbsdId in database then move to next
 
+            #loop through all avaiable channels provided by SAS
+            for channel in response['spectrumInquiryResponse'][i]['availableChannel']:
+                 #check if channel is GAA OR PAL
+                 if channel['channelType'] == 'GAA':
+                    #Check if preferred spectrum is avaiable
+                    
 
-            #check maxEirp if higher change
-
-            # print(len(response['spectrumInquiryResponse'][i]['availableChannel']))
-
-            # for channel in response['spectrumInquiryResponse'][i]['availableChannel']:
-            #      if channel['channelType'] == 'GAA':
-            #         if channel['maxEirp'] <= cbsd_list[i]['maxEIRP']:
-            #             print("over")
-            #         print(channel['frequencyRange']['lowFrequency'],channel['frequencyRange']['highFrequency'])
+                    if channel['maxEirp'] <= cbsd_list[i]['maxEIRP']:
+                        print("over")
+                    print(channel['frequencyRange']['lowFrequency'],channel['frequencyRange']['highFrequency'])
                        
                
             #TODO WHAT IF THE AVAIABLE CHANNEL ARRAY IS EMPTY
@@ -263,7 +262,6 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             conn = dbConn("ACS_V1_1") 
             conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.DEREG,cbsd_list[i]['SN']))
             conn.dbClose()
-
 
         elif typeOfCalling == consts.REL:
             #update sasStage
@@ -339,7 +337,6 @@ def cbsdAction(cbsdSN,action,time):
 
 def MHZtoEARFCN(cbsd):
     
-
     #take low freq in MHz and 10(to get the middle freq)
     MHz = int(cbsd['lowFrequency']) + 10
 
@@ -434,7 +431,6 @@ def setParameterValues(pDict,cbsd,typeOfCalling = None):
     conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd['SN'])
 
     for i in range(len(p)):
-
 
         #if EARFCN update low and high freq
         
