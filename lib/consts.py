@@ -304,8 +304,8 @@ HB501 = {
          "operationParam":{
             "maxEirp":11,
             "operationFrequencyRange":{
-               "lowFrequency":3680000000,
-               "highFrequency":3660000000
+               "lowFrequency":3660000000,
+               "highFrequency":3680000000
             }
          },
          "response":{  

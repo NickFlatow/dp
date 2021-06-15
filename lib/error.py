@@ -79,22 +79,41 @@ def errorModule(errorDict,typeOfCalling):
 
         elif errorCode == 500:
             rel = []
+            grant = []
 
             #check if any cbsds are expired
             for cbsd in errorDict[errorCode]:
-                if sasHandler.expired(cbsd['transmitExpireTime']):
-                    rel.append(cbsd)
-            #if expired relinuqish grant
-            if bool(rel):
-                sasHandler.Handle_Request(rel,consts.REL)
+                # if sasHandler.expired(cbsd['response']['transmitExpireTime']):
+                    # rel.append(cbsd)
+                #if expired relinuqish grant
+                if bool(rel):
+                    sasHandler.Handle_Request(rel,consts.REL)
+
+                if 'operationParam' in cbsd['response']:
+                    op = cbsd['response']['operationParam']
+                    FR = cbsd['response']['operationParam']['operationFrequencyRange']
+                    conn = dbConn("ACS_V1_1")
+                    conn.update("UPDATE dp_device_info SET maxEIRP = %s, lowFrequency = %s, highFrequency =%s WHERE SN = %s",(op['maxEirp'], FR['lowFrequency']/1000000,FR['highFrequency']/1000000,cbsd['SN']))
+
+                    updatedCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",cbsd['SN'])
+
+                    updateCbsdParameters(updatedCbsd[0])
+                    
+                    grant.append(updatedCbsd[0])
+                
 
             #send all to inquire for new specturm
-            sasHandler.Handle_Request(errorDict[errorCode],consts.SPECTRUM)
+            if bool(grant):
+                sasHandler.Handle_Request(grant,consts.GRANT)
+                cbsds_without_new_op_parmas = [cbsd for cbsd in errorDict[errorCode] if not sasHandler.hasError(cbsd,grant)]
+                sasHandler.Handle_Request(cbsds_without_new_op_parmas,consts.SPECTRUM)
+            else:    
+                sasHandler.Handle_Request(errorDict[errorCode],consts.SPECTRUM)
 
         elif errorCode == 501:
             for cbsd in errorDict[errorCode]:
         
-                if sasHandler.expired(cbsd['transmitExpireTime']):
+                if sasHandler.expired(cbsd['response']['transmitExpireTime']):
   
                     if cbsd['AdminState'] == 1:
                         sasHandler.setParameterValue(cbsd['SN'],consts.ADMIN_STATE,'boolean','false')
@@ -154,6 +173,27 @@ def update_sas_stage(cbsds_SN_list,typeOfCalling):
     conn = dbConn("ACS_V1_1")
     conn.updateSasStage(typeOfCalling,cbsds_SN_list)
     pass
+
+def updateCbsdParameters(cbsd):
+    
+    #init dict
+    setDict = {}
+    setDict[cbsd['SN']] = []
+
+    #get TxPower to set on cell(what about negative numbers)
+    txPower = cbsd['maxEIRP'] - cbsd['antennaGain']
+
+    setDict[cbsd['SN']].append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txPower})
+
+    #get earfcn to set on cell
+    earfcn = sasHandler.MHZtoEARFCN(cbsd['lowFrequency'] + 10)
+
+    setDict[cbsd['SN']].append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':earfcn})
+
+    sasHandler.setParameterValues(setDict,cbsd)
+
+
+
 
 
     # reposne 200 example

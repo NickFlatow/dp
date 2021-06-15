@@ -160,24 +160,13 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
             errorCode = response[resposneMessageType][i]['response']['responseCode']
 
-            #if transmit expire in response
-            if 'transmitExpireTime' in response[resposneMessageType][i]:
-                conn = dbConn("ACS_V1_1")
-                #update transmit expire in the database for cbsd_list[i]
-                conn.update("UPDATE dp_device_info SET transmitExpireTime = %s WHERE SN = %s",(response[resposneMessageType][i]['transmitExpireTime'],cbsd_list[i]['SN']))
-                #get new data from databbase for cbsd
-                conn.dbClose()
-                #pass to addErrordict
+            #This is a bad solution to my previous ignorance... I apologize
+            if 'transmitExpireTime' in response[resposneMessageType][i] or 'operationalParam' in response[resposneMessageType][i]:
+                cbsd_list[i]['response'] = response[resposneMessageType][i]
 
-                cbsd = conn.select("SELECT * from dp_device_info WHERE SN = %s",cbsd_list[i]['SN'])
-                addErrorDict(errorCode,errorDict,cbsd[0])
-            else:
-                addErrorDict(errorCode,errorDict,cbsd_list[i])
-
+            addErrorDict(errorCode,errorDict,cbsd_list[i])
             errorList.append(cbsd_list[i]['SN'])
-            
-            # errorDict[cbsd_list[i]['SN']] = response[resposneMessageType][i]
-
+        
         elif typeOfCalling == consts.REG:
 
             conn = dbConn("ACS_V1_1")
