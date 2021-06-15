@@ -65,10 +65,11 @@ def errorModule(errorDict,typeOfCalling):
 
         elif errorCode == 106:
 
-            log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
+            for cbsd in errorDict[errorCode]:
+                log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
 
-            time.sleep(30)
-            sasHandler.Handle_Request(errorDict[errorCode])
+                time.sleep(30)
+                sasHandler.Handle_Request(errorDict[errorCode],typeOfCalling)
 
         elif errorCode == 400:
             pass

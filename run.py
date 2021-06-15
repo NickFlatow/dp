@@ -1,3 +1,4 @@
+from config.default import SAS
 import requests
 import sys
 from lib.dbConn import dbConn
@@ -326,7 +327,9 @@ def select_frequency(pref, channels):
             print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
             high = True
     
-        if low and high: 
+        if low and high:
+            #  if channel['maxEirp'] < cbsd_list[i]['maxEIRP']:
+                #upate maxEirp with suggested from SAS
             return True
 
     return False
@@ -337,10 +340,9 @@ def change_EIRP():
     conn = dbConn(consts.DB)
     cbsd = conn.select("SELECT * FROM dp_device_info")
     
-
     channels = consts.SPEC_EIRP['spectrumInquiryResponse'][0]['availableChannel']
 
-    for channel in channels:
+    for channel in channels: 
         # print(channel['lowFre'])
         if channel['frequencyRange']['lowFrequency'] == 3630000000:
             if channel['maxEirp'] < cbsd[0]['maxEIRP']:
@@ -364,15 +366,24 @@ def change_EIRP():
                 print(datetime.now())
                 sasHandler.Handle_Request(testCbsd,consts.GRANT)
 
-                
-
             #SET PARAMETER VALUES SET TX POWER MAXEIRP - ANTENNA GAIN
 
     conn.dbClose()
 
+def sasSpecTest():
+    conn = dbConn(consts.DB)
+    cbsd = conn.select("SELECT * FROM dp_device_info")
+    conn.dbClose()
+
+    # sasHandler.Handle_Response(cbsd,consts.FS,consts.SPECTRUM)
+
+    sasHandler.Handle_Response(cbsd,consts.HB501,consts.HEART)
+
+
 # start()
+sasSpecTest()
 # change_EIRP()
-spectrum_test()
+# spectrum_test()
 # setParameterValues_Test()
 # testUpdateGrantTime()
 # test()

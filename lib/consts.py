@@ -1,3 +1,5 @@
+from datetime import datetime
+
 #program constants
 REG = 'registration'
 SPECTRUM = 'spectrumInquiry'
@@ -16,6 +18,10 @@ PERIODIC      = 'Device.ManagementServer.PeriodicInformInterval'
 PERIODIC_ONE    = {'data_path':PERIODIC,'data_type':'unsignedInt','data_value':1}
 ADMIN_POWER_OFF = {'data_path':ADMIN_STATE,'data_type':'boolean','data_value':'false'}
 ADMIN_POWER_ON  = {'data_path':ADMIN_STATE,'data_type':'boolean','data_value':'true'}
+
+
+HIGH_FREQUENCY = 3700000000
+LOW_FREQUENCY = 3550000000
 
 DB = 'ACS_V1_1'
 
@@ -49,7 +55,7 @@ FS = {
           },
           "channelType": "GAA",
           "ruleApplied": "FCC_PART_96",
-          "maxEirp": 30
+          "maxEirp": 0
         },
         {
           "frequencyRange": {
@@ -67,7 +73,7 @@ FS = {
           },
           "channelType": "GAA",
           "ruleApplied": "FCC_PART_96",
-          "maxEirp": 30
+          "maxEirp": 30 
         },
         {
           "frequencyRange": {
@@ -76,7 +82,7 @@ FS = {
           },
           "channelType": "GAA",
           "ruleApplied": "FCC_PART_96",
-          "maxEirp": 30
+          "maxEirp": 1
         },
         {
           "frequencyRange": {
@@ -244,7 +250,6 @@ HBGR = {
     ]
 }
 
-
 SPEC_EIRP = {
     "spectrumInquiryResponse": [
         {
@@ -288,4 +293,25 @@ GRANT_EIRP = {
             }
         }
     ]
+}
+
+HB501 = {  
+   "heartbeatResponse":[  
+      {  
+         "cbsdId":"<SAS-assigned device ID>",
+         "grantId":"<SAS-assigned grant ID>",
+         "transmitExpireTime":str(datetime.now()),
+         "operationParam":{
+            "maxEirp":11,
+            "operationFrequencyRange":{
+               "lowFrequency":3680000000,
+               "highFrequency":3660000000
+            }
+         },
+         "response":{  
+            "responseCode":500,
+            "responseMessage":"TERMINATED_GRANT"
+         }
+      }
+   ]
 }
