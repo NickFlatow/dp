@@ -345,25 +345,25 @@ def change_EIRP():
     for channel in channels: 
         # print(channel['lowFre'])
         if channel['frequencyRange']['lowFrequency'] == 3630000000:
-            if channel['maxEirp'] < cbsd[0]['maxEIRP']:
+            # if channel['maxEirp'] < cbsd[0]['maxEIRP']:
                 txPower = channel['maxEirp'] - cbsd[0]['antennaGain']
                 
                 print(txPower)
 
                 pDict = []
-                pDict.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':0})
+                pDict.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':10})
                 pDict.append(consts.ADMIN_POWER_OFF)
-                pDict.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':56240})
+                pDict.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':55590})
 
                 sasHandler.setParameterValues(pDict,cbsd[0])
 
-                sasHandler.EARFCNtoMHZ(cbsd[0]['SN'])
+                # sasHandler.EARFCNtoMHZ(cbsd[0]['SN'])
                 
-                testCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",cbsd[0]['SN'])
+                # testCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",cbsd[0]['SN'])
                 
-                print("send grant request")
-                print(datetime.now())
-                sasHandler.Handle_Request(testCbsd,consts.GRANT)
+                # print("send grant request")
+                # print(datetime.now())
+                # sasHandler.Handle_Request(testCbsd,consts.GRANT)
 
             #SET PARAMETER VALUES SET TX POWER MAXEIRP - ANTENNA GAIN
 
@@ -380,8 +380,8 @@ def sasSpecTest():
 
 
 # start()
-# sasSpecTest()
-change_EIRP()
+sasSpecTest()
+# change_EIRP()
 # spectrum_test()
 # setParameterValues_Test()
 # testUpdateGrantTime()

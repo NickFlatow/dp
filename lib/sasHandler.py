@@ -351,6 +351,12 @@ def updateMaxEirp(cbsd):
     conn.update("UPDATE dp_device_info SET maxEIRP = %s WHERE SN = %s",( (cbsd['TxPower'] + cbsd['antennaGain']), str(cbsd['SN'])))
     cbsd['maxEIRP'] = (cbsd['TxPower'] + cbsd['antennaGain'])
     conn.dbClose()
+
+def EirpToTxPower(maxEirp,cbsd):
+    return maxEirp - cbsd['antennaGain']
+
+
+
 def hasError(cbsd,errorList):
     if cbsd['SN'] in errorList:
         return True
@@ -396,72 +402,85 @@ def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue,index = 1):
 
 def setParameterValues(p,cbsd,typeOfCalling = None):
     #p is a list of properties to change on the cell in dict form
-
-    #add perodic inform to 1 second 
-    p.append(consts.PERIODIC_ONE)
-
-    #purge last action(s)
-    conn = dbConn("ACS_V1_1")
-    conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd['SN'])
-
-    for i in range(len(p)):
-
-        #if EARFCN update low and high freq
-        
-        #update Adminstate in DB
-        if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'false':
-            logging.info("Turn RF OFF for %s",cbsd['SN'])
-            conn.update("UPDATE dp_device_info SET AdminState = 0 WHERE SN = %s",cbsd['SN'])
-            cbsd['AdminState'] = 0
-
-        if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'true':
-            logging.info("Turn RF ON for %s",cbsd['SN'])
-            conn.update("UPDATE dp_device_info SET AdminState = 1 WHERE SN = %s",cbsd['SN'])
-            cbsd['AdminState'] = 1
-
-        if p[i]['data_path'] == consts.TXPOWER_PATH:
-            logging.info("adjust to power to %s dBm",p[i]['data_value'])
-            conn.update("UPDATE dp_device_info SET maxEIRP = %s WHERE SN = %s",((p[i]['data_value'] + cbsd['antennaGain']), str(cbsd['SN'])))
-            cbsd['TxPower'] = p[i]['data_value']
-
-        if p[i]['data_path'] == consts.EARFCN_LIST:
-            #if we are updating earfcn list on cell also update on the database
-            logging.info("adjust EARFCN list to %s",p[i]['data_value'])
-            #convert earfcn to middle frequency to in MHZ
-            MHz = EARFCNtoMHZ(p[i]['data_value'])
-            #update plus and minus
-            conn.update("UPDATE dp_device_info SET lowFrequency = %s, highFrequency = %s",((MHz -10),(MHz + 10)))
-
-
+    #cbsd is  dict of current values on the cell 
     
-        conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd['SN'],i,p[i]['data_path'],p[i]['data_type'],p[i]['data_value']))
-    
-    
-    #call cbsdAction with action as 'Set Parameter Value'
-
+    #create socket
     with socket.socket() as s:
         try:
+
+            #check if CBSD is connected
             s.connect((cbsd['IPAddress'], 10500))
             print(f"connected to ip: {cbsd['IPAddress']} {datetime.now()}")
+
+            #add perodic inform to 1 second 
+            p.append(consts.PERIODIC_ONE)
+
+            #purge last action(s)
+            conn = dbConn("ACS_V1_1")
+            conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd['SN'])
+
+            #for each value change in the parameter list
+            for i in range(len(p)):
+
+                #admin state if off
+                if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'false':
+                    logging.info("Turn RF OFF for %s",cbsd['SN'])
+                    conn.update("UPDATE dp_device_info SET AdminState = 0 WHERE SN = %s",cbsd['SN'])
+                    cbsd['AdminState'] = 0
+                #admin state is on
+                if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'true':
+                    logging.info("Turn RF ON for %s",cbsd['SN'])
+                    conn.update("UPDATE dp_device_info SET AdminState = 1 WHERE SN = %s",cbsd['SN'])
+                    cbsd['AdminState'] = 1
+                
+                #change cell power
+                if p[i]['data_path'] == consts.TXPOWER_PATH:
+                    logging.info("adjust to power to %s dBm",p[i]['data_value'])
+                    conn.update("UPDATE dp_device_info SET maxEIRP = %s WHERE SN = %s",((p[i]['data_value'] + cbsd['antennaGain']), str(cbsd['SN'])))
+                    cbsd['TxPower'] = p[i]['data_value']
+
+                #change cell frequency
+                if p[i]['data_path'] == consts.EARFCN_LIST:
+                    #if we are updating earfcn list on cell also update on the database
+                    logging.info("adjust EARFCN list to %s",p[i]['data_value'])
+                    #convert earfcn to middle frequency to in MHZ
+                    MHz = EARFCNtoMHZ(p[i]['data_value'])
+                    #update plus and minus
+                    conn.update("UPDATE dp_device_info SET lowFrequency = %s, highFrequency = %s",((MHz -10),(MHz + 10)))
+                    #update cbsd 
+                    cbsd['lowFrequency'] = MHz - 10
+                    cbsd['highFrequency'] = MHz + 10
+
+
+                #update parameters to database for update
+                conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd['SN'],i,p[i]['data_path'],p[i]['data_type'],p[i]['data_value']))
+
+            #send action to the cell to trigger connection request
             cbsdAction(cbsd['SN'],'Set Parameter Value',str(datetime.now()))
+
+            #wait until parameters are set
+            settingParameters = True
+            while settingParameters:
+                logging.info(f"Setting Parameters for {cbsd['SN']}")
+                database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",cbsd['SN'])
+                
+                if database == ():
+                    logging.info(f"Paramters set successfully for {cbsd['SN']}")
+                    settingParameters = False
+                time.sleep(10)
+
+            conn.dbClose()
+    
+        
         except Exception as e:
+            #if cell is disconnected log the failure
+            logging.info(f"Connection to {cbsd['IPAddress']} failed reason: {e}")
             print(f"Connection to {cbsd['IPAddress']} failed reason: {e}")
         s.close()
         print(f"finished {datetime.now()}")
 
     
-    #wait until parameters are set
-    settingParameters = True
-    while settingParameters:
-        print("settingParameters")
-        database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",cbsd['SN'])
-        
-        if database == ():
-            settingParameters = False
-        time.sleep(10)
 
-    conn.dbClose()
-    
 def getParameterValue():
     pass
     # check if action is already being executed
@@ -556,3 +575,21 @@ def selectFrequency(cbsd,channels,typeOfCalling = None):
         #send error to FeMS no spectrum avaiable
 
         #deregister? keep trying? wait x seconds and try again?
+
+
+#pass cbsd; Check if TxPower if txpower is already lower than SAS txpower leave alone
+def buildParameterList(parameterDict,cbsd):
+    #paramterDict is a dict of data_model_path : value
+    #returns a list containing all paramters needed to update the cell with new values
+    parameterList = []
+
+    for data_path in parameterDict:
+
+        if data_path == consts.TXPOWER_PATH and parameterDict[data_path] < cbsd['TxPower']:
+            parameterList.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':parameterDict[data_path]})
+
+        if data_path == consts.EARFCN_LIST:
+            parameterList.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':parameterDict[data_path]})
+
+    return parameterList
+
