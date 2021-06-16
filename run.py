@@ -350,11 +350,10 @@ def change_EIRP():
                 
                 print(txPower)
 
-                pDict = {}
-                pDict[cbsd[0]['SN']] = []
-                pDict[cbsd[0]['SN']].append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':0})
-                pDict[cbsd[0]['SN']].append(consts.ADMIN_POWER_OFF)
-                pDict[cbsd[0]['SN']].append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':56240})
+                pDict = []
+                pDict.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':0})
+                pDict.append(consts.ADMIN_POWER_OFF)
+                pDict.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':56240})
 
                 sasHandler.setParameterValues(pDict,cbsd[0])
 
@@ -375,14 +374,14 @@ def sasSpecTest():
     cbsd = conn.select("SELECT * FROM dp_device_info")
     conn.dbClose()
 
-    # sasHandler.Handle_Response(cbsd,consts.FS,consts.SPECTRUM)
+    sasHandler.Handle_Response(cbsd,consts.FS,consts.SPECTRUM)
 
-    sasHandler.Handle_Response(cbsd,consts.HB501,consts.HEART)
+    # sasHandler.Handle_Response(cbsd,consts.HB501,consts.HEART)
 
 
-start()
+# start()
 # sasSpecTest()
-# change_EIRP()
+change_EIRP()
 # spectrum_test()
 # setParameterValues_Test()
 # testUpdateGrantTime()

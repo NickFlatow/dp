@@ -131,7 +131,10 @@ def Handle_Request(cbsd_list,typeOfCalling):
     # SASresponse = False
 
     if SASresponse != False:
-        Handle_Response(cbsd_list,SASresponse.json(),typeOfCalling)
+        conn = dbConn("ACS_V1_1")
+        updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",typeOfCalling)
+        conn.dbClose()
+        Handle_Response(updated_cbsd_list,SASresponse.json(),typeOfCalling)
 
     # if SASresponse != False:
     #     Handle_Response(cbsd_list,SASresponse,typeOfCalling)
@@ -184,7 +187,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             channels = response['spectrumInquiryResponse'][0]['availableChannel']
             
             #scans EARFCN list for open channel on SAS
-            selectFrequency(cbsd_list[i],channels)
+            selectFrequency(cbsd_list[i],channels,typeOfCalling)
 
             sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
             conn.update(sqlUpdate)
@@ -255,6 +258,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
         if (nextCalling != False):
             conn = dbConn("ACS_V1_1")
             updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",nextCalling)
+            conn.dbClose()
             Handle_Request(updated_cbsd_list,nextCalling) 
 
 
@@ -317,37 +321,27 @@ def MHZtoEARFCN(MHz):
 
     return EARFCN
 
-def EARFCNtoMHZ(cbsd_SN):
+def EARFCNtoMHZ(earfcn):
     # Function to convert frequency from EARFCN  to MHz 3660 - 3700
     # hz add 6 zeros
 
-    conn = dbConn("ACS_V1_1")
-    sql = 'SELECT * FROM dp_device_info where SN = %s'
-    cbsd = conn.select(sql,cbsd_SN)
-
-    logging.info("////////////////////////////////EARFCN CONVERTION "+ cbsd[0]['SN']+"\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
-    print("EARFCN: " + str(cbsd[0]['EARFCN']))
-    if int(cbsd[0]['EARFCN']) > 56739 or int(cbsd[0]['EARFCN']) < 55240:
+    logging.info("////////////////////////////////EARFCN CONVERTION\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+    print("EARFCN: " + str(earfcn))
+    if int(earfcn) > 56739 or int(earfcn) < 55240:
         logging.info("SPECTRUM IS OUTSIDE OF BOUNDS")
         L_frq = 0
         H_frq = 0
         F = 0
-    elif cbsd[0]['EARFCN'] == 55240:
+    elif earfcn == 55240:
         L_frq = 3550
         H_frq = 3570
         F = 3560
-    elif cbsd[0]['EARFCN'] == 56739:
+    elif earfcn == 56739:
         L_frq = 3680
         H_frq = 3700
         F = 3690
     else:
-        F = math.ceil(3550 + (0.1 * (int(cbsd[0]['EARFCN']) - 55240)))
-        L_frq = F - 10
-        H_frq = F + 10
-
-    sql = "UPDATE `dp_device_info` SET lowFrequency= %s, highFrequency=%s WHERE SN = %s"
-    conn.update(sql,(str(L_frq),str(H_frq),str(cbsd[0]['SN'])))        
-    conn.dbClose()
+        F = math.ceil(3550 + (0.1 * (int(earfcn) - 55240)))
 
     #return middle frequency
     return F
@@ -355,6 +349,7 @@ def EARFCNtoMHZ(cbsd_SN):
 def updateMaxEirp(cbsd):
     conn = dbConn(consts.DB)
     conn.update("UPDATE dp_device_info SET maxEIRP = %s WHERE SN = %s",( (cbsd['TxPower'] + cbsd['antennaGain']), str(cbsd['SN'])))
+    cbsd['maxEIRP'] = (cbsd['TxPower'] + cbsd['antennaGain'])
     conn.dbClose()
 def hasError(cbsd,errorList):
     if cbsd['SN'] in errorList:
@@ -374,6 +369,8 @@ def getNextCalling(typeOfCalling):
     if typeOfCalling == consts.REL:
         return False
     if typeOfCalling == consts.DEREG:
+        return False
+    if typeOfCalling == False:
         return False
 
 def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue,index = 1):
@@ -397,8 +394,8 @@ def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue,index = 1):
     cbsdAction(cbsd_SN,'Set Parameter Value',str(datetime.now()))
 
 
-def setParameterValues(pDict,cbsd,typeOfCalling = None):
-    p = pDict[cbsd['SN']]
+def setParameterValues(p,cbsd,typeOfCalling = None):
+    #p is a list of properties to change on the cell in dict form
 
     #add perodic inform to 1 second 
     p.append(consts.PERIODIC_ONE)
@@ -415,14 +412,26 @@ def setParameterValues(pDict,cbsd,typeOfCalling = None):
         if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'false':
             logging.info("Turn RF OFF for %s",cbsd['SN'])
             conn.update("UPDATE dp_device_info SET AdminState = 0 WHERE SN = %s",cbsd['SN'])
+            cbsd['AdminState'] = 0
 
         if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'true':
             logging.info("Turn RF ON for %s",cbsd['SN'])
             conn.update("UPDATE dp_device_info SET AdminState = 1 WHERE SN = %s",cbsd['SN'])
+            cbsd['AdminState'] = 1
 
         if p[i]['data_path'] == consts.TXPOWER_PATH:
             logging.info("adjust to power to %s dBm",p[i]['data_value'])
             conn.update("UPDATE dp_device_info SET maxEIRP = %s WHERE SN = %s",((p[i]['data_value'] + cbsd['antennaGain']), str(cbsd['SN'])))
+            cbsd['TxPower'] = p[i]['data_value']
+
+        if p[i]['data_path'] == consts.EARFCN_LIST:
+            #if we are updating earfcn list on cell also update on the database
+            logging.info("adjust EARFCN list to %s",p[i]['data_value'])
+            #convert earfcn to middle frequency to in MHZ
+            MHz = EARFCNtoMHZ(p[i]['data_value'])
+            #update plus and minus
+            conn.update("UPDATE dp_device_info SET lowFrequency = %s, highFrequency = %s",((MHz -10),(MHz + 10)))
+
 
     
         conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd['SN'],i,p[i]['data_path'],p[i]['data_type'],p[i]['data_value']))
@@ -433,7 +442,7 @@ def setParameterValues(pDict,cbsd,typeOfCalling = None):
     with socket.socket() as s:
         try:
             s.connect((cbsd['IPAddress'], 10500))
-            print(f"connected to ip: 192.168.4.17 {datetime.now()}")
+            print(f"connected to ip: {cbsd['IPAddress']} {datetime.now()}")
             cbsdAction(cbsd['SN'],'Set Parameter Value',str(datetime.now()))
         except Exception as e:
             print(f"Connection to {cbsd['IPAddress']} failed reason: {e}")
@@ -496,18 +505,17 @@ def addErrorDict(errorCode,errorDict,cbsd):
         errorDict[errorCode].append(cbsd)
         # append list
 
-def selectFrequency(cbsd,channels):
+def selectFrequency(cbsd,channels,typeOfCalling = None):
     #cbsd - dict of cbsd values  
     #channels - List of avaiable channels from the SAS
     
     #pref     - The prefered middle frequecy of the CBSD in hz
 
     #updatea to list of EARFCN 
-    pref = EARFCNtoMHZ(cbsd['SN']) * 1000000
+    pref = EARFCNtoMHZ(cbsd['EARFCN']) * 1000000
     low = False
     high = False
-    setDict = {}
-    setDict[cbsd['SN']] = []
+    setList = []
     
     for channel in channels:
         if channel['channelType'] == 'GAA':
@@ -526,7 +534,7 @@ def selectFrequency(cbsd,channels):
                 #convert perf back to EARFCN
                 EARFCN = MHZtoEARFCN((pref/1000000))
                 #ADD earfcn to setDict
-                setDict[cbsd['SN']].append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':EARFCN})
+                setList.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':EARFCN})
                 #what if one channels eirp is lower than the others
                 if lowChannelEirp <= highChannelEirp:
                     maxEirp = lowChannelEirp
@@ -534,16 +542,17 @@ def selectFrequency(cbsd,channels):
                     maxEirp = highChannelEirp
                 if maxEirp < cbsd['maxEIRP']:
                     txPower = maxEirp - cbsd['antennaGain']
-                    setDict[cbsd['SN']].append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txPower})
+                    setList.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txPower})
                 
                 #updates maxEirp if txpower is included in dict
-                setParameterValues(setDict,cbsd)
+                setParameterValues(setList,cbsd)
                 break
 
     #if no spectrum is found for any channels on cbsd
     if not low or not high:
         print("no spectrum")
-        pass
+        typeOfCalling = False
+        
         #send error to FeMS no spectrum avaiable
 
         #deregister? keep trying? wait x seconds and try again?

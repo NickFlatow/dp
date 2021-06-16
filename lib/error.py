@@ -1,4 +1,5 @@
 import time
+import math
 import lib.consts as consts
 from datetime import datetime
 from lib import sasHandler
@@ -47,7 +48,7 @@ def errorModule(errorDict,typeOfCalling):
                     #during the reg process just place error in FeMS and deregister to stop trying
                     dereg.append(cbsd)
                     
-                if bool(rel):
+                if bool(rel) and typeOfCalling != consts.REL:
                     #relinquish grant
                     sasHandler.Handle_Request(rel,consts.REL)
                     #reapply
@@ -80,33 +81,40 @@ def errorModule(errorDict,typeOfCalling):
         elif errorCode == 500:
             rel = []
             grant = []
+            spec = []
 
             #check if any cbsds are expired
             for cbsd in errorDict[errorCode]:
-                # if sasHandler.expired(cbsd['response']['transmitExpireTime']):
-                    # rel.append(cbsd)
+                if sasHandler.expired(cbsd['response']['transmitExpireTime']):
+                    rel.append(cbsd)
                 #if expired relinuqish grant
                 if bool(rel):
                     sasHandler.Handle_Request(rel,consts.REL)
 
                 if 'operationParam' in cbsd['response']:
+                    setList = []
+                    #add shorthand for json
                     op = cbsd['response']['operationParam']
                     FR = cbsd['response']['operationParam']['operationFrequencyRange']
+                    
+                    #update database with operatinal parameter change(will this happen after the grant req)
                     conn = dbConn("ACS_V1_1")
                     conn.update("UPDATE dp_device_info SET maxEIRP = %s, lowFrequency = %s, highFrequency =%s WHERE SN = %s",(op['maxEirp'], FR['lowFrequency']/1000000,FR['highFrequency']/1000000,cbsd['SN']))
-
-                    updatedCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",cbsd['SN'])
-
-                    updateCbsdParameters(updatedCbsd[0])
+                    conn.dbClose()
                     
-                    grant.append(updatedCbsd[0])
-                
+                    #update local cbsd with changes
+                    cbsd['maxEIRP'] = op['maxEirp']
+                    cbsd['lowFrequency'] = math.floor(FR['lowFrequency']/1000000)
+                    cbsd['highFrequency'] = math.floor(FR['highFrequency']/1000000)
 
-            #send all to inquire for new specturm
+                    #add to list for new grant req
+                    grant.append(cbsd)
+                else:
+                    #if no suggested operational paramters from SAS do spectrum inquiry
+                    spec.append(cbsd)
+                
             if bool(grant):
                 sasHandler.Handle_Request(grant,consts.GRANT)
-                cbsds_without_new_op_parmas = [cbsd for cbsd in errorDict[errorCode] if not sasHandler.hasError(cbsd,grant)]
-                sasHandler.Handle_Request(cbsds_without_new_op_parmas,consts.SPECTRUM)
             else:    
                 sasHandler.Handle_Request(errorDict[errorCode],consts.SPECTRUM)
 
