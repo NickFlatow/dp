@@ -379,8 +379,8 @@ def sasSpecTest():
     # sasHandler.Handle_Response(cbsd,consts.HB501,consts.HEART)
 
 
-# start()
-sasSpecTest()
+start()
+# sasSpecTest()
 # change_EIRP()
 # spectrum_test()
 # setParameterValues_Test()

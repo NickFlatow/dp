@@ -23,6 +23,8 @@ ADMIN_POWER_ON  = {'data_path':ADMIN_STATE,'data_type':'boolean','data_value':'t
 HIGH_FREQUENCY = 3700000000
 LOW_FREQUENCY = 3550000000
 
+Hz = 1000000
+
 DB = 'ACS_V1_1'
 
 FS = {

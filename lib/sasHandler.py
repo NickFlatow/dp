@@ -530,20 +530,20 @@ def selectFrequency(cbsd,channels,typeOfCalling = None):
     
     #pref     - The prefered middle frequecy of the CBSD in hz
 
-    #updatea to list of EARFCN 
-    pref = EARFCNtoMHZ(cbsd['EARFCN']) * 1000000
+    #update to list of EARFCN 
+    pref = EARFCNtoMHZ(cbsd['EARFCN']) * consts.Hz
     low = False
     high = False
     setList = []
     
     for channel in channels:
         if channel['channelType'] == 'GAA':
-            if pref == channel['frequencyRange']['lowFrequency']:
+            if (pref - consts.Hz) >= channel['frequencyRange']['lowFrequency'] and (pref - consts.Hz) <= channel['frequencyRange']['highFrequency']:
                 # print(f"matched low value missing high value:")
                 # print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
                 low = True
                 lowChannelEirp = channel['maxEirp']
-            if pref == channel['frequencyRange']['highFrequency']:
+            if (pref + consts.Hz) >= channel['frequencyRange']['lowFrequency'] and (pref + consts.Hz) <= channel['frequencyRange']['highFrequency']:
                 # print("matched high value missing low value:")
                 # print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
                 high = True
