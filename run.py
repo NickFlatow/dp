@@ -391,9 +391,41 @@ def sasSpecTest():
     for i in l:
         print(i)
 
+def getParameters(cbsd):
+    conn = dbConn(consts.DB)
+    
+    #collect all parameters from subscription table (update to json ajax send or add more value so there is no case of duplicated entires with same SN in apt_subscription table)
+    parameters = conn.select("SELECT parameter FROM apt_subscription WHERE SN = %s",cbsd['SN'])
+    
+    #convert to json
+    parameters = json.loads(parameters[0]['parameter'])
+    
+    #get eutra values(all possible earfcns provided by user in the subscription table)
+    eutra = parameters['EUTRACarrierARFCNDL']['value']
+    
+    #convert to list
+    earfcnList = list(eutra.split(","))
+
+    #convert all values to ints
+    earfcnList = [int(i) for i in earfcnList]
+
+    for i in earfcnList:
+        print(i)
+        print(type(i))
+        
+    #get current earfcn in use(currently assigned to the cell from SON) 
+    earfcn = conn.select("SELECT EARFCN FROM dp_device_info WHERE SN = %s",cbsd['SN'])
+    #add to the front of the list
+    earfcnList.insert(0,earfcn[0]['EARFCN'])
+
+    conn.dbClose()
+
+    return earfcnList
+
 
 # start()
-sasSpecTest()
+getParameters()
+# sasSpecTest()
 # change_EIRP()
 # spectrum_test()
 # setParameterValues_Test()
