@@ -373,23 +373,23 @@ def sasSpecTest():
 
 
     conn = dbConn(consts.DB)
-    g = conn.select("SELECT getValue FROM fems_gpv WHERE SN = %s", 'DCE994613163')
-    # cbsd = conn.select("SELECT * FROM dp_device_info")
-    # conn.dbClose()
+    # g = conn.select("SELECT getValue FROM fems_gpv WHERE SN = %s", 'DCE994613163')
+    cbsd = conn.select("SELECT * FROM dp_device_info")
+    conn.dbClose()
 
-    # # sasHandler.Handle_Response(cbsd,consts.FS,consts.SPECTRUM)
+    sasHandler.Handle_Response(cbsd,consts.FSCB,consts.SPECTRUM)
 
-    # # sasHandler.Handle_Response(cbsd,consts.HB501,consts.HEART)
+    # sasHandler.Handle_Response(cbsd,consts.HB501,consts.HEART)
     
     # g =sasHandler.getParameterValue('Device.X_FOXCONN_FAP.CellConfig.EUTRACarrierARFCNDL',cbsd[0])
 
 
-    print(g)
-    print(type(g[0]['getValue']))
-    l = list(g[0]['getValue'].split(","))
+    # print(g)
+    # print(type(g[0]['getValue']))
+    # l = list(g[0]['getValue'].split(","))
 
-    for i in l:
-        print(i)
+    # for i in l:
+    #     print(i)
 
 def getParameters(cbsd):
     conn = dbConn(consts.DB)
@@ -424,8 +424,8 @@ def getParameters(cbsd):
 
 
 # start()
-getParameters()
-# sasSpecTest()
+# getParameters()
+sasSpecTest()
 # change_EIRP()
 # spectrum_test()
 # setParameterValues_Test()

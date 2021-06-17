@@ -541,49 +541,62 @@ def selectFrequency(cbsd,channels,typeOfCalling = None):
     
     #pref     - The prefered middle frequecy of the CBSD in hz
 
-    #update to list of EARFCN 
+    
+    
+    
+    #get earfcn list 
     earfcnList = getEarfcnList(cbsd)
 
-    pref = EARFCNtoMHZ(cbsd['EARFCN']) * consts.Hz
-    low = False
-    high = False
-    setList = []
-    
-    for channel in channels:
-        if channel['channelType'] == 'GAA':
-            if (pref - consts.Hz) >= channel['frequencyRange']['lowFrequency'] and (pref - consts.Hz) <= channel['frequencyRange']['highFrequency']:
-                # print(f"matched low value missing high value:")
-                # print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
-                low = True
-                lowChannelEirp = channel['maxEirp']
-            if (pref + consts.Hz) >= channel['frequencyRange']['lowFrequency'] and (pref + consts.Hz) <= channel['frequencyRange']['highFrequency']:
-                # print("matched high value missing low value:")
-                # print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
-                high = True
-                highChannelEirp = channel['maxEirp']
-    
-            if low and high:
-                #convert perf back to EARFCN
+    for earfcn in earfcnList:
 
-                #if earfcn is != cbsd['EARFCN'] 
-                EARFCN = MHZtoEARFCN((pref/consts.Hz))
-                #else:
-                    #update frequency on cbsd and database
+        pref = EARFCNtoMHZ(earfcn) * consts.Hz
+        low = False
+        high = False
+        setList = []
+        
+        for channel in channels:
+            if channel['channelType'] == 'GAA':
+                lowFreq = pref - consts.TEN_MHz
+                if (lowFreq) >= channel['frequencyRange']['lowFrequency'] and (lowFreq) <= channel['frequencyRange']['highFrequency']:
+                    # print(f"matched low value missing high value:")
+                    # print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
+                    low = True
+                    clow_low = channel['frequencyRange']['lowFrequency']
+                    clow_high = channel['frequencyRange']['highFrequency']
+                    lowChannelEirp = channel['maxEirp']
+                highFreq = pref + consts.TEN_MHz
+                if (highFreq) >= channel['frequencyRange']['lowFrequency'] and (highFreq) <= channel['frequencyRange']['highFrequency']:
+                    # print("matched high value missing low value:")
+                    # print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
+                    high = True
+                    chigh_low = channel['frequencyRange']['lowFrequency']
+                    chigh_high = channel['frequencyRange']['highFrequency']
+                    highChannelEirp = channel['maxEirp']
+        
+                if low and high:
+                    #convert perf back to EARFCN
 
-                #ADD earfcn to setlist
-                setList.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':EARFCN})
-                #what if one channels eirp is lower than the others
-                if lowChannelEirp <= highChannelEirp:
-                    maxEirp = lowChannelEirp
-                else: 
-                    maxEirp = highChannelEirp
-                if maxEirp < cbsd['maxEIRP']:
-                    txPower = maxEirp - cbsd['antennaGain']
-                    setList.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txPower})
-                
-                #updates maxEirp if txpower is included in dict
-                setParameterValues(setList,cbsd)
-                break
+                    #if earfcn is != cbsd['EARFCN'] 
+                    selected_earfcn = MHZtoEARFCN((pref/consts.Hz))
+                    #else:
+                        #update frequency on cbsd and database
+
+                    #ADD earfcn to setlist
+                    setList.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':selected_earfcn})
+                   
+                    #what if one channels eirp is lower than the other?
+                    if lowChannelEirp <= highChannelEirp:
+                        maxEirp = lowChannelEirp
+                    else: 
+                        maxEirp = highChannelEirp
+                    if maxEirp < cbsd['maxEIRP']:
+                        txPower = maxEirp - cbsd['antennaGain']
+                        setList.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txPower})
+                    
+                    setParameterValues(setList,cbsd)
+
+                    #exit for loops
+                    return
 
     #if no spectrum is found for any channels on cbsd
     if not low or not high:
