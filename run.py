@@ -370,17 +370,30 @@ def change_EIRP():
     conn.dbClose()
 
 def sasSpecTest():
+
+
     conn = dbConn(consts.DB)
-    cbsd = conn.select("SELECT * FROM dp_device_info")
-    conn.dbClose()
+    g = conn.select("SELECT getValue FROM fems_gpv WHERE SN = %s", 'DCE994613163')
+    # cbsd = conn.select("SELECT * FROM dp_device_info")
+    # conn.dbClose()
 
-    sasHandler.Handle_Response(cbsd,consts.FS,consts.SPECTRUM)
+    # # sasHandler.Handle_Response(cbsd,consts.FS,consts.SPECTRUM)
 
-    # sasHandler.Handle_Response(cbsd,consts.HB501,consts.HEART)
+    # # sasHandler.Handle_Response(cbsd,consts.HB501,consts.HEART)
+    
+    # g =sasHandler.getParameterValue('Device.X_FOXCONN_FAP.CellConfig.EUTRACarrierARFCNDL',cbsd[0])
 
 
-start()
-# sasSpecTest()
+    print(g)
+    print(type(g[0]['getValue']))
+    l = list(g[0]['getValue'].split(","))
+
+    for i in l:
+        print(i)
+
+
+# start()
+sasSpecTest()
 # change_EIRP()
 # spectrum_test()
 # setParameterValues_Test()

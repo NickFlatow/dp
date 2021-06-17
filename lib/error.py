@@ -85,11 +85,11 @@ def errorModule(errorDict,typeOfCalling):
 
             #check if any cbsds are expired
             for cbsd in errorDict[errorCode]:
-                # if sasHandler.expired(cbsd['response']['transmitExpireTime']):
-                    # rel.append(cbsd)
+                if sasHandler.expired(cbsd['response']['transmitExpireTime']):
+                    rel.append(cbsd)
                 #if expired relinuqish grant
-                if bool(rel):
-                    sasHandler.Handle_Request(rel,consts.REL)
+                # if bool(rel):
+                #     sasHandler.Handle_Request(rel,consts.REL)
 
                 if 'operationParam' in cbsd['response']:
                     #list to store value changes for the cell
@@ -97,11 +97,6 @@ def errorModule(errorDict,typeOfCalling):
                     #add shorthand for json
                     op = cbsd['response']['operationParam']
                     FR = cbsd['response']['operationParam']['operationFrequencyRange']
-                    
-
-                    # conn = dbConn("ACS_V1_1")
-                    # conn.update("UPDATE dp_device_info SET maxEIRP = %s, lowFrequency = %s, highFrequency =%s WHERE SN = %s",(op['maxEirp'], FR['lowFrequency']/1000000,FR['highFrequency']/1000000,cbsd['SN']))
-                    # conn.dbClose()
                     
                     #set new op paramters on the cell
                     #convert Eirp to txpower build cell parameter list
@@ -113,16 +108,12 @@ def errorModule(errorDict,typeOfCalling):
 
                     sasHandler.setParameterValues(paramList,cbsd)
 
-                    #update local cbsd with changes
-                    # cbsd['maxEIRP'] = op['maxEirp']
-                    # cbsd['lowFrequency'] = math.floor(FR['lowFrequency']/1000000)
-                    # cbsd['highFrequency'] = math.floor(FR['highFrequency']/1000000)
-
-                    #add to list for new grant req
                     grant.append(cbsd)
                 else:
                     #if no suggested operational paramters from SAS do spectrum inquiry
                     spec.append(cbsd)
+
+
                 
             if bool(grant):
                 sasHandler.Handle_Request(grant,consts.GRANT)

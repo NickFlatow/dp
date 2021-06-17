@@ -427,6 +427,7 @@ def setParameterValues(p,cbsd,typeOfCalling = None):
                     logging.info("Turn RF OFF for %s",cbsd['SN'])
                     conn.update("UPDATE dp_device_info SET AdminState = 0 WHERE SN = %s",cbsd['SN'])
                     cbsd['AdminState'] = 0
+
                 #admin state is on
                 if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'true':
                     logging.info("Turn RF ON for %s",cbsd['SN'])
@@ -481,23 +482,32 @@ def setParameterValues(p,cbsd,typeOfCalling = None):
 
     
 
-def getParameterValue():
-    pass
-    # check if action is already being executed
-    # sqlQueryStr = "SELECT `Note` FROM `apt_action_queue` WHERE `Action`='".$In_Action."' AND `SN`='".$In_SN."'";
-    # $sqlQueryResult = mysql_query($sqlQueryStr);
-    # if(mysql_num_rows($sqlQueryResult) != 0)
-    # {
-    #     $note = mysql_result($sqlQueryResult, 0);
-    #     if (!empty($note) && ($note == 'EXEC')) /* block replacement if action is executing */
-    #     {
-    #         echo '<script language="javascript">alert("Previous GPV is running, please retry later");top.location.href=\'deviceList.php\';</script>';
-    #         exit();                
-    #     }
-    # }
+def getParameterValue(data_model_path,cbsd):
+    #data_model_path list of data model path values to get from the cell
+    
+    conn = dbConn(consts.DB)
+    #purge last action
+    conn.update('DELETE FROM fems_gpv WHERE SN = %s',cbsd['SN'])
 
-    #if no action purge last action
+    conn.update('INSERT INTO fems_gpv(`SN`,`gpv_index`,`dbpath`,`username`) VALUES(%s,%s,%s,%s)',(cbsd['SN'],1,data_model_path,"femtocell"))
 
+    cbsdAction(cbsd['SN'],'Get Parameter Value',str(datetime.now()))
+    # wait until action is completed
+    gettingParameters = True
+    while gettingParameters:
+        logging.info(f"Getting Parameters for {cbsd['SN']}")
+        database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",cbsd['SN'])
+        
+        if database == ():
+            logging.info(f"Paramters gotten successfully for {cbsd['SN']}")
+            gettingParameters = False
+        else:
+            time.sleep(5)
+
+    getValue = conn.select("SELECT getValue FROM fems_gpv WHERE SN = %s",cbsd['SN'])
+
+    return getValue
+    
 def expired(transmitExpireTime, grantRenew = False):
     #convert transmitExpireTime string to datetime
     if transmitExpireTime == None:
@@ -551,8 +561,13 @@ def selectFrequency(cbsd,channels,typeOfCalling = None):
     
             if low and high:
                 #convert perf back to EARFCN
-                EARFCN = MHZtoEARFCN((pref/1000000))
-                #ADD earfcn to setDict
+
+                #if earfcn is != cbsd['EARFCN'] 
+                EARFCN = MHZtoEARFCN((pref/consts.Hz))
+                #else:
+                    #update frequency on cbsd and database
+
+                #ADD earfcn to setlist
                 setList.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':EARFCN})
                 #what if one channels eirp is lower than the others
                 if lowChannelEirp <= highChannelEirp:
