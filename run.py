@@ -19,6 +19,7 @@ import threading
 import lib.consts as consts
 from flask_cors import CORS, cross_origin
 from itertools import filterfalse
+from requests.auth import HTTPDigestAuth
 
 #init log class
 logger = logger()
@@ -377,19 +378,13 @@ def sasSpecTest():
     cbsd = conn.select("SELECT * FROM dp_device_info")
     conn.dbClose()
 
-    sasHandler.Handle_Response(cbsd,consts.FSCB,consts.SPECTRUM)
+  
+    sasHandler.Handle_Response(cbsd,consts.FS,consts.SPECTRUM)
 
     # sasHandler.Handle_Response(cbsd,consts.HB501,consts.HEART)
     
     # g =sasHandler.getParameterValue('Device.X_FOXCONN_FAP.CellConfig.EUTRACarrierARFCNDL',cbsd[0])
 
-
-    # print(g)
-    # print(type(g[0]['getValue']))
-    # l = list(g[0]['getValue'].split(","))
-
-    # for i in l:
-    #     print(i)
 
 def getParameters(cbsd):
     conn = dbConn(consts.DB)
@@ -422,10 +417,96 @@ def getParameters(cbsd):
 
     return earfcnList
 
+def powerOn():
+
+    conn = dbConn(consts.DB)
+    cbsd =conn.select("SELECT * FROM dp_device_info WHERE SN = DCE994613163")
+    conn.dbClose()
+
+    # connURL = 'http://192.168.4.17:10500'
+    # connUser = 'HeNB_DCE994613163'
+    # connPass = '0_169_DCE994613163'
+
+    # connURL1 = 'http://192.168.4.20:10500'
+    # connUser1 = 'undefined_DCE99461317E'
+    # connPass1 = '0_170_DCE99461317E'
+
+
+    # session = requests.Session()
+    # session.auth = (connUser, connPass)
+    # response = session.get(connURL)
+    # print(response)
+    sasHandler.cbsdAction('DCE994613163','Set Parameter Value',str(datetime.now()))
+    # sasHandler.cbsdAction('DCE99461317E','Set Parameter Value',str(datetime.now()))ko
+
+    response = requests.get(cbsd['connURL'], auth= HTTPDigestAuth(cbsd['connUser'],cbsd['connPass']))
+    # response1 = requests.get(connURL1, auth= HTTPDigestAuth(connUser1,connPass1))
+
+    print(response)
+    # print(f"response1: {response1}")
+
+
+    # (curl -X GET --connect-timeout 15 -s -k -w "%{http_code}\\n" --digest -u $CurrentNameH:$CurrentWordH $CurrentURLH &)
+
+
+    # sasHandler.cbsdAction('DCE994613163','Set Parameter Value',str(datetime.now()))
+    # sasHandler.cbsdAction('DCE99461317E','Set Parameter Value',str(datetime.now()))
+
+    conn = dbConn(consts.DB)
+    
+    #wait until parameters are set
+    settingParameters = True
+    while settingParameters:
+        logging.info(f"Setting Parameters for .....")
+        database = conn.select("SELECT * FROM apt_action_queue")
+        
+        if database == ():
+            logging.info(f"Paramters set successfully for both cbsds")
+            settingParameters = False
+        else:
+            time.sleep(3)
+
+    conn.dbClose()
+
+
+    
+
+
+    # conn = dbConn(consts.DB)
+    
+    # #wait until parameters are set
+    # settingParameters = True
+    # while settingParameters:
+    #     logging.info(f"Setting Parameters for .....")
+    #     database = conn.select("SELECT * FROM apt_action_queue")
+        
+    #     if database == ():
+    #         logging.info(f"Paramters set successfully for both cbsds")
+    #         settingParameters = False
+    #     else:
+    #         time.sleep(3)
+
+    # conn.dbClose()
+
+
+
+# try:
+#     #if using args a comma for tuple is needed 
+#     thread = threading.Thread(target=powerOn, args=())
+#     thread.start()
+# except Exception as e:
+#     print(f"Registration thread failed: {e}")
+# try:
+#     #if using args a comma for tuple is needed 
+#     thread = threading.Thread(target=powerOn, args=())
+#     thread.start()
+# except Exception as e:
+#     print(f"Heartbeat thread failed reason: {e}")
 
 # start()
+powerOn()
 # getParameters()
-sasSpecTest()
+# sasSpecTest()
 # change_EIRP()
 # spectrum_test()
 # setParameterValues_Test()

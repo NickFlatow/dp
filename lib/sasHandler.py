@@ -10,7 +10,9 @@ from lib.log import dpLogger
 from lib.dbConn import dbConn
 from lib import error as e
 from datetime import datetime, timedelta
+from requests.auth import HTTPDigestAuth
 from test import app
+
 
 
 def Handle_Request(cbsd_list,typeOfCalling):
@@ -190,6 +192,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #scans EARFCN list for open channel on SAS
             selectFrequency(cbsd_list[i],channels,typeOfCalling)
 
+
             sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
             conn.update(sqlUpdate)
 
@@ -356,8 +359,6 @@ def updateMaxEirp(cbsd):
 def EirpToTxPower(maxEirp,cbsd):
     return maxEirp - cbsd['antennaGain']
 
-
-
 def hasError(cbsd,errorList):
     if cbsd['SN'] in errorList:
         return True
@@ -448,7 +449,7 @@ def setParameterValues(p,cbsd,typeOfCalling = None):
                     #convert earfcn to middle frequency to in MHZ
                     MHz = EARFCNtoMHZ(p[i]['data_value'])
                     #update plus and minus
-                    conn.update("UPDATE dp_device_info SET lowFrequency = %s, highFrequency = %s",((MHz -10),(MHz + 10)))
+                    conn.update("UPDATE dp_device_info SET lowFrequency = %s, highFrequency = %s WHERE SN = %s",((MHz -10),(MHz + 10),cbsd['SN']))
                     #update cbsd 
                     cbsd['lowFrequency'] = MHz - 10
                     cbsd['highFrequency'] = MHz + 10
@@ -457,9 +458,14 @@ def setParameterValues(p,cbsd,typeOfCalling = None):
                 #update parameters to database for update
                 conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd['SN'],i,p[i]['data_path'],p[i]['data_type'],p[i]['data_value']))
 
-            #send action to the cell to trigger connection request
+
+            #place action in apt_action_queue
             cbsdAction(cbsd['SN'],'Set Parameter Value',str(datetime.now()))
 
+            #send connection request to cell
+            response = requests.get(cbsd['connURL'], auth= HTTPDigestAuth(cbsd['connUser'],cbsd['connPass']))
+
+            # if response == 200
             #wait until parameters are set
             settingParameters = True
             while settingParameters:
@@ -469,7 +475,12 @@ def setParameterValues(p,cbsd,typeOfCalling = None):
                 if database == ():
                     logging.info(f"Paramters set successfully for {cbsd['SN']}")
                     settingParameters = False
-                time.sleep(10)
+                else:
+                    time.sleep(3)
+
+            #else:
+                #remove action from action queue
+                #log connection error to FeMS
 
             conn.dbClose()
     
@@ -537,13 +548,11 @@ def addErrorDict(errorCode,errorDict,cbsd):
 
 def selectFrequency(cbsd,channels,typeOfCalling = None):
     #cbsd - dict of cbsd values  
+    
     #channels - List of avaiable channels from the SAS
     
-    #pref     - The prefered middle frequecy of the CBSD in hz
+    #pref - The prefered middle frequecy of the CBSD in hz
 
-    
-    
-    
     #get earfcn list 
     earfcnList = getEarfcnList(cbsd)
 
