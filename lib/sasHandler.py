@@ -146,7 +146,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
     #HTTP address that is in place e.g.(reg,spectrum,grant heartbeat)
     resposneMessageType = str(typeOfCalling +"Response")
     
-
+ 
     #check if any cbsds need to be turned off
 
     #init dict to pass to error module
@@ -164,9 +164,15 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             errorCode = response[resposneMessageType][i]['response']['responseCode']
 
             #This is a bad solution to my previous ignorance... I apologize
-            if 'transmitExpireTime' in response[resposneMessageType][i] or 'operationalParam' in response[resposneMessageType][i]:
-                
-                cbsd_list[i]['response'] = response[resposneMessageType][i]
+            if 'transmitExpireTime' in response[resposneMessageType][i]:
+                if expired(response['heartbeatResponse'][i]['transmitExpireTime']):
+                    setList  = [consts.ADMIN_POWER_OFF]
+                    #power off ASAP
+                    setParameterValues(setList,cbsd_list[i])
+
+
+            #include resposne when sending cbsd to error module
+            cbsd_list[i]['response'] = response[resposneMessageType][i]
 
             addErrorDict(errorCode,errorDict,cbsd_list[i])
             errorList.append(cbsd_list[i]['SN'])
@@ -211,13 +217,18 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #TODO
 
             conn = dbConn("ACS_V1_1")
-            # print(f"resposne transmist expire time {response['heartbeatResponse'][i]['transmitExpireTime']}")
             
             #update operational state to granted/ what if operational state is already authorized
             if not expired(response['heartbeatResponse'][i]['transmitExpireTime']):
                 update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
                 conn.update(update_operational_state)
-            
+            else:
+                    #if the heartbeat is expired 
+                    setList  = [consts.ADMIN_POWER_OFF]
+                    #power off ASAP
+                    setParameterValues(setList,cbsd_list[i])
+
+
             #update transmist expire time
             update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + response['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
             conn.update(update_transmit_time)

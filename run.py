@@ -420,8 +420,21 @@ def getParameters(cbsd):
 def powerOn():
 
     conn = dbConn(consts.DB)
-    cbsd =conn.select("SELECT * FROM dp_device_info WHERE SN = DCE994613163")
+    cbsd =conn.select("SELECT * FROM dp_device_info")
     conn.dbClose()
+
+    pList = []
+    for c in cbsd:
+        # response = requests.get(c['connreqURL'], auth= HTTPDigestAuth(c['connreqUname'],c['connreqPass']))
+        # print(response)
+        pList.append(consts.ADMIN_POWER_OFF)
+        # pList.append(consts.ADMIN_POWER_ON)
+        sasHandler.setParameterValues(pList,c)
+
+    
+
+
+    
 
     # connURL = 'http://192.168.4.17:10500'
     # connUser = 'HeNB_DCE994613163'
@@ -436,37 +449,38 @@ def powerOn():
     # session.auth = (connUser, connPass)
     # response = session.get(connURL)
     # print(response)
-    sasHandler.cbsdAction('DCE994613163','Set Parameter Value',str(datetime.now()))
+    # sasHandler.cbsdAction(cbsd['SN'],'Set Parameter Value',str(datetime.now()))
     # sasHandler.cbsdAction('DCE99461317E','Set Parameter Value',str(datetime.now()))ko
 
-    response = requests.get(cbsd['connURL'], auth= HTTPDigestAuth(cbsd['connUser'],cbsd['connPass']))
+    # response = requests.get(cbsd[0]['connreqURL'], auth= HTTPDigestAuth(cbsd[0]['connreqUname'],cbsd[0]['connreqPass']))
     # response1 = requests.get(connURL1, auth= HTTPDigestAuth(connUser1,connPass1))
 
-    print(response)
+    # print(response)
     # print(f"response1: {response1}")
 
-
+    # print(response.status_code)
     # (curl -X GET --connect-timeout 15 -s -k -w "%{http_code}\\n" --digest -u $CurrentNameH:$CurrentWordH $CurrentURLH &)
 
 
     # sasHandler.cbsdAction('DCE994613163','Set Parameter Value',str(datetime.now()))
     # sasHandler.cbsdAction('DCE99461317E','Set Parameter Value',str(datetime.now()))
 
-    conn = dbConn(consts.DB)
-    
-    #wait until parameters are set
-    settingParameters = True
-    while settingParameters:
-        logging.info(f"Setting Parameters for .....")
-        database = conn.select("SELECT * FROM apt_action_queue")
-        
-        if database == ():
-            logging.info(f"Paramters set successfully for both cbsds")
-            settingParameters = False
-        else:
-            time.sleep(3)
+    # conn = dbConn(consts.DB)
 
-    conn.dbClose()
+    # conn.update("DELETE FROM dp_device_info WHERE SN = 'DCE994613163'")
+    #wait until parameters are set
+    # settingParameters = True
+    # while settingParameters:
+    #     logging.info(f"Setting Parameters for .....")
+    #     database = conn.select("SELECT * FROM apt_action_queue")
+        
+    #     if database == ():
+    #         logging.info(f"Paramters set successfully for both cbsds")
+    #         settingParameters = False
+    #     else:
+    #         time.sleep(3)
+
+    # conn.dbClose()
 
 
     
@@ -503,8 +517,8 @@ def powerOn():
 # except Exception as e:
 #     print(f"Heartbeat thread failed reason: {e}")
 
-# start()
-powerOn()
+start()
+# powerOn()
 # getParameters()
 # sasSpecTest()
 # change_EIRP()

@@ -69,8 +69,8 @@ def errorModule(errorDict,typeOfCalling):
             for cbsd in errorDict[errorCode]:
                 log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
 
-                time.sleep(30)
-                sasHandler.Handle_Request(errorDict[errorCode],typeOfCalling)
+            time.sleep(30)
+            sasHandler.Handle_Request(errorDict[errorCode],typeOfCalling)
 
         elif errorCode == 400:
             pass
@@ -81,18 +81,12 @@ def errorModule(errorDict,typeOfCalling):
         elif errorCode == 500:
             rel = []
             grant = []
-            spec = []
 
             #check if any cbsds are expired
             for cbsd in errorDict[errorCode]:
-                if sasHandler.expired(cbsd['response']['transmitExpireTime']):
-                    rel.append(cbsd)
-                #if expired relinuqish grant
-                # if bool(rel):
-                #     sasHandler.Handle_Request(rel,consts.REL)
 
                 if 'operationParam' in cbsd['response']:
-                    #list to store value changes for the cell
+                    #dict to store value changes for the cell
                     pDict = {}
                     #add shorthand for json
                     op = cbsd['response']['operationParam']
@@ -111,14 +105,16 @@ def errorModule(errorDict,typeOfCalling):
                     grant.append(cbsd)
                 else:
                     #if no suggested operational paramters from SAS do spectrum inquiry
-                    spec.append(cbsd)
+                    
+                    #reliquish existing grant and apply for new specturm
+                    rel.append(cbsd)
 
-
-                
+            if bool(rel):
+                sasHandler.Handle_Request(rel,consts.REL)
+                sasHandler.Handle_Request(rel,consts.SPECTRUM) 
             if bool(grant):
                 sasHandler.Handle_Request(grant,consts.GRANT)
-            else:    
-                sasHandler.Handle_Request(errorDict[errorCode],consts.SPECTRUM)
+                
 
         elif errorCode == 501:
             for cbsd in errorDict[errorCode]:
@@ -128,11 +124,11 @@ def errorModule(errorDict,typeOfCalling):
                     if cbsd['AdminState'] == 1:
                         sasHandler.setParameterValue(cbsd['SN'],consts.ADMIN_STATE,'boolean','false')
                     
-                    #put cbsd in granted state but still heartbeating
-                    conn = dbConn("ACS_V1_1")
-                    conn.update("UPDATE dp_device_info SET operationalState = 'GRANTED' WHERE SN = %s",cbsd['SN'])
-                    conn.dbClose()
-                
+                #put cbsd in granted state but still heartbeating
+                conn = dbConn("ACS_V1_1")
+                conn.update("UPDATE dp_device_info SET operationalState = 'GRANTED' WHERE SN = %s",cbsd['SN'])
+                conn.dbClose()
+            
                 log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
 
         elif errorCode == 502:

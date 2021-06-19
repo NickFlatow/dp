@@ -18,7 +18,7 @@ class logger(object):
         #Creating an object
         self.logger=logging.getLogger()
         #Setting the threshold of logger to DEBUG
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.INFO)
 
  
     def log_json(self,json_array,cbsds=None):
