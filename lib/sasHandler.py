@@ -13,8 +13,6 @@ from datetime import datetime, timedelta
 from requests.auth import HTTPDigestAuth
 from test import app
 
-
-
 def Handle_Request(cbsd_list,typeOfCalling):
     '''
     handles all requests send to SAS
@@ -100,7 +98,9 @@ def Handle_Request(cbsd_list,typeOfCalling):
             #get parameter value
             # cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
             if cbsd['AdminState'] == 1:
-                setParameterValue(cbsd['SN'],consts.ADMIN_STATE,'boolean','false')
+                setList  = [consts.ADMIN_POWER_OFF]
+                #power off ASAP
+                setParameterValues(setList,cbsd)
             
             #if grantID != NULL
             # call grant relinquish
@@ -114,7 +114,9 @@ def Handle_Request(cbsd_list,typeOfCalling):
 
             #Set small cell admin state to false
             if cbsd['AdminState'] == 1:
-                setParameterValue(cbsd['SN'],consts.ADMIN_STATE,'boolean','false')
+                setList  = [consts.ADMIN_POWER_OFF]
+                #power off ASAP
+                setParameterValues(setList,cbsd)
             
             
             req[requestMessageType].append(
@@ -291,8 +293,8 @@ def contactSAS(request,method):
 
     try:
         return requests.post(app.config['SAS']+method, 
-        cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
-        verify=('googleCerts/ca.cert'),
+        cert=('certs/client.cert','certs/client.key'),
+        verify=('certs/ca.cert'),
         json=request)
 
         # timeout=5
@@ -310,7 +312,9 @@ def getOpState(cbsd):
         conn.dbClose()
         #turn RF Off
         # cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
-        setParameterValue(cbsd['SN'],consts.ADMIN_STATE,'boolean','false')
+        setList  = [consts.ADMIN_POWER_OFF]
+        #power off ASAP
+        setParameterValues(setList,cbsd)
     else:
         opState = 'AUTHORIZED'
 
@@ -439,11 +443,14 @@ def setParameterValues(p,cbsd,typeOfCalling = None):
             if p[i]['data_path'] == consts.ADMIN_STATE: 
                 if p[i]['data_value'] == 'false':
                     logging.info("Turn RF OFF for %s",cbsd['SN'])
+                    conn.update("UPDATE dp_device_info SET AdminState = %s WHERE SN = %s",(0,cbsd['SN']))
+                    cbsd['AdminState'] = 0
                 else:
                     logging.info("Turn on RF for %s",cbsd['SN'])
+                    conn.update("UPDATE dp_device_info SET AdminState = %s WHERE SN = %s",(1,cbsd['SN']))
+                    cbsd['AdminState'] = 1
                 
-                conn.update("UPDATE dp_device_info SET AdminState = %s WHERE SN = %s",(p[i]['data_value'],cbsd['SN']))
-                cbsd['AdminState'] = p[i]['data_value']
+
 
             # #admin state is on
             # if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'true':
@@ -593,19 +600,15 @@ def selectFrequency(cbsd,channels,typeOfCalling = None):
             if channel['channelType'] == 'GAA':
                 lowFreq = pref - consts.TEN_MHz
                 if (lowFreq) >= channel['frequencyRange']['lowFrequency'] and (lowFreq) <= channel['frequencyRange']['highFrequency']:
-                    # print(f"matched low value missing high value:")
-                    # print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
+
                     low = True
-                    # clow_low = channel['frequencyRange']['lowFrequency']
-                    # clow_high = channel['frequencyRange']['highFrequency']
+
                     lowChannelEirp = channel['maxEirp']
                 highFreq = pref + consts.TEN_MHz
                 if (highFreq) >= channel['frequencyRange']['lowFrequency'] and (highFreq) <= channel['frequencyRange']['highFrequency']:
-                    # print("matched high value missing low value:")
-                    # print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
+
                     high = True
-                    # chigh_low = channel['frequencyRange']['lowFrequency']
-                    # chigh_high = channel['frequencyRange']['highFrequency']
+
                     highChannelEirp = channel['maxEirp']
         
                 if low and high:
