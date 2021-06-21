@@ -109,6 +109,10 @@ def Handle_Request(cbsd_list,typeOfCalling):
                         "cbsdId":cbsd['cbsdID'],
                     }
                 )
+            conn = dbConn("ACS_V1_1")
+            update_grantID = "UPDATE dp_device_info SET operationalState = NULL, grantExpireTime = NULL, transmitExpireTime = NULL, sasStage = %s WHERE SN = %s"
+            conn.update(update_grantID,(consts.DEREG,cbsd['SN']))
+            conn.dbClose()
 
         elif typeOfCalling == consts.REL:
 
@@ -125,10 +129,10 @@ def Handle_Request(cbsd_list,typeOfCalling):
                     "grantId":cbsd['grantID']
                 }
             )
-            #set grant IDs to NULL
+            #set grant IDs to NULL and sasStage to relinquish
             conn = dbConn("ACS_V1_1")
-            update_grantID = "UPDATE dp_device_info SET grantID = NULL, SET operationalState = NULL, SET grantExpireTime = NULL, SET transmitExpireTime = NULL WHERE SN = %s "
-            conn.update(update_grantID,cbsd['SN'])
+            update_grantID = "UPDATE dp_device_info SET grantID = NULL, operationalState = NULL, grantExpireTime = NULL, transmitExpireTime = NULL, sasStage = %s WHERE SN = %s"
+            conn.update(update_grantID,(consts.REL,cbsd['SN']))
             conn.dbClose()
 
     dpLogger.log_json(req,len(cbsd_list))
@@ -218,6 +222,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #TODO WHAT IF MEAS REPORT
             #TODO
 
+
             conn = dbConn("ACS_V1_1")
             
             #update operational state to granted/ what if operational state is already authorized
@@ -244,22 +249,26 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
                 if cbsd_list[i]['AdminState'] != 1:
                     pList = [consts.ADMIN_POWER_ON]
                     setParameterValues(pList,cbsd_list[i])
+            # else:
+            #     dp_deregister()
 
             #if response has new grantTime update databas
             if 'grantExpireTime' in response['heartbeatResponse'][i]:
                 updateGrantTime(response['heartbeatResponse'][i]['grantExpireTime'],cbsd_list[i]['SN'])
 
         elif typeOfCalling == consts.DEREG:
-            #update sasStage
-            conn = dbConn("ACS_V1_1") 
-            conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.DEREG,cbsd_list[i]['SN']))
-            conn.dbClose()
+            pass
+            #update sasStage            
+            # conn = dbConn("ACS_V1_1")
+            # conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.DEREG,cbsd_list[i]['SN']))
+            # conn.dbClose()
 
         elif typeOfCalling == consts.REL:
+            pass
             #update sasStage
-            conn = dbConn("ACS_V1_1")
-            conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REL,cbsd_list[i]['SN']))
-            conn.dbClose()
+            # conn = dbConn("ACS_V1_1")
+            # conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REL,cbsd_list[i]['SN']))
+            # conn.dbClose()
 
 
     if bool(errorDict):
@@ -293,8 +302,8 @@ def contactSAS(request,method):
 
     try:
         return requests.post(app.config['SAS']+method, 
-        cert=('certs/client.cert','certs/client.key'),
-        verify=('certs/ca.cert'),
+        cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+        verify=('googleCerts/ca.cert'),
         json=request)
 
         # timeout=5
@@ -302,7 +311,7 @@ def contactSAS(request,method):
     except Exception as e:
         print(f"your connection has failed: {e}")
         return False
-    # return consts.FS1
+
 def getOpState(cbsd):
 
     if expired(cbsd['transmitExpireTime'] ):
@@ -523,9 +532,6 @@ def setParameterValues(p,cbsd,typeOfCalling = None):
     print(f"total time take to set paramter for {cbsd['IPAddress']}: {totalTime}")
 
 
-    
-
-    
 
 def getParameterValue(data_model_path,cbsd):
     #data_model_path list of data model path values to get from the cell
@@ -640,12 +646,10 @@ def selectFrequency(cbsd,channels,typeOfCalling = None):
     #if no spectrum is found for any channels on cbsd
     if not low or not high:
         print("no spectrum")
-        typeOfCalling = False
-        
-        #send error to FeMS no spectrum avaiable
-
-        #deregister? keep trying? wait x seconds and try again?
-
+        #log error to FeMS (Try to expand spectrum)
+        err.log_error_to_FeMS_alarm("CRITICAL",cbsd,400,consts.SPECTRUM)
+        #stop trying
+        Handle_Request(cbsd,False)
 
 #pass cbsd; Check if TxPower if txpower is already lower than SAS txpower leave alone
 def buildParameterList(parameterDict,cbsd):
@@ -700,3 +704,31 @@ def updateFreq(cbsd,earfcn):
     #update cbsd 
     cbsd['lowFrequency'] = MHz - 10
     cbsd['highFrequency'] = MHz + 10
+def dp_deregister():
+    #Get cbsd SNs from FeMS    
+    # SNlist = request.form['json']
+
+    # #convert to json
+    # SN_json_dict = json.loads(SNlist)
+
+    # #select only the values
+    # SNlist = list(SN_json_dict.values())
+    # print(f"output of SNlist: {SNlist}")
+    SNlist = ['DCE994613163','DCE99461317E']
+
+    #collect all values from databse
+    conn = dbConn("ACS_V1_1")
+    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
+    cbsd_list = conn.select(sql,SNlist)
+
+    #Relinquish grant if the cbsd is currently granted to transmit
+    rel = []
+    print(cbsd_list)
+    for cbsd in cbsd_list:
+        if cbsd['grantID'] != None:
+            rel.append(cbsd)
+
+    if bool(rel):
+        Handle_Request(rel,consts.REL)
+    Handle_Request(cbsd_list,consts.DEREG)
+    return "success"

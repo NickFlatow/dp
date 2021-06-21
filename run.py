@@ -44,13 +44,20 @@ def dp_register():
 
     #select only the values
     SNlist = list(SN_json_dict.values())
-    print(SNlist)
+    # print(SNlist)
 
     #collect all values from databse
     conn = dbConn("ACS_V1_1")
     sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
     cbsd_list = conn.select(sql,SNlist)
 
+    for cbsd in cbsd_list:
+        if cbsd['sasStage'] != consts.REG:
+            cbsd['sasStage'] = consts.REG
+            conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REG,cbsd['SN']))
+
+
+    conn.dbClose()
     sasHandler.Handle_Request(cbsd_list,consts.REG)
     return "success"
 
@@ -60,22 +67,28 @@ def dp_deregister():
     #Get cbsd SNs from FeMS    
     SNlist = request.form['json']
 
-    #convert to json
+    # #convert to json
     SN_json_dict = json.loads(SNlist)
 
-    #select only the values
+    # #select only the values
     SNlist = list(SN_json_dict.values())
-    # print(SNlist)
+    # print(f"output of SNlist: {SNlist}")
+    # SNlist = ['DCE994613163','DCE99461317E']
 
     #collect all values from databse
     conn = dbConn("ACS_V1_1")
     sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
     cbsd_list = conn.select(sql,SNlist)
 
+    #Relinquish grant if the cbsd is currently granted to transmit
+    rel = []
     print(cbsd_list)
-    #for cbsd in cbsd_list
-        #if grantId
-    sasHandler.Handle_Request(cbsd_list,consts.REL)
+    for cbsd in cbsd_list:
+        if cbsd['grantID'] != None:
+            rel.append(cbsd)
+
+    if bool(rel):
+        sasHandler.Handle_Request(rel,consts.REL)
     sasHandler.Handle_Request(cbsd_list,consts.DEREG)
     return "success"
 
@@ -157,61 +170,6 @@ def start():
         print(f"Heartbeat thread failed reason: {e}")
     runFlaskSever() 
 
-
-def test():
-    # error_resposne = {"registrationResponse": [{"response": {"responseCode": 200}},{"response": {"responseCode": 200}}]}
-    # error_response =  {"registrationResponse": [{"response": {"responseCode": 200,"responseMessage": "A Category B device must be installed by a CPI"}}]}
-
-    meth = [consts.REG,consts.SPECTRUM,consts.GRANT]
-
-    while True:
-        for m in meth:
-            conn = dbConn("ACS_V1_1")
-            cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',m)
-            conn.dbClose()
-            if cbsd_list !=():
-                sasHandler.Handle_Request(cbsd_list, m)
-
-        time.sleep(20)
-        # regRequest()
-
-def test2():
-    SNlist = str({"SN1":"DCE994613163","SN2":"abc123"})
-
-    # print(SNlist)
-    # SN_json_dict = json.loads(SNlist)
-    # print(SN_json_dict)
-
-    SN_json_dict = {'SN1': 'DCE994613163', 'SN2': 'abc123'}
-
-
-    conn = dbConn("ACS_V1_1")
-    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(list(SN_json_dict.values()))))
-    cbsd_list = conn.select(sql,list(SN_json_dict.values()))
-
-    # sasHandler.Handle_Request(cbsd_list,consts.REG)
-    print(type(cbsd_list))
-
-def test3():
-    erroDict = {'DCE994613163': "has error", 'abc123': "has error"}
-
-    conn = dbConn("ACS_V1_1")
-    cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s","NONE")
-    cbsd_list[:] = [cbsd for cbsd in cbsd_list if not hasError(cbsd,erroDict)]
-
-    print(bool(cbsd_list))
-
-def test4(): 
-    
-    SNlist = ['abc123','DCE994613163']
-
-    conn = dbConn("ACS_V1_1")
-    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
-    cbsd_list = conn.select(sql,SNlist)
-
-    print(cbsd_list)
-    sasHandler.Handle_Request(cbsd_list,consts.REL)
-    sasHandler.Handle_Request(cbsd_list,consts.DEREG)
 
 def test5():
     
@@ -431,93 +389,20 @@ def powerOn():
         # pList.append(consts.ADMIN_POWER_ON)
         sasHandler.setParameterValues(pList,c)
 
-    
+def test_dereg(): 
+    dp_deregister()
+
+def error_106():
+    conn = dbConn(consts.DB)
+    cbsds = conn.select("SELECT * FROM dp_device_info")
+    conn.dbClose()
+    sasHandler.Handle_Response(cbsds, consts.ERR106,consts.GRANT)
 
 
-    
-
-    # connURL = 'http://192.168.4.17:10500'
-    # connUser = 'HeNB_DCE994613163'
-    # connPass = '0_169_DCE994613163'
-
-    # connURL1 = 'http://192.168.4.20:10500'
-    # connUser1 = 'undefined_DCE99461317E'
-    # connPass1 = '0_170_DCE99461317E'
-
-
-    # session = requests.Session()
-    # session.auth = (connUser, connPass)
-    # response = session.get(connURL)
-    # print(response)
-    # sasHandler.cbsdAction(cbsd['SN'],'Set Parameter Value',str(datetime.now()))
-    # sasHandler.cbsdAction('DCE99461317E','Set Parameter Value',str(datetime.now()))ko
-
-    # response = requests.get(cbsd[0]['connreqURL'], auth= HTTPDigestAuth(cbsd[0]['connreqUname'],cbsd[0]['connreqPass']))
-    # response1 = requests.get(connURL1, auth= HTTPDigestAuth(connUser1,connPass1))
-
-    # print(response)
-    # print(f"response1: {response1}")
-
-    # print(response.status_code)
-    # (curl -X GET --connect-timeout 15 -s -k -w "%{http_code}\\n" --digest -u $CurrentNameH:$CurrentWordH $CurrentURLH &)
-
-
-    # sasHandler.cbsdAction('DCE994613163','Set Parameter Value',str(datetime.now()))
-    # sasHandler.cbsdAction('DCE99461317E','Set Parameter Value',str(datetime.now()))
-
-    # conn = dbConn(consts.DB)
-
-    # conn.update("DELETE FROM dp_device_info WHERE SN = 'DCE994613163'")
-    #wait until parameters are set
-    # settingParameters = True
-    # while settingParameters:
-    #     logging.info(f"Setting Parameters for .....")
-    #     database = conn.select("SELECT * FROM apt_action_queue")
-        
-    #     if database == ():
-    #         logging.info(f"Paramters set successfully for both cbsds")
-    #         settingParameters = False
-    #     else:
-    #         time.sleep(3)
-
-    # conn.dbClose()
-
-
-    
-
-
-    # conn = dbConn(consts.DB)
-    
-    # #wait until parameters are set
-    # settingParameters = True
-    # while settingParameters:
-    #     logging.info(f"Setting Parameters for .....")
-    #     database = conn.select("SELECT * FROM apt_action_queue")
-        
-    #     if database == ():
-    #         logging.info(f"Paramters set successfully for both cbsds")
-    #         settingParameters = False
-    #     else:
-    #         time.sleep(3)
-
-    # conn.dbClose()
-
-
-
-# try:
-#     #if using args a comma for tuple is needed 
-#     thread = threading.Thread(target=powerOn, args=())
-#     thread.start()
-# except Exception as e:
-#     print(f"Registration thread failed: {e}")
-# try:
-#     #if using args a comma for tuple is needed 
-#     thread = threading.Thread(target=powerOn, args=())
-#     thread.start()
-# except Exception as e:
-#     print(f"Heartbeat thread failed reason: {e}")
 
 start()
+# error_106()
+# test_dereg()
 # powerOn()
 # getParameters()
 # sasSpecTest()

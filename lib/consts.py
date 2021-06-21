@@ -459,3 +459,20 @@ HB501 = {
       }
    ]
 }
+
+ERR106 = {
+    "grantResponse": [
+        {
+            "response": {
+                "responseCode": 106,
+                "responseMessage": "NOT_PROCESSED"
+            }
+        },
+        {
+            "response": {
+                "responseCode": 106,
+                "responseMessage": "NOT_PROCESSED"
+            }
+        }
+    ]
+}

@@ -65,7 +65,7 @@ def errorModule(errorDict,typeOfCalling):
             sasHandler.Handle_Request(errorDict[errorCode],consts.REG)
 
         elif errorCode == 106:
-
+            retry = []
             for cbsd in errorDict[errorCode]:
                 log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
 
@@ -119,17 +119,20 @@ def errorModule(errorDict,typeOfCalling):
         elif errorCode == 501:
             for cbsd in errorDict[errorCode]:
         
-                if sasHandler.expired(cbsd['response']['transmitExpireTime']):
+                # if sasHandler.expired(cbsd['response']['transmitExpireTime']):
   
-                    if cbsd['AdminState'] == 1:
-                        sasHandler.setParameterValue(cbsd['SN'],consts.ADMIN_STATE,'boolean','false')
+                #     if cbsd['AdminState'] == 1:
+                #         sasHandler.setParameterValue(cbsd['SN'],consts.ADMIN_STATE,'boolean','false')
                     
                 #put cbsd in granted state but still heartbeating
-                conn = dbConn("ACS_V1_1")
-                conn.update("UPDATE dp_device_info SET operationalState = 'GRANTED' WHERE SN = %s",cbsd['SN'])
-                conn.dbClose()
-            
-                log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
+                if cbsd['operationalState'] != 'GRANTED':
+                    conn = dbConn("ACS_V1_1")
+                    conn.update("UPDATE dp_device_info SET operationalState = 'GRANTED' WHERE SN = %s",cbsd['SN'])
+                    cbsd['operationalState'] = 'GRANTED'
+                    conn.dbClose()
+                
+                log_error_to_FeMS_alarm("WARNING",cbsd,errorCode,typeOfCalling)
+                sasHandler.Handle_Request(errorDict[errorDict],consts.HEART)
 
         elif errorCode == 502:
 
