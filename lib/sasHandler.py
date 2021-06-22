@@ -170,7 +170,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             errorCode = response[resposneMessageType][i]['response']['responseCode']
 
             #This is a bad solution to my previous ignorance... I apologize
-            if 'transmitExpireTime' in response[resposneMessageType][i]:
+            if 'transmitExpireTime' in response[resposneMessageType][i] and cbsd_list[i]['AdminState'] == 1:
                 if expired(response['heartbeatResponse'][i]['transmitExpireTime']):
                     setList  = [consts.ADMIN_POWER_OFF]
                     #power off ASAP
@@ -229,7 +229,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             if not expired(response['heartbeatResponse'][i]['transmitExpireTime']):
                 update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
                 conn.update(update_operational_state)
-            else:
+            elif cbsd_list[i]['AdminState'] == 1:
                     #if the heartbeat is expired 
                     setList  = [consts.ADMIN_POWER_OFF]
                     #power off ASAP
