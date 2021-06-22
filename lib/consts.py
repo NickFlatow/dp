@@ -1,12 +1,16 @@
 from datetime import datetime
 
 #program constants
+
+#CBSD SAS states
+PROV_REG = 'provision_registration'
 REG = 'registration'
 SPECTRUM = 'spectrumInquiry'
 GRANT = 'grant'
 HEART = 'heartbeat'
 DEREG = 'deregistration'
 REL = 'relinquishment'
+
 
 #DATA MODEL PATHS
 TXPOWER_PATH  = 'Device.X_FOXCONN_FAP.CellConfig.SonMaxTxPower_Max'  

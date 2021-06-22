@@ -158,7 +158,6 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
     #init dict to pass to error module
     errorDict = {}
     errorList = []
-    responseList = []
     
     dpLogger.log_json(response,(len(response[resposneMessageType])))
     
@@ -169,7 +168,6 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
             errorCode = response[resposneMessageType][i]['response']['responseCode']
 
-            #This is a bad solution to my previous ignorance... I apologize
             if 'transmitExpireTime' in response[resposneMessageType][i] and cbsd_list[i]['AdminState'] == 1:
                 if expired(response['heartbeatResponse'][i]['transmitExpireTime']):
                     setList  = [consts.ADMIN_POWER_OFF]
@@ -405,26 +403,6 @@ def getNextCalling(typeOfCalling):
     if typeOfCalling == False:
         return False
 
-def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue,index = 1):
-    #purge last action
-    conn = dbConn("ACS_V1_1")
-    conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd_SN)
-
-    #update Adminstate in DB
-    if data_model_path == consts.ADMIN_STATE and setValue == 'false':
-        logging.info("Turn RF OFF for %s",cbsd_SN)
-        conn.update("UPDATE dp_device_info SET AdminState = 0 WHERE SN = %s",cbsd_SN)
-
-    if data_model_path == consts.ADMIN_STATE and setValue == 'true':
-        logging.info("Turn RF ON for %s",cbsd_SN)
-        conn.update("UPDATE dp_device_info SET AdminState = 1 WHERE SN = %s",cbsd_SN)
-
-    #insert SN, data_model_path and value into FeMS_spv
-    conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd_SN,index,data_model_path,setValueType,setValue))
-    conn.dbClose()
-    #call cbsdAction with action as 'Set Parameter Value'
-    cbsdAction(cbsd_SN,'Set Parameter Value',str(datetime.now()))
-    
 def setParameterValues(parameterList,cbsd,typeOfCalling = None):
     #setParamterValues will take in a parameterList and a cbsd.
     #setParamterValues will first check if the cell value matches the paramterList value - in which case no change needs to be made.
@@ -608,13 +586,13 @@ def selectFrequency(cbsd,channels,typeOfCalling = None):
                     low = True
 
                     lowChannelEirp = channel['maxEirp']
+                #refactor to plusbandWidth(cbsd) to get how many MHz to offset middle freq
                 highFreq = pref + consts.TEN_MHz
                 if (highFreq) >= channel['frequencyRange']['lowFrequency'] and (highFreq) <= channel['frequencyRange']['highFrequency']:
 
                     high = True
 
                     highChannelEirp = channel['maxEirp']
-        
                 if low and high:
                     #convert perf back to EARFCN
                     if earfcn != cbsd['EARFCN'] :
@@ -702,6 +680,7 @@ def updateFreq(cbsd,earfcn):
     #update cbsd 
     cbsd['lowFrequency'] = MHz - 10
     cbsd['highFrequency'] = MHz + 10
+
 def dp_deregister():
     #Get cbsd SNs from FeMS    
     # SNlist = request.form['json']

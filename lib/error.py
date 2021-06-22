@@ -70,7 +70,17 @@ def errorModule(errorDict,typeOfCalling):
                 log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
 
             time.sleep(30)
-            sasHandler.Handle_Request(errorDict[errorCode],typeOfCalling)
+            #were there any state changes to the cbsd while we were sleeping
+            for cbsd in errorDict[errorCode]: 
+                #update cbsd from sas
+                conn = dbConn(consts.DB)
+                c = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",cbsd['SN'])
+                conn.dbClose()
+                if c['sasStage'] != consts.REL or c['sasStage'] != consts.DEREG:
+                    retry.append(c)
+
+            if bool(c):
+                sasHandler.Handle_Request(retry,typeOfCalling)
 
         elif errorCode == 400:
             pass
@@ -118,21 +128,16 @@ def errorModule(errorDict,typeOfCalling):
 
         elif errorCode == 501:
             for cbsd in errorDict[errorCode]:
-        
-                # if sasHandler.expired(cbsd['response']['transmitExpireTime']):
-  
-                #     if cbsd['AdminState'] == 1:
-                #         sasHandler.setParameterValue(cbsd['SN'],consts.ADMIN_STATE,'boolean','false')
-                    
+
                 #put cbsd in granted state but still heartbeating
                 if cbsd['operationalState'] != 'GRANTED':
                     conn = dbConn("ACS_V1_1")
                     conn.update("UPDATE dp_device_info SET operationalState = 'GRANTED' WHERE SN = %s",cbsd['SN'])
                     cbsd['operationalState'] = 'GRANTED'
                     conn.dbClose()
-                    log_error_to_FeMS_alarm("WARNING",cbsd,errorCode,typeOfCalling)
+                log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
             
-            sasHandler.Handle_Request(errorDict[errorCode],consts.HEART)
+            # sasHandler.Handle_Request(errorDict[errorCode],consts.HEART)
 
         elif errorCode == 502:
 
@@ -178,10 +183,6 @@ def hasAlarmIdentifier(ai):
     else:
         return True
 
-def update_sas_stage(cbsds_SN_list,typeOfCalling):
-    conn = dbConn("ACS_V1_1")
-    conn.updateSasStage(typeOfCalling,cbsds_SN_list)
-    pass
 
 def updateCbsdParameters(cbsd):
     

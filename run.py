@@ -45,6 +45,7 @@ def dp_register():
     #select only the values
     SNlist = list(SN_json_dict.values())
     # print(SNlist)
+    # SNlist = ['DCE994613163','DCE99461317E']
 
     #collect all values from databse
     conn = dbConn("ACS_V1_1")
@@ -56,9 +57,9 @@ def dp_register():
             cbsd['sasStage'] = consts.REG
             conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REG,cbsd['SN']))
 
-
     conn.dbClose()
     sasHandler.Handle_Request(cbsd_list,consts.REG)
+
     return "success"
 
 @app.route('/dp/v1/test', methods=['POST'])
@@ -80,51 +81,28 @@ def dp_deregister():
     sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
     cbsd_list = conn.select(sql,SNlist)
 
-    #Relinquish grant if the cbsd is currently granted to transmit
+    
     rel = []
+    dereg = []
     print(cbsd_list)
     for cbsd in cbsd_list:
+        #Relinquish grant if the cbsd is currently granted to transmit
         if cbsd['grantID'] != None:
+            conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REL,cbsd['SN']))
+            cbsd['sasStage'] = consts.REL
             rel.append(cbsd)
+        else:
+            conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.DEREG,cbsd['SN']))
+            cbsd['sasStage'] = consts.DEREG
+            dereg.append(cbsd)
 
+    conn.dbClose()
     if bool(rel):
         sasHandler.Handle_Request(rel,consts.REL)
-    sasHandler.Handle_Request(cbsd_list,consts.DEREG)
+        sasHandler.Handle_Request(rel,consts.DEREG)
+    if bool(dereg):
+        sasHandler.Handle_Request(dereg,consts.DEREG)
     return "success"
-
-def expired(time):
-    #convert sting to datetime and compare to current time.
-    hbinterval = 60
-    hbresponse = {'heartbeatResponse': [{'grantId': '578807884', 'cbsdId': 'FoxconnMock-SASDCE994613163', 'transmitExpireTime': '2021-04-9T18:01:48Z', 'response': {'responseCode': 0}}, {'grantId': '32288332', 'cbsdId': 'FoxconMock-SAS1111', 'transmitExpireTime': '2021-03-26T21:30:48Z', 'response': {'responseCode': 0}}]}
-    # print(hbresposne['hearbeatResposne'][i]['transmitExpireTime'])
-    
-    #time of which grant or transmit will expire
-    expireTime = datetime.strptime(time,"%Y-%m-%dT%H:%M:%SZ")
-    print(expireTime)
-    timeChange = expireTime + timedelta(seconds=hbinterval)
-    print(datetime.now())
-    print(timeChange)
-    #if the current time is less than the expire time plus the heartbeat interval
-    if timeChange > datetime.now():
-        try:
-            conn = dbConn("ACS_V1_1")
-            sql = "UPDATE `dp_device_info` SET `sasStage` = 'dereg' where `cbsdID` = 'FoxconnMock-SASDCE994613163'"
-            conn.cursor.execute(sql)
-            cbsdAction("DCE994613163","RF_OFF",str(datetime.now()))
-        except Exception as e:
-            print(e)
-    else:
-        return False
-
-print(__name__) 
-
-# while True:  
-    # app.run(port = app.config["PORT"])
-
-    # cbsdAction("DCE994613163","RF_OFF",str(datetime.now()))
-    # EARFCNtoMHZ([{'EARFCN':55240},{'EARFCN':55990},{'EARFCN':56739}])
-    
-    #Convert EARFCN into hz
 
 def registration():
     meth = [consts.REG,consts.SPECTRUM,consts.GRANT]
@@ -133,7 +111,7 @@ def registration():
         # for m in meth:
         print("registration")
         conn = dbConn("ACS_V1_1")
-        cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.REG)
+        cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.PROV_REG)
         conn.dbClose()
         if cbsd_list !=():
             sasHandler.Handle_Request(cbsd_list, consts.REG)
@@ -152,10 +130,9 @@ def heartbeat():
             time.sleep(45)    
 
 def start():
-    conn = dbConn("ACS_V1_1")
-    conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE fccID = '2AQ68T99B226'")
-    conn.dbClose()
-
+    # conn = dbConn("ACS_V1_1")
+    # conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE fccID = '2AQ68T99B226'")
+    # conn.dbClose()
     try:
         #if using args a comma for tuple is needed 
         thread = threading.Thread(target=registration, args=())
@@ -238,10 +215,6 @@ def setParameterValues_Test():
     # EARFCN = ((MHz - 3550)/0.1) + 55240
 
     # print(EARFCN)
-
-
-def hb_op_params_test():
-    pass
 
 def spectrum_test():
 
@@ -424,35 +397,3 @@ start()
 # test6()
 # test_105_error()
 # test_501_error_module()
-
-# try:
-#     a_socket.connect(("192.168.4.5", 10500))
-#     print("connected")
-# except:
-#     print("Connection failed")
-#     #     conn.dbClose()
-
-# while True:
-
-
-# def some_test(response):
-#     with socket.socket() as s:
-#         try:
-#             s.connect((response, 10500))
-#             print(f"connected to ip: {response}")
-#         except Exception as e:
-#             print(f"Connection failed reason: {e}")
-#         time.sleep(10)
-#         s.close()
-#         print("finished")
-
-# cbsds = ["192.168.4.5", "192.168.4.9"]
-# for response in cbsds:
-#     print(response)
-#     try:
-#         #comma for tuple
-#         thread = threading.Thread(target=some_test, args=(response,))
-#         thread.start()
-#     except Exception as e:
-#         print(f"Connection failed reason: {e}")
-
