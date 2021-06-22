@@ -398,9 +398,15 @@ def error_106():
     conn.dbClose()
     sasHandler.Handle_Response(cbsds, consts.ERR106,consts.GRANT)
 
+def error_501():
+    conn = dbConn(consts.DB)
+    cbsds = conn.select("SELECT * FROM dp_device_info")
+    conn.dbClose()
+    sasHandler.Handle_Response(cbsds, consts.ERR501,consts.HEART)
 
 
 start()
+# error_501()
 # error_106()
 # test_dereg()
 # powerOn()

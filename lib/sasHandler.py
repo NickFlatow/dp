@@ -70,7 +70,7 @@ def Handle_Request(cbsd_list,typeOfCalling):
             grantRenew = False
            
             
-            logging.info(f"GRANT EXPIRE TIME: {cbsd['grantExpireTime']}")
+            # logging.info(f"GRANT EXPIRE TIME: {cbsd['grantExpireTime']}")
             
             #check if grant is expired
             if expired(cbsd['grantExpireTime'],True):
@@ -321,9 +321,10 @@ def getOpState(cbsd):
         conn.dbClose()
         #turn RF Off
         # cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
-        setList  = [consts.ADMIN_POWER_OFF]
-        #power off ASAP
-        setParameterValues(setList,cbsd)
+        if cbsd['AdminState'] != 0:
+            setList  = [consts.ADMIN_POWER_OFF]
+            #power off ASAP
+            setParameterValues(setList,cbsd)
     else:
         opState = 'AUTHORIZED'
 
@@ -424,12 +425,16 @@ def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue,index = 1):
     #call cbsdAction with action as 'Set Parameter Value'
     cbsdAction(cbsd_SN,'Set Parameter Value',str(datetime.now()))
     
-def setParameterValues(p,cbsd,typeOfCalling = None):
-    #p is a list of properties to change on the cell in dict form
+def setParameterValues(parameterList,cbsd,typeOfCalling = None):
+    #setParamterValues will take in a parameterList and a cbsd.
+    #setParamterValues will first check if the cell value matches the paramterList value - in which case no change needs to be made.
+    #If a chnage needs to be made we will then add the value to setList and passed to spv db table
+
+    #parameterList is a list of properties to be changed on the cell.
     #cbsd is  dict of current values on the cell 
-        
-    #create socket
-    # with socket.socket() as s:
+
+    #list of parameters to set on the cell 
+    setList = []
     try:
 
         #check if CBSD is connected
@@ -439,18 +444,18 @@ def setParameterValues(p,cbsd,typeOfCalling = None):
         startTime = datetime.now()
 
         #add perodic inform to 1 second 
-        p.append(consts.PERIODIC_ONE)
+        parameterList.append(consts.PERIODIC_ONE)
 
         #purge last action(s)
         conn = dbConn("ACS_V1_1")
         conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd['SN'])
 
         #for each value change in the parameter list
-        for i in range(len(p)):
+        for i in range(len(parameterList)):
 
             #admin state if off
-            if p[i]['data_path'] == consts.ADMIN_STATE: 
-                if p[i]['data_value'] == 'false':
+            if parameterList[i]['data_path'] == consts.ADMIN_STATE: 
+                if parameterList[i]['data_value'] == 'false':
                     logging.info("Turn RF OFF for %s",cbsd['SN'])
                     conn.update("UPDATE dp_device_info SET AdminState = %s WHERE SN = %s",(0,cbsd['SN']))
                     cbsd['AdminState'] = 0
@@ -459,26 +464,19 @@ def setParameterValues(p,cbsd,typeOfCalling = None):
                     conn.update("UPDATE dp_device_info SET AdminState = %s WHERE SN = %s",(1,cbsd['SN']))
                     cbsd['AdminState'] = 1
                 
-
-
-            # #admin state is on
-            # if p[i]['data_path'] == consts.ADMIN_STATE and p[i]['data_value'] == 'true':
-            #     logging.info("Turn RF ON for %s",cbsd['SN'])
-            #     conn.update("UPDATE dp_device_info SET AdminState = 1 WHERE SN = %s",cbsd['SN'])
-            #     cbsd['AdminState'] = 1
             
             #change cell power
-            if p[i]['data_path'] == consts.TXPOWER_PATH:
-                logging.info("adjust to power to %s dBm",p[i]['data_value'])
-                conn.update("UPDATE dp_device_info SET maxEIRP = %s WHERE SN = %s",((p[i]['data_value'] + cbsd['antennaGain']), str(cbsd['SN'])))
-                cbsd['TxPower'] = p[i]['data_value']
+            if parameterList[i]['data_path'] == consts.TXPOWER_PATH:
+                logging.info("adjust to power to %s dBm",parameterList[i]['data_value'])
+                conn.update("UPDATE dp_device_info SET maxEIRP = %s WHERE SN = %s",((parameterList[i]['data_value'] + cbsd['antennaGain']), str(cbsd['SN'])))
+                cbsd['TxPower'] = parameterList[i]['data_value']
 
             #change cell frequency
-            if p[i]['data_path'] == consts.EARFCN_LIST:
+            if parameterList[i]['data_path'] == consts.EARFCN_LIST:
                 #if we are updating earfcn list on cell also update on the database
-                logging.info("adjust EARFCN list to %s",p[i]['data_value'])
+                logging.info("adjust EARFCN list to %s",parameterList[i]['data_value'])
                 #convert earfcn to middle frequency to in MHZ
-                MHz = EARFCNtoMHZ(p[i]['data_value'])
+                MHz = EARFCNtoMHZ(parameterList[i]['data_value'])
                 #update plus and minus
                 conn.update("UPDATE dp_device_info SET lowFrequency = %s, highFrequency = %s WHERE SN = %s",((MHz -10),(MHz + 10),cbsd['SN']))
                 #update cbsd 
@@ -487,7 +485,7 @@ def setParameterValues(p,cbsd,typeOfCalling = None):
 
 
             #update parameters to database for update
-            conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd['SN'],i,p[i]['data_path'],p[i]['data_type'],p[i]['data_value']))
+            conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd['SN'],i,parameterList[i]['data_path'],parameterList[i]['data_type'],parameterList[i]['data_value']))
 
 
         #place action in apt_action_queue

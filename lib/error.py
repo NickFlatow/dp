@@ -130,9 +130,9 @@ def errorModule(errorDict,typeOfCalling):
                     conn.update("UPDATE dp_device_info SET operationalState = 'GRANTED' WHERE SN = %s",cbsd['SN'])
                     cbsd['operationalState'] = 'GRANTED'
                     conn.dbClose()
-                
-                log_error_to_FeMS_alarm("WARNING",cbsd,errorCode,typeOfCalling)
-                sasHandler.Handle_Request(errorDict[errorDict],consts.HEART)
+                    log_error_to_FeMS_alarm("WARNING",cbsd,errorCode,typeOfCalling)
+            
+            sasHandler.Handle_Request(errorDict[errorCode],consts.HEART)
 
         elif errorCode == 502:
 

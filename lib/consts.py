@@ -476,3 +476,34 @@ ERR106 = {
         }
     ]
 }
+
+ERR501 = {
+    "heartbeatResponse": [
+        {
+            "cbsdId": "2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982",
+            "grantId": "2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982/1750595678109855402",
+            "heartbeatInterval": 60,
+            "response": {
+                "responseCode": 501,
+                "responseData": [
+                    "The grant is suspended because it is in the move list of a DPA that has been activated"
+                ],
+                "responseMessage": "SUSPENDED_GRANT: The grant is suspended because it is in the move list of a DPA that has been activated"
+            },
+            "transmitExpireTime": "2021-06-21T22:35:35Z"
+        },
+        {
+            "cbsdId": "2AQ68T99B226/87b4920114c1b81d92a3342a68fa0d86d2c71f37",
+            "grantId": "2AQ68T99B226/87b4920114c1b81d92a3342a68fa0d86d2c71f37/11876706669600188705",
+            "heartbeatInterval": 60,
+            "response": {
+                "responseCode": 501,
+                "responseData": [
+                    "The grant is suspended because it is in the move list of a DPA that has been activated"
+                ],
+                "responseMessage": "SUSPENDED_GRANT: The grant is suspended because it is in the move list of a DPA that has been activated"
+            },
+            "transmitExpireTime": "2021-06-21T22:35:35Z"
+        }
+    ]
+}
