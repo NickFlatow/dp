@@ -1,3 +1,4 @@
+from config.default import SAS
 import requests
 import sys
 from lib.dbConn import dbConn
@@ -14,10 +15,11 @@ from datetime import datetime
 from datetime import timedelta
 import logging
 import socket
-import threading
+import threading 
 import lib.consts as consts
 from flask_cors import CORS, cross_origin
 from itertools import filterfalse
+from requests.auth import HTTPDigestAuth
 
 #init log class
 logger = logger()
@@ -42,13 +44,20 @@ def dp_register():
 
     #select only the values
     SNlist = list(SN_json_dict.values())
-    print(SNlist)
+    # print(SNlist)
 
     #collect all values from databse
     conn = dbConn("ACS_V1_1")
     sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
     cbsd_list = conn.select(sql,SNlist)
 
+    for cbsd in cbsd_list:
+        if cbsd['sasStage'] != consts.REG:
+            cbsd['sasStage'] = consts.REG
+            conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REG,cbsd['SN']))
+
+
+    conn.dbClose()
     sasHandler.Handle_Request(cbsd_list,consts.REG)
     return "success"
 
@@ -58,94 +67,30 @@ def dp_deregister():
     #Get cbsd SNs from FeMS    
     SNlist = request.form['json']
 
-    #convert to json
+    # #convert to json
     SN_json_dict = json.loads(SNlist)
 
-    #select only the values
+    # #select only the values
     SNlist = list(SN_json_dict.values())
-    # print(SNlist)
+    # print(f"output of SNlist: {SNlist}")
+    # SNlist = ['DCE994613163','DCE99461317E']
 
     #collect all values from databse
     conn = dbConn("ACS_V1_1")
     sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
     cbsd_list = conn.select(sql,SNlist)
 
+    #Relinquish grant if the cbsd is currently granted to transmit
+    rel = []
     print(cbsd_list)
-    sasHandler.Handle_Request(cbsd_list,consts.REL)
+    for cbsd in cbsd_list:
+        if cbsd['grantID'] != None:
+            rel.append(cbsd)
+
+    if bool(rel):
+        sasHandler.Handle_Request(rel,consts.REL)
     sasHandler.Handle_Request(cbsd_list,consts.DEREG)
     return "success"
-
-def deregistrationRequest(cbsds_SN = None):
-
-    #send relinquishment
-    grantRelinquishmentRequest(cbsds_SN)
-
-    cbsd_db = query_update(cbsds_SN,consts.DEREG)
-
-    #send deregistration
-    dereg = {"deregistrationRequest":[]}
-    for i in range(len(cbsd_db)):
-        #power off RF(How do I know if the CBSD turned off ADMIN_STATE check? do I still need to socket test?)
-        cbsdAction(cbsd_db[i]['SN'],"RF_OFF",str(datetime.now()))
-
-        #build json request for SAS
-        dereg["deregistrationRequest"].append(
-            {
-                "cbsdId":cbsd_db[i]['cbsdID'],
-            }
-        )
-    logger.log_json(dereg,len(cbsd_db))
-    response = contactSAS(dereg,consts.DEREG)
-    sasHandler.Handle_Response(response.json(),consts.DEREG)
-
-def grantRelinquishmentRequest(cbsd_SN_list):
-    #select all cbsds looking to have grant relinquished and updatea their status
-    cbsds = query_update(cbsd_SN_list,'relinquish')
-    
-    #build reliquishment array
-    relinquish = {"relinquishmentRequest":[]}
-    for response in cbsds:
-        # print(response['userID'])
-        relinquish["relinquishmentRequest"].append(
-            {
-                "cbsdId":response['cbsdID'],
-                "grantId":response['grantID']
-            }
-        )
-    
-    logger.log_json(relinquish,len(cbsds))
-    
-    #set grant IDs to NULL
-    conn = dbConn("ACS_V1_1")
-    update_grantID = "UPDATE dp_device_info SET grantID = NULL WHERE SN in" + str(cbsd_SN_list) + ";"
-    
-    logging.info(f"\n grant ID = NULL: {update_grantID} ")
-    conn.update(update_grantID)
-    conn.dbClose()
-    
-    #send request to SAS
-    response = contactSAS(relinquish,"relinquishment")
-    
-    #process reponse
-    if response != False:
-        sasHandler.Handle_Response(response.json(),consts.REL)
-
-
-
-def getResponseType(sasStage):
-    if sasStage == 'reg':
-        return 'registartionResponse'
-
-
-def query_update(cbsds_SN_list,sasStage):
-    conn = dbConn("ACS_V1_1")
-    sql_select = 'SELECT * FROM dp_device_info WHERE SN IN ({})'.format(','.join(['%s'] * len(cbsds_SN_list)))
-    rows = conn.select(sql_select,cbsds_SN_list)
-    print(rows)
-    conn.updateSasStage(sasStage,cbsds_SN_list)
-    conn.dbClose()
-    return rows
-
 
 def expired(time):
     #convert sting to datetime and compare to current time.
@@ -186,6 +131,7 @@ def registration():
 
     while True:
         # for m in meth:
+        print("registration")
         conn = dbConn("ACS_V1_1")
         cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.REG)
         conn.dbClose()
@@ -203,9 +149,13 @@ def heartbeat():
             if cbsd_list !=():
                 sasHandler.Handle_Request(cbsd_list,consts.HEART)
            
-            time.sleep(1)   
+            time.sleep(45)    
 
 def start():
+    conn = dbConn("ACS_V1_1")
+    conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE fccID = '2AQ68T99B226'")
+    conn.dbClose()
+
     try:
         #if using args a comma for tuple is needed 
         thread = threading.Thread(target=registration, args=())
@@ -218,63 +168,8 @@ def start():
         thread.start()
     except Exception as e:
         print(f"Heartbeat thread failed reason: {e}")
-    runFlaskSever()
+    runFlaskSever() 
 
-
-def test():
-    # error_resposne = {"registrationResponse": [{"response": {"responseCode": 200}},{"response": {"responseCode": 200}}]}
-    # error_response =  {"registrationResponse": [{"response": {"responseCode": 200,"responseMessage": "A Category B device must be installed by a CPI"}}]}
-
-    meth = [consts.REG,consts.SPECTRUM,consts.GRANT]
-
-    while True:
-        for m in meth:
-            conn = dbConn("ACS_V1_1")
-            cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',m)
-            conn.dbClose()
-            if cbsd_list !=():
-                sasHandler.Handle_Request(cbsd_list, m)
-
-        time.sleep(20)
-        # regRequest()
-
-def test2():
-    SNlist = str({"SN1":"DCE994613163","SN2":"abc123"})
-
-    # print(SNlist)
-    # SN_json_dict = json.loads(SNlist)
-    # print(SN_json_dict)
-
-    SN_json_dict = {'SN1': 'DCE994613163', 'SN2': 'abc123'}
-
-
-    conn = dbConn("ACS_V1_1")
-    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(list(SN_json_dict.values()))))
-    cbsd_list = conn.select(sql,list(SN_json_dict.values()))
-
-    # sasHandler.Handle_Request(cbsd_list,consts.REG)
-    print(type(cbsd_list))
-
-def test3():
-    erroDict = {'DCE994613163': "has error", 'abc123': "has error"}
-
-    conn = dbConn("ACS_V1_1")
-    cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s","NONE")
-    cbsd_list[:] = [cbsd for cbsd in cbsd_list if not hasError(cbsd,erroDict)]
-
-    print(bool(cbsd_list))
-
-def test4(): 
-    
-    SNlist = ['abc123','DCE994613163']
-
-    conn = dbConn("ACS_V1_1")
-    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
-    cbsd_list = conn.select(sql,SNlist)
-
-    print(cbsd_list)
-    sasHandler.Handle_Request(cbsd_list,consts.REL)
-    sasHandler.Handle_Request(cbsd_list,consts.DEREG)
 
 def test5():
     
@@ -301,10 +196,226 @@ def test_501_error_module():
     cbsd_list = conn.select(sql,SNlist)
     sasHandler.Handle_Response(cbsd_list,consts.HBE,consts.HEART)
 
+def testUpdateGrantTime():
 
+    conn = dbConn("ACS_V1_1")
+    cbsd = conn.select("select * from dp_device_info WHERE fccID = 'FOXCONN'")
+    conn.dbClose()
+
+def setParameterValues_Test():
+    conn = dbConn("ACS_V1_1")
+    cbsd = conn.select("select * from dp_device_info WHERE fccID = 'FOXCONN'")
+    conn.dbClose()
+
+
+    EARFCN = sasHandler.MHZtoEARFCN(cbsd[0])
+    print(EARFCN)
+
+    pDict = {}
+    pDict[cbsd[0]['SN']] = []
+    pDict[cbsd[0]['SN']].append(consts.ADMIN_POWER_OFF)
+    # pDict[cbsd[0]['SN']].append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':EARFCN})
+    # pDict[cbsd[0]['SN']].append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':23})
+
+    # pDict[cbsd[0]['SN']].append({'dtat_path':})
+    #add 
+
+    # for dict in pDict[cbsd[0]['SN']]:
+        # print(dict)
+
+    sasHandler.setParameterValues(pDict,cbsd[0]['SN'])
+
+    time.sleep(10)
+    aDict = {}
+    aDict[cbsd[0]['SN']] = []
+    aDict[cbsd[0]['SN']].append(consts.ADMIN_POWER_ON)
+
+    sasHandler.setParameterValues(aDict,cbsd[0]['SN'])
+    # sasHandler.setParameterValue(cbsd[0]['SN'],consts.EARFCN_LIST,'string',EARFCN,1)
+    # sasHandler.setParameterValue(cbsd[0]['SN'],consts.TXPOWER_PATH,'int',0,2)
+    # MHz = 3585
+
+    # EARFCN = ((MHz - 3550)/0.1) + 55240
+
+    # print(EARFCN)
+
+
+def hb_op_params_test():
+    pass
+
+def spectrum_test():
+
+    channels = consts.FS['spectrumInquiryResponse'][0]['availableChannel']
+
+    #show all channels
+    for channel in channels:
+        # for i in range(len(channel))
+        print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
+        # print(f"")
+
+    pref = 3580000000 #middle of low and high freq from database lowFrequency + 10
+    
+
+    print('\n\n\n')
+    #To convert dBm/MHz to dBm/10MHz => 37 dBm/MHz = 37 + 10 * log(10) dBm/10MHz = 47 dBm/10MHz.
+    freqArray = [3560000000,3570000000,3580000000,3590000000,3600000000,3610000000,3620000000,3630000000,3640000000,3650000000.3660000000,3670000000,3680000000,3690000000]
+    #check if 20MHz is avaiable
+    searching = True
+    while searching:
+        if select_frequency(pref,channels):
+            searching = False
+            print("found")
+        print("still searching, increase pref by 10 Mhz")
+        pref = pref + 10000000
+        
+        # if pref ==  3690000000:
+        #     pref = 3560000000
+        #we have come around again and must end the loop because there is no specturm for you
+    
+def select_frequency(pref, channels):
+    low = False
+    high = False
+    
+    for channel in channels:
+        if pref == channel['frequencyRange']['lowFrequency']:
+            print(f"matched low value missing high value:")
+            print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
+            low = True
+        if pref == channel['frequencyRange']['highFrequency']:
+            print("matched high value missing low value:")
+            print(f"low: {channel['frequencyRange']['lowFrequency']} high: {channel['frequencyRange']['highFrequency']}")
+            high = True
+    
+        if low and high:
+            #  if channel['maxEirp'] < cbsd_list[i]['maxEIRP']:
+                #upate maxEirp with suggested from SAS
+            return True
+
+    return False
+
+def change_EIRP():
+    # print(consts.SPEC_EIRP)
+
+    conn = dbConn(consts.DB)
+    cbsd = conn.select("SELECT * FROM dp_device_info")
+    
+    channels = consts.SPEC_EIRP['spectrumInquiryResponse'][0]['availableChannel']
+
+    for channel in channels: 
+        # print(channel['lowFre'])
+        if channel['frequencyRange']['lowFrequency'] == 3630000000:
+            # if channel['maxEirp'] < cbsd[0]['maxEIRP']:
+                txPower = channel['maxEirp'] - cbsd[0]['antennaGain']
+                
+                print(txPower)
+
+                pDict = []
+                pDict.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':10})
+                pDict.append(consts.ADMIN_POWER_OFF)
+                pDict.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':55590})
+
+                sasHandler.setParameterValues(pDict,cbsd[0])
+
+                # sasHandler.EARFCNtoMHZ(cbsd[0]['SN'])
+                
+                # testCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",cbsd[0]['SN'])
+                
+                # print("send grant request")
+                # print(datetime.now())
+                # sasHandler.Handle_Request(testCbsd,consts.GRANT)
+
+            #SET PARAMETER VALUES SET TX POWER MAXEIRP - ANTENNA GAIN
+
+    conn.dbClose()
+
+def sasSpecTest():
+
+
+    conn = dbConn(consts.DB)
+    # g = conn.select("SELECT getValue FROM fems_gpv WHERE SN = %s", 'DCE994613163')
+    cbsd = conn.select("SELECT * FROM dp_device_info")
+    conn.dbClose()
+
+  
+    sasHandler.Handle_Response(cbsd,consts.FS,consts.SPECTRUM)
+
+    # sasHandler.Handle_Response(cbsd,consts.HB501,consts.HEART)
+    
+    # g =sasHandler.getParameterValue('Device.X_FOXCONN_FAP.CellConfig.EUTRACarrierARFCNDL',cbsd[0])
+
+
+def getParameters(cbsd):
+    conn = dbConn(consts.DB)
+    
+    #collect all parameters from subscription table (update to json ajax send or add more value so there is no case of duplicated entires with same SN in apt_subscription table)
+    parameters = conn.select("SELECT parameter FROM apt_subscription WHERE SN = %s",cbsd['SN'])
+    
+    #convert to json
+    parameters = json.loads(parameters[0]['parameter'])
+    
+    #get eutra values(all possible earfcns provided by user in the subscription table)
+    eutra = parameters['EUTRACarrierARFCNDL']['value']
+    
+    #convert to list
+    earfcnList = list(eutra.split(","))
+
+    #convert all values to ints
+    earfcnList = [int(i) for i in earfcnList]
+
+    for i in earfcnList:
+        print(i)
+        print(type(i))
+        
+    #get current earfcn in use(currently assigned to the cell from SON) 
+    earfcn = conn.select("SELECT EARFCN FROM dp_device_info WHERE SN = %s",cbsd['SN'])
+    #add to the front of the list
+    earfcnList.insert(0,earfcn[0]['EARFCN'])
+
+    conn.dbClose()
+
+    return earfcnList
+
+def powerOn():
+
+    conn = dbConn(consts.DB)
+    cbsd =conn.select("SELECT * FROM dp_device_info")
+    conn.dbClose()
+
+    pList = []
+    for c in cbsd:
+        # response = requests.get(c['connreqURL'], auth= HTTPDigestAuth(c['connreqUname'],c['connreqPass']))
+        # print(response)
+        pList.append(consts.ADMIN_POWER_OFF)
+        # pList.append(consts.ADMIN_POWER_ON)
+        sasHandler.setParameterValues(pList,c)
+
+def test_dereg(): 
+    dp_deregister()
+
+def error_106():
+    conn = dbConn(consts.DB)
+    cbsds = conn.select("SELECT * FROM dp_device_info")
+    conn.dbClose()
+    sasHandler.Handle_Response(cbsds, consts.ERR106,consts.GRANT)
+
+def error_501():
+    conn = dbConn(consts.DB)
+    cbsds = conn.select("SELECT * FROM dp_device_info")
+    conn.dbClose()
+    sasHandler.Handle_Response(cbsds, consts.ERR501,consts.HEART)
 
 
 start()
+# error_501()
+# error_106()
+# test_dereg()
+# powerOn()
+# getParameters()
+# sasSpecTest()
+# change_EIRP()
+# spectrum_test()
+# setParameterValues_Test()
+# testUpdateGrantTime()
 # test()
 # test2()
 # test3()

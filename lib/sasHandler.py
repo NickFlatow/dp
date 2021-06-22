@@ -1,17 +1,17 @@
+from config.default import SAS
 import math
+import json
 import logging
 import requests
+import socket
 import time
 import lib.consts as consts
 from lib.log import dpLogger
 from lib.dbConn import dbConn
-from lib import error as e
+from lib import error as err
 from datetime import datetime, timedelta
+from requests.auth import HTTPDigestAuth
 from test import app
-
-# class sasHandler():
-#     def __init__(self,cbsd_list):
-#         pass
 
 def Handle_Request(cbsd_list,typeOfCalling):
     '''
@@ -32,19 +32,19 @@ def Handle_Request(cbsd_list,typeOfCalling):
                     "userId": cbsd["userID"]
                 }
             )
-        
+    
         elif typeOfCalling == consts.SPECTRUM:
             
             #calculate MHz and MaxEirp
-            FreqDict = EARFCNtoMHZ(cbsd['SN'])
+            # FreqDict = EARFCNtoMHZ(cbsd['SN'])
 
             req[requestMessageType].append(
                 {
                     "cbsdId":cbsd['cbsdID'],
                     "inquiredSpectrum":[
                         {
-                            "highFrequency":FreqDict['highFreq'] * 1000000,
-                            "lowFrequency":FreqDict['lowFreq']  * 1000000
+                            "highFrequency":consts.HIGH_FREQUENCY,
+                            "lowFrequency":consts.LOW_FREQUENCY
                         }
                     ]
                 }
@@ -53,7 +53,7 @@ def Handle_Request(cbsd_list,typeOfCalling):
         elif typeOfCalling == consts.GRANT:
             
             req[requestMessageType].append(
-                    {
+                    { 
                         "cbsdId":cbsd['cbsdID'],
                         "operationParam":{
                             # grab antennaGain from web interface
@@ -66,69 +66,99 @@ def Handle_Request(cbsd_list,typeOfCalling):
                     }
                 )
         elif typeOfCalling == consts.HEART:
+
+            grantRenew = False
+           
+            
+            # logging.info(f"GRANT EXPIRE TIME: {cbsd['grantExpireTime']}")
+            
+            #check if grant is expired
+            if expired(cbsd['grantExpireTime'],True):
+                grantRenew = True 
+            
+            #check if we are transmiting with an expired heartbeat
+            if cbsd['operationalState'] == 'AUTHORIZED':
+                #in the case of no reply from SAS continue to check transmit expire time and switch opState to granted and turn off RF if we exceed transmit time
+                opState = getOpState(cbsd)
+            else:
+                opState = 'GRANTED'
+            
             req[requestMessageType].append(
                     {
                         "cbsdId":cbsd['cbsdID'],
                         "grantId":cbsd['grantID'],
-                        "operationState":cbsd['operationalState']
+                        "operationState":opState,
+                        "grantRenew":grantRenew
                     }
                 )
-                
-
         elif typeOfCalling == consts.DEREG:
             
+            #if adminstate is on turn off.
 
-            #how to determine if action was complete?
-            cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
+            #get parameter value
+            # cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
+            if cbsd['AdminState'] == 1:
+                setList  = [consts.ADMIN_POWER_OFF]
+                #power off ASAP
+                setParameterValues(setList,cbsd)
             
             #if grantID != NULL
             # call grant relinquish
-
-
-
             req[requestMessageType].append(
                     {
                         "cbsdId":cbsd['cbsdID'],
                     }
                 )
+            conn = dbConn("ACS_V1_1")
+            update_grantID = "UPDATE dp_device_info SET operationalState = NULL, grantExpireTime = NULL, transmitExpireTime = NULL, sasStage = %s WHERE SN = %s"
+            conn.update(update_grantID,(consts.DEREG,cbsd['SN']))
+            conn.dbClose()
 
         elif typeOfCalling == consts.REL:
-            print("REL")
+
+            #Set small cell admin state to false
+            if cbsd['AdminState'] == 1:
+                setList  = [consts.ADMIN_POWER_OFF]
+                #power off ASAP
+                setParameterValues(setList,cbsd)
+            
+            
             req[requestMessageType].append(
                 {
                     "cbsdId":cbsd['cbsdID'],
                     "grantId":cbsd['grantID']
                 }
             )
-            #set grant IDs to NULL
+            #set grant IDs to NULL and sasStage to relinquish
             conn = dbConn("ACS_V1_1")
-            update_grantID = "UPDATE dp_device_info SET grantID = NULL WHERE SN = %s "
-            conn.update(update_grantID,cbsd['SN'])
+            update_grantID = "UPDATE dp_device_info SET grantID = NULL, operationalState = NULL, grantExpireTime = NULL, transmitExpireTime = NULL, sasStage = %s WHERE SN = %s"
+            conn.update(update_grantID,(consts.REL,cbsd['SN']))
             conn.dbClose()
-
 
     dpLogger.log_json(req,len(cbsd_list))
     SASresponse = contactSAS(req,typeOfCalling)
+    # SASresponse = False
 
     if SASresponse != False:
-        Handle_Response(cbsd_list,SASresponse.json(),typeOfCalling)
+        conn = dbConn("ACS_V1_1")
+        updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",typeOfCalling)
+        conn.dbClose()
+        Handle_Response(updated_cbsd_list,SASresponse.json(),typeOfCalling)
 
     # if SASresponse != False:
     #     Handle_Response(cbsd_list,SASresponse,typeOfCalling)
-
 
 def Handle_Response(cbsd_list,response,typeOfCalling):
     #HTTP address that is in place e.g.(reg,spectrum,grant heartbeat)
     resposneMessageType = str(typeOfCalling +"Response")
     
-    # select all cbsd that are in current step for typeOfCalling
-    # conn = dbConn("ACS_V1_1")
-    # sql = 'SELECT * FROM dp_device_info where sasStage = %s' 
-    # cbsd_list = conn.select(sql,typeOfCalling)
-    # conn.dbClose()
+ 
+    #check if any cbsds need to be turned off
 
     #init dict to pass to error module
     errorDict = {}
+    errorList = []
+    responseList = []
     
     dpLogger.log_json(response,(len(response[resposneMessageType])))
     
@@ -136,10 +166,23 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
         #check for errors in response
         if response[resposneMessageType][i]['response']['responseCode'] != 0:
-            # errorList.append(response[resposneMessageType][i][response])
-        #    print(response[resposneMessageType][i]['response'])
-            errorDict[cbsd_list[i]['SN']] = response[resposneMessageType][i]
 
+            errorCode = response[resposneMessageType][i]['response']['responseCode']
+
+            #This is a bad solution to my previous ignorance... I apologize
+            if 'transmitExpireTime' in response[resposneMessageType][i]:
+                if expired(response['heartbeatResponse'][i]['transmitExpireTime']):
+                    setList  = [consts.ADMIN_POWER_OFF]
+                    #power off ASAP
+                    setParameterValues(setList,cbsd_list[i])
+
+
+            #include resposne when sending cbsd to error module
+            cbsd_list[i]['response'] = response[resposneMessageType][i]
+
+            addErrorDict(errorCode,errorDict,cbsd_list[i])
+            errorList.append(cbsd_list[i]['SN'])
+        
         elif typeOfCalling == consts.REG:
 
             conn = dbConn("ACS_V1_1")
@@ -149,38 +192,19 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #nextCalling = conts.SPECTRUM
 
         elif typeOfCalling == consts.SPECTRUM:
+            #ensure Eirp reflects current antenna and txPower values
+            updateMaxEirp(cbsd_list[i])
             conn = dbConn("ACS_V1_1")
-            # if high frequcy and low frequcy match value(convert to hz) for cbsdId in database then move to next
 
-
-            #check maxEirp if higher change
-
-            # print(len(response['spectrumInquiryResponse'][i]['availableChannel']))
-
-            # for channel in response['spectrumInquiryResponse'][i]['availableChannel']:
-            #      if channel['channelType'] == 'GAA':
-            #         if channel['maxEirp'] <= cbsd_list[i]['maxEIRP']:
-            #             print("over")
-            #         print(channel['frequencyRange']['lowFrequency'],channel['frequencyRange']['highFrequency'])
-                       
-               
-            #TODO WHAT IF THE AVAIABLE CHANNEL ARRAY IS EMPTY
-            low = math.floor(response['spectrumInquiryResponse'][i]['availableChannel'][0]['frequencyRange']['lowFrequency']/1000000)
-            high = math.floor(response['spectrumInquiryResponse'][i]['availableChannel'][0]['frequencyRange']['highFrequency']/1000000)
-
-            sql = "SELECT `SN`,`lowFrequency`,`highFrequency` from dp_device_info where cbsdID = \'" + response['spectrumInquiryResponse'][i]['cbsdId'] + "\'"
-
-            #if the SAS sends back spectrum response with avaible channgel array outsid of the use values set on the cell. Use the values set by the spectrum response
+            #grab all avaialbe channels provided by SAS reply
+            channels = response['spectrumInquiryResponse'][0]['availableChannel']
             
-            #select values currently used in the database per response
-            # cbsd_freq_values = conn.select(sql)
-            #  if cbsd_freq_values are outside of the range of low and high(set above) then use value inside the low and high range
-            #  cbsdaction(SN,setvalues,now)
-            #
+            #scans EARFCN list for open channel on SAS
+            selectFrequency(cbsd_list[i],channels,typeOfCalling)
+
+
             sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
             conn.update(sqlUpdate)
-
-            #nextCalling = consts.GRANT
 
         elif typeOfCalling == consts.GRANT:
             #TODO Check for measurement Report
@@ -198,12 +222,20 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #TODO WHAT IF MEAS REPORT
             #TODO
 
+
             conn = dbConn("ACS_V1_1")
+            
             #update operational state to granted/ what if operational state is already authorized
             if not expired(response['heartbeatResponse'][i]['transmitExpireTime']):
                 update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
                 conn.update(update_operational_state)
-            
+            else:
+                    #if the heartbeat is expired 
+                    setList  = [consts.ADMIN_POWER_OFF]
+                    #power off ASAP
+                    setParameterValues(setList,cbsd_list[i])
+
+
             #update transmist expire time
             update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + response['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
             conn.update(update_transmit_time)
@@ -213,25 +245,35 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             if cbsd_list[i]['operationalState'] == 'GRANTED':
                 print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
                 # turn on RF in cell
-                cbsdAction(cbsd_list[i]['SN'],"RF_ON",str(datetime.now()))
+                # cbsdAction(cbsd_list[i]['SN'],"RF_ON",str(datetime.now()))
+                if cbsd_list[i]['AdminState'] != 1:
+                    pList = [consts.ADMIN_POWER_ON]
+                    setParameterValues(pList,cbsd_list[i])
+            # else:
+            #     dp_deregister()
+
+            #if response has new grantTime update databas
+            if 'grantExpireTime' in response['heartbeatResponse'][i]:
+                updateGrantTime(response['heartbeatResponse'][i]['grantExpireTime'],cbsd_list[i]['SN'])
 
         elif typeOfCalling == consts.DEREG:
-            #update sasStage
-            conn = dbConn("ACS_V1_1")
-            conn.update("UPDATE dp_device_info SET sasStage = %s",consts.DEREG)
-            conn.dbClose()
-
+            pass
+            #update sasStage            
+            # conn = dbConn("ACS_V1_1")
+            # conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.DEREG,cbsd_list[i]['SN']))
+            # conn.dbClose()
 
         elif typeOfCalling == consts.REL:
+            pass
             #update sasStage
-            conn = dbConn("ACS_V1_1")
-            conn.update("UPDATE dp_device_info SET sasStage = %s",consts.REL)
-            conn.dbClose()
+            # conn = dbConn("ACS_V1_1")
+            # conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REL,cbsd_list[i]['SN']))
+            # conn.dbClose()
 
 
     if bool(errorDict):
-        e.errorModule(errorDict,typeOfCalling)
-        cbsd_list[:] = [cbsd for cbsd in cbsd_list if not hasError(cbsd,errorDict)]
+        err.errorModule(errorDict,typeOfCalling)
+        cbsd_list[:] = [cbsd for cbsd in cbsd_list if not hasError(cbsd,errorList)]
 
     if bool(cbsd_list):
         nextCalling = getNextCalling(typeOfCalling)
@@ -241,7 +283,15 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
         if (nextCalling != False):
             conn = dbConn("ACS_V1_1")
             updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",nextCalling)
-            Handle_Request(updated_cbsd_list,nextCalling)
+            conn.dbClose()
+            Handle_Request(updated_cbsd_list,nextCalling) 
+
+
+
+def updateGrantTime(grantExpireTime,SN):
+    conn = dbConn("ACS_V1_1")
+    conn.update("UPDATE dp_device_info SET grantExpireTime = %s WHERE SN = %s",(grantExpireTime,SN))
+    conn.dbClose()
 
 
 def contactSAS(request,method):
@@ -251,25 +301,38 @@ def contactSAS(request,method):
     # logger.info(f"{app.config['SAS']}  {method}")
 
     try:
-        a = requests.post(app.config['SAS']+method, 
-        cert=('certs/client.cert','certs/client.key'),
-        verify=('certs/ca.cert'),
-        json=request,
-        timeout=1.5)
+        return requests.post(app.config['SAS']+method, 
+        cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+        verify=('googleCerts/ca.cert'),
+        json=request)
 
-        print(a)
-        return a
-    except requests.ConnectionError:
-        print("tragic")
+        # timeout=5
+        
     except Exception as e:
         print(f"your connection has failed: {e}")
         return False
-    # return consts.FS1
+
+def getOpState(cbsd):
+
+    if expired(cbsd['transmitExpireTime'] ):
+        opState = 'GRANTED'
+        conn = dbConn("ACS_V1_1")
+        conn.update("UPDATE dp_device_info SET operationalState = 'GRANTED' WHERE SN = %s",cbsd['SN'])
+        conn.dbClose()
+        #turn RF Off
+        # cbsdAction(cbsd['SN'],"RF_OFF",str(datetime.now()))
+        if cbsd['AdminState'] != 0:
+            setList  = [consts.ADMIN_POWER_OFF]
+            #power off ASAP
+            setParameterValues(setList,cbsd)
+    else:
+        opState = 'AUTHORIZED'
+
+    return opState
 
 def cbsdAction(cbsdSN,action,time):
 
     #check note field for EXEC
-
     logging.critical("Triggering CBSD action")
     conn = dbConn("ACS_V1_1")
     sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+cbsdSN+"\',\'"+action+"\',\'"+time+"\')"
@@ -277,42 +340,51 @@ def cbsdAction(cbsdSN,action,time):
     conn.update(sql_action)
     conn.dbClose()
 
-def EARFCNtoMHZ(cbsd_SN):
-    # Function to convert frequency from EARFCN  to MHz 3660 - 3700
-    # mhz plus 6 zeros
-    freqDict = {}
-    conn = dbConn("ACS_V1_1")
-    sql = 'SELECT * FROM dp_device_info where SN = %s'
-    cbsd = conn.select(sql,cbsd_SN)
-
+def MHZtoEARFCN(MHz):
     
-    logging.info("////////////////////////////////EARFCN CONVERTION "+ cbsd[0]['SN']+"\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
-    print("EARFCN: " + str(cbsd[0]['EARFCN']))
-    if int(cbsd[0]['EARFCN']) > 56739 or int(cbsd[0]['EARFCN']) < 55240:
+    #take low freq in MHz and 10(to get the middle freq)
+    # MHz = int(cbsd['lowFrequency']) + 10
+    #then convert to EARFCN
+    EARFCN = math.ceil(((MHz - 3550)/0.1) + 55240)
+
+    return EARFCN
+
+def EARFCNtoMHZ(earfcn):
+    # Function to convert frequency from EARFCN  to MHz 3660 - 3700
+    # hz add 6 zeros
+
+    logging.info("////////////////////////////////EARFCN CONVERTION\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
+    print("EARFCN: " + str(earfcn))
+    if int(earfcn) > 56739 or int(earfcn) < 55240:
         logging.info("SPECTRUM IS OUTSIDE OF BOUNDS")
         L_frq = 0
         H_frq = 0
-    elif cbsd[0]['EARFCN'] == 55240:
+        F = 0
+    elif earfcn == 55240:
         L_frq = 3550
         H_frq = 3570
-    elif cbsd[0]['EARFCN'] == 56739:
+        F = 3560
+    elif earfcn == 56739:
         L_frq = 3680
         H_frq = 3700
+        F = 3690
     else:
-        F = math.ceil(3550 + (0.1 * (int(cbsd[0]['EARFCN']) - 55240)))
-        L_frq = F - 10
-        H_frq = F + 10
+        F = math.ceil(3550 + (0.1 * (int(earfcn) - 55240)))
 
-    sql = "UPDATE `dp_device_info` SET lowFrequency= %s, highFrequency=%s, maxEIRP= %s WHERE SN = %s"
-    conn.update(sql,(str(L_frq),str(H_frq),int(cbsd[0]['TxPower'] + cbsd[0]['antennaGain']), str(cbsd[0]['SN'])))        
+    #return middle frequency
+    return F
+
+def updateMaxEirp(cbsd):
+    conn = dbConn(consts.DB)
+    conn.update("UPDATE dp_device_info SET maxEIRP = %s WHERE SN = %s",( (cbsd['TxPower'] + cbsd['antennaGain']), str(cbsd['SN'])))
+    cbsd['maxEIRP'] = (cbsd['TxPower'] + cbsd['antennaGain'])
     conn.dbClose()
 
-    freqDict['lowFreq'] = L_frq
-    freqDict['highFreq'] = H_frq
-    return freqDict
+def EirpToTxPower(maxEirp,cbsd):
+    return maxEirp - cbsd['antennaGain']
 
-def hasError(cbsd,errorDict):
-    if cbsd['SN'] in errorDict:
+def hasError(cbsd,errorList):
+    if cbsd['SN'] in errorList:
         return True
     else:
         return False
@@ -330,61 +402,331 @@ def getNextCalling(typeOfCalling):
         return False
     if typeOfCalling == consts.DEREG:
         return False
+    if typeOfCalling == False:
+        return False
 
-def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue):
+def setParameterValue(cbsd_SN,data_model_path,setValueType,setValue,index = 1):
     #purge last action
     conn = dbConn("ACS_V1_1")
     conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd_SN)
 
+    #update Adminstate in DB
+    if data_model_path == consts.ADMIN_STATE and setValue == 'false':
+        logging.info("Turn RF OFF for %s",cbsd_SN)
+        conn.update("UPDATE dp_device_info SET AdminState = 0 WHERE SN = %s",cbsd_SN)
+
+    if data_model_path == consts.ADMIN_STATE and setValue == 'true':
+        logging.info("Turn RF ON for %s",cbsd_SN)
+        conn.update("UPDATE dp_device_info SET AdminState = 1 WHERE SN = %s",cbsd_SN)
+
     #insert SN, data_model_path and value into FeMS_spv
-    conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd_SN,1,data_model_path,setValueType,setValue))
+    conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd_SN,index,data_model_path,setValueType,setValue))
     conn.dbClose()
     #call cbsdAction with action as 'Set Parameter Value'
     cbsdAction(cbsd_SN,'Set Parameter Value',str(datetime.now()))
     
+def setParameterValues(parameterList,cbsd,typeOfCalling = None):
+    #setParamterValues will take in a parameterList and a cbsd.
+    #setParamterValues will first check if the cell value matches the paramterList value - in which case no change needs to be made.
+    #If a chnage needs to be made we will then add the value to setList and passed to spv db table
 
-def getParameterValue():
-    pass
-    #check if action is already being executed
-    # $sqlQueryStr = "SELECT `Note` FROM `apt_action_queue` WHERE `Action`='".$In_Action."' AND `SN`='".$In_SN."'";
-    # $sqlQueryResult = mysql_query($sqlQueryStr);
-    # if(mysql_num_rows($sqlQueryResult) != 0)
-    # {
-    #     $note = mysql_result($sqlQueryResult, 0);
-    #     if (!empty($note) && ($note == 'EXEC')) /* block replacement if action is executing */
-    #     {
-    #         echo '<script language="javascript">alert("Previous GPV is running, please retry later");top.location.href=\'deviceList.php\';</script>';
-    #         exit();                
-    #     }
-    # }
+    #parameterList is a list of properties to be changed on the cell.
+    #cbsd is  dict of current values on the cell 
 
-    #if no action purge last action
-def expired(transmitExpireTime):
+    #list of parameters to set on the cell 
+    setList = []
+    try:
+
+        #check if CBSD is connected
+        # s.connect((cbsd['IPAddress'], 10500))
+        print(f"connected to ip: {cbsd['IPAddress']}")
+
+        startTime = datetime.now()
+
+        #add perodic inform to 1 second 
+        parameterList.append(consts.PERIODIC_ONE)
+
+        #purge last action(s)
+        conn = dbConn("ACS_V1_1")
+        conn.update('DELETE FROM fems_spv WHERE SN = %s',cbsd['SN'])
+
+        #for each value change in the parameter list
+        for i in range(len(parameterList)):
+
+            #admin state if off
+            if parameterList[i]['data_path'] == consts.ADMIN_STATE: 
+                if parameterList[i]['data_value'] == 'false':
+                    logging.info("Turn RF OFF for %s",cbsd['SN'])
+                    conn.update("UPDATE dp_device_info SET AdminState = %s WHERE SN = %s",(0,cbsd['SN']))
+                    cbsd['AdminState'] = 0
+                else:
+                    logging.info("Turn on RF for %s",cbsd['SN'])
+                    conn.update("UPDATE dp_device_info SET AdminState = %s WHERE SN = %s",(1,cbsd['SN']))
+                    cbsd['AdminState'] = 1
+                
+            
+            #change cell power
+            if parameterList[i]['data_path'] == consts.TXPOWER_PATH:
+                logging.info("adjust to power to %s dBm",parameterList[i]['data_value'])
+                conn.update("UPDATE dp_device_info SET maxEIRP = %s WHERE SN = %s",((parameterList[i]['data_value'] + cbsd['antennaGain']), str(cbsd['SN'])))
+                cbsd['TxPower'] = parameterList[i]['data_value']
+
+            #change cell frequency
+            if parameterList[i]['data_path'] == consts.EARFCN_LIST:
+                #if we are updating earfcn list on cell also update on the database
+                logging.info("adjust EARFCN list to %s",parameterList[i]['data_value'])
+                #convert earfcn to middle frequency to in MHZ
+                MHz = EARFCNtoMHZ(parameterList[i]['data_value'])
+                #update plus and minus
+                conn.update("UPDATE dp_device_info SET lowFrequency = %s, highFrequency = %s WHERE SN = %s",((MHz -10),(MHz + 10),cbsd['SN']))
+                #update cbsd 
+                cbsd['lowFrequency'] = MHz - 10
+                cbsd['highFrequency'] = MHz + 10
+
+
+            #update parameters to database for update
+            conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(cbsd['SN'],i,parameterList[i]['data_path'],parameterList[i]['data_type'],parameterList[i]['data_value']))
+
+
+        #place action in apt_action_queue
+        cbsdAction(cbsd['SN'],'Set Parameter Value',str(datetime.now()))
+
+        #send connection request to cell
+        response = requests.get(cbsd['connreqURL'], auth= HTTPDigestAuth(cbsd['connreqUname'],cbsd['connreqPass']))
+        
+        #check if conncetion if accepted by the cell
+        if response.status_code == 200:
+            #wait until parameters are set
+            settingParameters = True
+            while settingParameters:
+                # logging.info(f"Setting Parameters for {cbsd['SN']}")
+                database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",cbsd['SN'])
+                
+                if database == ():
+                    logging.info(f"Paramters set successfully for {cbsd['SN']}")
+                    settingParameters = False
+                else:
+                    time.sleep(.5)
+        else:
+            # remove action from action queue
+            conn.update("DELETE FROM apt_action_queue WHERE SN = 'DCE994613163'")
+            
+            # log connection error to FeMS
+            err.log_error_to_FeMS_alarm("CRITICAL",cbsd,"Connection Request Failed",typeOfCalling)    
+        conn.dbClose()
+
+    
+    except Exception as e:
+        #if cell is disconnected log the failure
+        logging.info(f"Connection to {cbsd['IPAddress']} failed reason: {e}")
+        print(f"Connection to {cbsd['IPAddress']} failed reason: {e}")
+    # s.close()
+    
+
+    endTime = datetime.now()
+
+    totalTime = endTime - startTime
+
+    print(f"total time take to set paramter for {cbsd['IPAddress']}: {totalTime}")
+
+
+
+def getParameterValue(data_model_path,cbsd):
+    #data_model_path list of data model path values to get from the cell
+    
+    conn = dbConn(consts.DB)
+    #purge last action
+    conn.update('DELETE FROM fems_gpv WHERE SN = %s',cbsd['SN'])
+
+    conn.update('INSERT INTO fems_gpv(`SN`,`gpv_index`,`dbpath`,`username`) VALUES(%s,%s,%s,%s)',(cbsd['SN'],1,data_model_path,"femtocell"))
+
+    cbsdAction(cbsd['SN'],'Get Parameter Value',str(datetime.now()))
+    # wait until action is completed
+    gettingParameters = True
+    while gettingParameters:
+        logging.info(f"Getting Parameters for {cbsd['SN']}")
+        database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",cbsd['SN'])
+        
+        if database == ():
+            logging.info(f"Paramters gotten successfully for {cbsd['SN']}")
+            gettingParameters = False
+        else:
+            time.sleep(5)
+
+    getValue = conn.select("SELECT getValue FROM fems_gpv WHERE SN = %s",cbsd['SN'])
+
+    return getValue
+    
+def expired(transmitExpireTime, grantRenew = False):
     #convert transmitExpireTime string to datetime
+    if transmitExpireTime == None:
+        return False
+    
     expireTime = datetime.strptime(transmitExpireTime,"%Y-%m-%dT%H:%M:%SZ")
 
+    if grantRenew:
+        expireTime = expireTime - timedelta(seconds=280)
+   
     if datetime.utcnow() > expireTime:
         return True
-    else:
+    else: 
         return False
 
-def expired_1(transmiteExpireTime):
-    #convert sting to datetime and compare to current time.
-    
-    #time of which grant or transmit will expire
-    expireTime = datetime.strptime(time,"%Y-%m-%dT%H:%M:%SZ")
-    print(expireTime)
-    timeChange = expireTime + timedelta(seconds=hbinterval)
-    print(datetime.now())
-    print(timeChange)
-    #if the current time is less than the expire time plus the heartbeat interval
-    if timeChange > datetime.now():
-        try:
-            conn = dbConn("ACS_V1_1")
-            sql = "UPDATE `dp_device_info` SET `sasStage` = 'dereg' where `cbsdID` = 'FoxconnMock-SASDCE994613163'"
-            conn.cursor.execute(sql)
-            cbsdAction("DCE994613163","RF_OFF",str(datetime.now()))
-        except Exception as e:
-            print(e)
+def addErrorDict(errorCode,errorDict,cbsd):
+    #if key in dict
+    if errorCode in errorDict:
+        #append list
+        errorDict[errorCode].append(cbsd)
     else:
-        return False
+        #create key and list
+        errorDict[errorCode] = []
+        errorDict[errorCode].append(cbsd)
+        # append list
+
+def selectFrequency(cbsd,channels,typeOfCalling = None):
+    #cbsd - dict of cbsd values  
+    
+    #channels - List of avaiable channels from the SAS
+    
+    #pref - The prefered middle frequecy of the CBSD in hz
+
+    #get earfcn list 
+    earfcnList = getEarfcnList(cbsd)
+
+    for earfcn in earfcnList:
+
+        pref = EARFCNtoMHZ(earfcn) * consts.Hz
+        low = False
+        high = False
+        setList = []
+        
+        for channel in channels:
+            if channel['channelType'] == 'GAA':
+                lowFreq = pref - consts.TEN_MHz
+                if (lowFreq) >= channel['frequencyRange']['lowFrequency'] and (lowFreq) <= channel['frequencyRange']['highFrequency']:
+
+                    low = True
+
+                    lowChannelEirp = channel['maxEirp']
+                highFreq = pref + consts.TEN_MHz
+                if (highFreq) >= channel['frequencyRange']['lowFrequency'] and (highFreq) <= channel['frequencyRange']['highFrequency']:
+
+                    high = True
+
+                    highChannelEirp = channel['maxEirp']
+        
+                if low and high:
+                    #convert perf back to EARFCN
+                    if earfcn != cbsd['EARFCN'] :
+                        selected_earfcn = MHZtoEARFCN((pref/consts.Hz))
+                        setList.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':selected_earfcn})
+                    else:
+                        # update frequency on cbsd and database
+                        updateFreq(cbsd,earfcn)
+                    #ADD earfcn to setlist
+                    
+                   
+                    #what if one channels eirp is lower than the other?
+                    if lowChannelEirp <= highChannelEirp:
+                        maxEirp = lowChannelEirp
+                    else: 
+                        maxEirp = highChannelEirp
+                    if maxEirp < cbsd['maxEIRP']:
+                        txPower = maxEirp - cbsd['antennaGain']
+                        setList.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txPower})
+                    
+                    if bool(setList):
+                        setParameterValues(setList,cbsd)
+
+                    #exit for loops
+                    return
+
+    #if no spectrum is found for any channels on cbsd
+    if not low or not high:
+        print("no spectrum")
+        #log error to FeMS (Try to expand spectrum)
+        err.log_error_to_FeMS_alarm("CRITICAL",cbsd,400,consts.SPECTRUM)
+        #stop trying
+        Handle_Request(cbsd,False)
+
+#pass cbsd; Check if TxPower if txpower is already lower than SAS txpower leave alone
+def buildParameterList(parameterDict,cbsd):
+    #paramterDict is a dict of data_model_path : value
+    #returns a list containing all paramters needed to update the cell with new values
+    parameterList = []
+
+    for data_path in parameterDict:
+
+        if data_path == consts.TXPOWER_PATH and parameterDict[data_path] < cbsd['TxPower']:
+            parameterList.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':parameterDict[data_path]})
+
+        if data_path == consts.EARFCN_LIST:
+            parameterList.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':parameterDict[data_path]})
+
+    return parameterList
+
+
+def getEarfcnList(cbsd):
+    conn = dbConn(consts.DB)
+    
+    #collect all parameters from subscription table (update to json ajax send or add more value so there is no case of duplicated entires with same SN in apt_subscription table)
+    parameters = conn.select("SELECT parameter FROM apt_subscription WHERE SN = %s",cbsd['SN'])
+    
+    #convert to json
+    parameters = json.loads(parameters[0]['parameter'])
+    
+    #get eutra values(all possible earfcns provided by user in the subscription table)
+    eutra = parameters['EUTRACarrierARFCNDL']['value']
+    
+    #convert to list
+    earfcnList = list(eutra.split(","))
+
+    #convert all values to ints
+    earfcnList = [int(i) for i in earfcnList]
+        
+    #get current earfcn in use(currently assigned to the cell from SON) 
+    earfcn = conn.select("SELECT EARFCN FROM dp_device_info WHERE SN = %s",cbsd['SN'])
+    #add to the front of the list
+    earfcnList.insert(0,earfcn[0]['EARFCN'])
+
+    conn.dbClose()
+
+    return earfcnList
+
+#given an earfcn value and a cbsd; The fucntion will update the low and high freq in the dp_device_info database table
+def updateFreq(cbsd,earfcn):
+    conn = dbConn(consts.DB)
+    MHz = EARFCNtoMHZ(earfcn)
+    #update plus and minus
+    conn.update("UPDATE dp_device_info SET lowFrequency = %s, highFrequency = %s WHERE SN = %s",((MHz -10),(MHz + 10),cbsd['SN']))
+    #update cbsd 
+    cbsd['lowFrequency'] = MHz - 10
+    cbsd['highFrequency'] = MHz + 10
+def dp_deregister():
+    #Get cbsd SNs from FeMS    
+    # SNlist = request.form['json']
+
+    # #convert to json
+    # SN_json_dict = json.loads(SNlist)
+
+    # #select only the values
+    # SNlist = list(SN_json_dict.values())
+    # print(f"output of SNlist: {SNlist}")
+    SNlist = ['DCE994613163','DCE99461317E']
+
+    #collect all values from databse
+    conn = dbConn("ACS_V1_1")
+    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
+    cbsd_list = conn.select(sql,SNlist)
+
+    #Relinquish grant if the cbsd is currently granted to transmit
+    rel = []
+    print(cbsd_list)
+    for cbsd in cbsd_list:
+        if cbsd['grantID'] != None:
+            rel.append(cbsd)
+
+    if bool(rel):
+        Handle_Request(rel,consts.REL)
+    Handle_Request(cbsd_list,consts.DEREG)
+    return "success"
