@@ -84,7 +84,7 @@ def dp_deregister():
     
     rel = []
     dereg = []
-    print(cbsd_list)
+    # print(cbsd_list)
     for cbsd in cbsd_list:
         #Relinquish grant if the cbsd is currently granted to transmit
         if cbsd['grantID'] != None:
@@ -127,7 +127,7 @@ def heartbeat():
             if cbsd_list !=():
                 sasHandler.Handle_Request(cbsd_list,consts.HEART)
            
-            time.sleep(45)    
+            time.sleep(1)    
 
 def start():
     # conn = dbConn("ACS_V1_1")
@@ -136,13 +136,17 @@ def start():
     try:
         #if using args a comma for tuple is needed 
         thread = threading.Thread(target=registration, args=())
+        thread.name = 'registration-thread'
+        threading.Lock().acquire()
         thread.start()
     except Exception as e:
         print(f"Registration thread failed: {e}")
     try:
         #if using args a comma for tuple is needed 
-        thread = threading.Thread(target=heartbeat, args=())
-        thread.start()
+        hbthread = threading.Thread(target=heartbeat, args=())
+        hbthread.name = 'heartbeat-thread'
+        threading.Lock().acquire()
+        hbthread.start()
     except Exception as e:
         print(f"Heartbeat thread failed reason: {e}")
     runFlaskSever() 

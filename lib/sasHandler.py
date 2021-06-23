@@ -214,7 +214,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
             #nextCalling = consts.HEART
 
-        elif typeOfCalling == consts.HEART: 
+        elif typeOfCalling == consts.HEART or typeOfCalling == consts.SUB_HEART: 
             #TODO what if no reply... lost in the internet
             #TODO check if reply is recieved from all cbsds
             #TODO WHAT IF MEAS REPORT
@@ -237,7 +237,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #update transmist expire time
             update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + response['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
             conn.update(update_transmit_time)
-            conn.dbClose()
+            
 
             #collect SN from dp_device_info where cbsdId = $cbsdid
             if cbsd_list[i]['operationalState'] == 'GRANTED':
@@ -247,12 +247,15 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
                 if cbsd_list[i]['AdminState'] != 1:
                     pList = [consts.ADMIN_POWER_ON]
                     setParameterValues(pList,cbsd_list[i])
+
             # else:
             #     dp_deregister()
 
             #if response has new grantTime update databas
             if 'grantExpireTime' in response['heartbeatResponse'][i]:
                 updateGrantTime(response['heartbeatResponse'][i]['grantExpireTime'],cbsd_list[i]['SN'])
+
+            conn.dbClose()
 
         elif typeOfCalling == consts.DEREG:
             pass
@@ -300,9 +303,14 @@ def contactSAS(request,method):
 
     try:
         return requests.post(app.config['SAS']+method, 
-        cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
-        verify=('googleCerts/ca.cert'),
+        cert=('certs/client.cert','certs/client.key'),
+        verify=('certs/ca.cert'),
         json=request)
+
+
+        # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+        # verify=('googleCerts/ca.cert'),
+        # json=request)
 
         # timeout=5
         
@@ -563,9 +571,7 @@ def addErrorDict(errorCode,errorDict,cbsd):
 
 def selectFrequency(cbsd,channels,typeOfCalling = None):
     #cbsd - dict of cbsd values  
-    
     #channels - List of avaiable channels from the SAS
-    
     #pref - The prefered middle frequecy of the CBSD in hz
 
     #get earfcn list 
@@ -582,17 +588,17 @@ def selectFrequency(cbsd,channels,typeOfCalling = None):
             if channel['channelType'] == 'GAA':
                 lowFreq = pref - consts.TEN_MHz
                 if (lowFreq) >= channel['frequencyRange']['lowFrequency'] and (lowFreq) <= channel['frequencyRange']['highFrequency']:
-
                     low = True
 
-                    lowChannelEirp = channel['maxEirp']
+                    if 'maxEirp' in channel:
+                        lowChannelEirp = channel['maxEirp']
                 #refactor to plusbandWidth(cbsd) to get how many MHz to offset middle freq
                 highFreq = pref + consts.TEN_MHz
                 if (highFreq) >= channel['frequencyRange']['lowFrequency'] and (highFreq) <= channel['frequencyRange']['highFrequency']:
-
                     high = True
 
-                    highChannelEirp = channel['maxEirp']
+                    if 'maxEirp' in channel:
+                        highChannelEirp = channel['maxEirp']
                 if low and high:
                     #convert perf back to EARFCN
                     if earfcn != cbsd['EARFCN'] :
@@ -601,18 +607,17 @@ def selectFrequency(cbsd,channels,typeOfCalling = None):
                     else:
                         # update frequency on cbsd and database
                         updateFreq(cbsd,earfcn)
-                    #ADD earfcn to setlist
                     
-                   
+                    if 'maxEirp' in channel:
                     #what if one channels eirp is lower than the other?
-                    if lowChannelEirp <= highChannelEirp:
-                        maxEirp = lowChannelEirp
-                    else: 
-                        maxEirp = highChannelEirp
-                    if maxEirp < cbsd['maxEIRP']:
-                        txPower = maxEirp - cbsd['antennaGain']
-                        setList.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txPower})
-                    
+                        if lowChannelEirp <= highChannelEirp:
+                            maxEirp = lowChannelEirp
+                        else: 
+                            maxEirp = highChannelEirp
+                        if maxEirp < cbsd['maxEIRP']:
+                            txPower = maxEirp - cbsd['antennaGain']
+                            setList.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txPower})
+                        
                     if bool(setList):
                         setParameterValues(setList,cbsd)
 
@@ -665,7 +670,8 @@ def getEarfcnList(cbsd):
     #get current earfcn in use(currently assigned to the cell from SON) 
     earfcn = conn.select("SELECT EARFCN FROM dp_device_info WHERE SN = %s",cbsd['SN'])
     #add to the front of the list
-    earfcnList.insert(0,earfcn[0]['EARFCN'])
+    if earfcn not in earfcnList:
+        earfcnList.insert(0,earfcn[0]['EARFCN'])
 
     conn.dbClose()
 

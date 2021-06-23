@@ -8,6 +8,7 @@ REG = 'registration'
 SPECTRUM = 'spectrumInquiry'
 GRANT = 'grant'
 HEART = 'heartbeat'
+SUB_HEART = 'subsequent_heartbeat'
 DEREG = 'deregistration'
 REL = 'relinquishment'
 
