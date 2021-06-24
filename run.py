@@ -1,4 +1,3 @@
-from lib.thread import myThread
 from config.default import SAS
 import requests
 import sys
@@ -9,7 +8,6 @@ from lib import sasHandler
 from test import app, runFlaskSever
 import json
 import flask
-from flask import request
 import math
 import time
 from datetime import datetime
@@ -22,96 +20,14 @@ from flask_cors import CORS, cross_origin
 from itertools import filterfalse
 from requests.auth import HTTPDigestAuth
 
+#needed here to make routes work
+from lib import routes
+
 #init log class
 logger = logger()
 hbtimer = 0
 #create threadLock
 threadLock = threading.Lock()
-
-def test():
-    pass
-@app.route('/', methods=['GET'])
-def home():
-    return"<h1>Domain Proxy</h1><p>test version</p>"
-
-
-@app.route('/dp/v1/register', methods=['POST'])
-@cross_origin()
-def dp_register():
-    
-
-    
-    #Get cbsd SNs from FeMS    
-    SNlist = request.form['json']
-
-    #convert to json
-    SN_json_dict = json.loads(SNlist)
-
-    #select only the values
-    SNlist = list(SN_json_dict.values())
-    # print(SNlist)
-    # SNlist = ['DCE994613163','DCE99461317E']
-
-    #collect all values from databse
-    conn = dbConn("ACS_V1_1")
-    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
-    cbsd_list = conn.select(sql,SNlist)
-
-    for cbsd in cbsd_list:
-        if cbsd['sasStage'] != consts.REG:
-            cbsd['sasStage'] = consts.REG
-            conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REG,cbsd['SN']))
-
-    conn.dbClose()
-    threadLock.acquire()
-    sasHandler.Handle_Request(cbsd_list,consts.REG)
-    threadLock.release()
-
-    #thread.join()
-
-    return "success"
-
-@app.route('/dp/v1/test', methods=['POST'])
-@cross_origin()
-def dp_deregister():
-    #Get cbsd SNs from FeMS    
-    SNlist = request.form['json']
-
-    # #convert to json
-    SN_json_dict = json.loads(SNlist)
-
-    # #select only the values
-    SNlist = list(SN_json_dict.values())
-    # print(f"output of SNlist: {SNlist}")
-    # SNlist = ['DCE994613163','DCE99461317E']
-
-    #collect all values from databse
-    conn = dbConn("ACS_V1_1")
-    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
-    cbsd_list = conn.select(sql,SNlist)
-
-    
-    rel = []
-    dereg = []
-    # print(cbsd_list)
-    for cbsd in cbsd_list:
-        #Relinquish grant if the cbsd is currently granted to transmit
-        if cbsd['grantID'] != None:
-            conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REL,cbsd['SN']))
-            cbsd['sasStage'] = consts.REL
-            rel.append(cbsd)
-        else:
-            conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.DEREG,cbsd['SN']))
-            cbsd['sasStage'] = consts.DEREG
-            dereg.append(cbsd)
-
-    conn.dbClose()
-    if bool(rel):
-        sasHandler.Handle_Request(rel,consts.REL)
-        sasHandler.Handle_Request(rel,consts.DEREG)
-    if bool(dereg):
-        sasHandler.Handle_Request(dereg,consts.DEREG)
-    return "success"
 
 def registration():
     meth = [consts.REG,consts.SPECTRUM,consts.GRANT]
@@ -138,7 +54,7 @@ def heartbeat():
                 sasHandler.Handle_Request(cbsd_list,consts.HEART)
                
             threadLock.release()
-            time.sleep(20)    
+            time.sleep(3)    
 
 def start():
     # conn = dbConn("ACS_V1_1")
@@ -156,10 +72,7 @@ def start():
         hbthread = threading.Thread(target=heartbeat, args=())
         hbthread.name = 'heartbeat-thread'
         hbthread.start()
-        # print('hbtread start')
-        # hbthread = myThread(1,'hbthread',1)
-        # hbthread.start()
-        # print('hbtread end')
+
     except Exception as e:
         print(f"Heartbeat thread failed reason: {e}")
     runFlaskSever() 
@@ -395,11 +308,11 @@ def error_501():
     sasHandler.Handle_Response(cbsds, consts.ERR501,consts.HEART)
 
 
-# start()
+start()
 # error_501()
 # error_106()
 # test_dereg()
-powerOn()
+# powerOn()
 # getParameters()
 # sasSpecTest()
 # change_EIRP()
