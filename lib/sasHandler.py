@@ -427,7 +427,7 @@ def setParameterValues(parameterList,cbsd,typeOfCalling = None):
         # s.connect((cbsd['IPAddress'], 10500))
         print(f"connected to ip: {cbsd['IPAddress']}")
 
-        startTime = datetime.now()
+        
 
         #add perodic inform to 1 second 
         parameterList.append(consts.PERIODIC_ONE)
@@ -483,16 +483,23 @@ def setParameterValues(parameterList,cbsd,typeOfCalling = None):
         #check if conncetion if accepted by the cell
         if response.status_code == 200:
             #wait until parameters are set
+            startTime = datetime.now()
+            logging.info(f"startTime: {startTime}")
             settingParameters = True
             while settingParameters:
                 # logging.info(f"Setting Parameters for {cbsd['SN']}")
+                endTime = datetime.now()
+                # logging.info(f"before query: {endTime}")
                 database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",cbsd['SN'])
+                # logging.info(f"after query: {endTime}")
                 
                 if database == ():
                     logging.info(f"Paramters set successfully for {cbsd['SN']}")
                     settingParameters = False
                 else:
-                    time.sleep(.5)
+                    time.sleep(1)
+                    endTime = datetime.now()
+                    logging.info(f"end time in loop: {endTime}")
         else:
             # remove action from action queue
             conn.update("DELETE FROM apt_action_queue WHERE SN = 'DCE994613163'")

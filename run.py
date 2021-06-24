@@ -1,3 +1,4 @@
+from lib.thread import myThread
 from config.default import SAS
 import requests
 import sys
@@ -24,7 +25,8 @@ from requests.auth import HTTPDigestAuth
 #init log class
 logger = logger()
 hbtimer = 0
-
+#create threadLock
+threadLock = threading.Lock()
 
 def test():
     pass
@@ -36,6 +38,9 @@ def home():
 @app.route('/dp/v1/register', methods=['POST'])
 @cross_origin()
 def dp_register():
+    
+
+    
     #Get cbsd SNs from FeMS    
     SNlist = request.form['json']
 
@@ -58,7 +63,11 @@ def dp_register():
             conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REG,cbsd['SN']))
 
     conn.dbClose()
+    threadLock.acquire()
     sasHandler.Handle_Request(cbsd_list,consts.REG)
+    threadLock.release()
+
+    #thread.join()
 
     return "success"
 
@@ -120,14 +129,16 @@ def registration():
 
 def heartbeat():
         while True:
+            threadLock.acquire()
             print("heartbeat")
             conn = dbConn("ACS_V1_1")
             cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.HEART)
             conn.dbClose()
             if cbsd_list !=():
                 sasHandler.Handle_Request(cbsd_list,consts.HEART)
-           
-            time.sleep(1)    
+               
+            threadLock.release()
+            time.sleep(20)    
 
 def start():
     # conn = dbConn("ACS_V1_1")
@@ -137,7 +148,6 @@ def start():
         #if using args a comma for tuple is needed 
         thread = threading.Thread(target=registration, args=())
         thread.name = 'registration-thread'
-        threading.Lock().acquire()
         thread.start()
     except Exception as e:
         print(f"Registration thread failed: {e}")
@@ -145,8 +155,11 @@ def start():
         #if using args a comma for tuple is needed 
         hbthread = threading.Thread(target=heartbeat, args=())
         hbthread.name = 'heartbeat-thread'
-        threading.Lock().acquire()
         hbthread.start()
+        # print('hbtread start')
+        # hbthread = myThread(1,'hbthread',1)
+        # hbthread.start()
+        # print('hbtread end')
     except Exception as e:
         print(f"Heartbeat thread failed reason: {e}")
     runFlaskSever() 
@@ -362,7 +375,7 @@ def powerOn():
     for c in cbsd:
         # response = requests.get(c['connreqURL'], auth= HTTPDigestAuth(c['connreqUname'],c['connreqPass']))
         # print(response)
-        pList.append(consts.ADMIN_POWER_OFF)
+        pList.append(consts.ADMIN_POWER_ON)
         # pList.append(consts.ADMIN_POWER_ON)
         sasHandler.setParameterValues(pList,c)
 
@@ -382,11 +395,11 @@ def error_501():
     sasHandler.Handle_Response(cbsds, consts.ERR501,consts.HEART)
 
 
-start()
+# start()
 # error_501()
 # error_106()
 # test_dereg()
-# powerOn()
+powerOn()
 # getParameters()
 # sasSpecTest()
 # change_EIRP()
