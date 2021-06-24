@@ -1,3 +1,4 @@
+from lib.thread import lockedThread
 from config.default import SAS
 import requests
 import sys
@@ -40,20 +41,12 @@ def registration():
         conn.dbClose()
         if cbsd_list !=():
             sasHandler.Handle_Request(cbsd_list, consts.REG)
-
         time.sleep(30)
 
 def heartbeat():
+        hb = lockedThread("hbThread")
         while True:
-            threadLock.acquire()
-            print("heartbeat")
-            conn = dbConn("ACS_V1_1")
-            cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.HEART)
-            conn.dbClose()
-            if cbsd_list !=():
-                sasHandler.Handle_Request(cbsd_list,consts.HEART)
-               
-            threadLock.release()
+            hb.hbThread()
             time.sleep(3)    
 
 def start():
