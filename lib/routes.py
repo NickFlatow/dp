@@ -97,9 +97,13 @@ def dp_deregister():
             dereg.append(cbsd)
 
     conn.dbClose()
+
+    deregistrationThread = lockedThread("FeMS_de-reg_thread")
+    
     if bool(rel):
-        sasHandler.Handle_Request(rel,consts.REL)
-        sasHandler.Handle_Request(rel,consts.DEREG)
+        deregistrationThread.run(rel,consts.REL)
+        deregistrationThread.run(rel,consts.DEREG)
     if bool(dereg):
-        sasHandler.Handle_Request(dereg,consts.DEREG)
+        deregistrationThread.run(dereg,consts.DEREG)
+    
     return "success"
