@@ -303,15 +303,13 @@ def contactSAS(request,method):
 
     try:
         return requests.post(app.config['SAS']+method, 
-        cert=('certs/client.cert','certs/client.key'),
-        verify=('certs/ca.cert'),
+        cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+        verify=('googleCerts/ca.cert'),
         json=request)
 
-
-        # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
-        # verify=('googleCerts/ca.cert'),
+        # cert=('certs/client.cert','certs/client.key'),
+        # verify=('certs/ca.cert'),
         # json=request)
-
         # timeout=5
         
     except Exception as e:

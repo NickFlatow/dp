@@ -76,8 +76,8 @@ def errorModule(errorDict,typeOfCalling):
                 conn = dbConn(consts.DB)
                 c = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",cbsd['SN'])
                 conn.dbClose()
-                if c['sasStage'] != consts.REL or c['sasStage'] != consts.DEREG:
-                    retry.append(c)
+                if c[0]['sasStage'] != consts.REL or c[0]['sasStage'] != consts.DEREG:
+                    retry.append(c[0])
 
             if bool(c):
                 sasHandler.Handle_Request(retry,typeOfCalling)

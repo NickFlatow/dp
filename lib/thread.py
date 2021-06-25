@@ -28,3 +28,10 @@ class lockedThread (threading.Thread):
       if cbsd_list !=():
             sasHandler.Handle_Request(cbsd_list,consts.HEART)
       threadLock.release()
+   def regThread(self):
+      print("registration")
+      conn = dbConn("ACS_V1_1")
+      cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.REG)
+      conn.dbClose()
+      if cbsd_list !=():
+         sasHandler.Handle_Request(cbsd_list, consts.REG)

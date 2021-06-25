@@ -32,22 +32,16 @@ threadLock = threading.Lock()
 
 def registration():
     meth = [consts.REG,consts.SPECTRUM,consts.GRANT]
-
+    reg = lockedThread("regThread")
     while True:
-        # for m in meth:
-        print("registration")
-        conn = dbConn("ACS_V1_1")
-        cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.PROV_REG)
-        conn.dbClose()
-        if cbsd_list !=():
-            sasHandler.Handle_Request(cbsd_list, consts.REG)
+        reg.regThread()
         time.sleep(30)
 
 def heartbeat():
         hb = lockedThread("hbThread")
         while True:
             hb.hbThread()
-            time.sleep(3)    
+            time.sleep(30)    
 
 def start():
     # conn = dbConn("ACS_V1_1")

@@ -26,17 +26,12 @@ def dp_register():
     SNlist = request.form['json']
 
     #convert to json
-    SN_json_dict = json.loads(SNlist)
-
-    #select only the values
-    SNlist = list(SN_json_dict.values())
-    # print(SNlist)
-    # SNlist = ['DCE994613163','DCE99461317E']
+    SNlist = json.loads(SNlist)
 
     #collect all values from databse
     conn = dbConn("ACS_V1_1")
-    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
-    cbsd_list = conn.select(sql,SNlist)
+    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist['snDict'])))
+    cbsd_list = conn.select(sql,SNlist['snDict'])
 
     for cbsd in cbsd_list:
         if cbsd['sasStage'] != consts.REG:
@@ -46,19 +41,9 @@ def dp_register():
     conn.dbClose()
 
     #create thread with threadLock so we do not get interference from heartbeat thread.
-    # registartionThread = threadLock('FeMS_reg_thread')
     registrationThread = lockedThread("FeMS_reg_thread")
     
     registrationThread.run(cbsd_list,consts.REG)
-    
-    # registartionThread.join()
-    # threadLock.acquire()
-    # sasHandler.Handle_Request(cbsd_list,consts.REG)
-    # threadLock.release()
-    
-    for thread in threading.enumerate(): 
-        print(thread.name)
-    #thread.join()
 
     return "success"
 
@@ -68,18 +53,14 @@ def dp_deregister():
     #Get cbsd SNs from FeMS    
     SNlist = request.form['json']
 
-    # #convert to json
-    SN_json_dict = json.loads(SNlist)
+    #convert to json
+    SNlist = json.loads(SNlist)
 
-    # #select only the values
-    SNlist = list(SN_json_dict.values())
-    # print(f"output of SNlist: {SNlist}")
-    # SNlist = ['DCE994613163','DCE99461317E']
-
+    print(SNlist['snDict'])
     #collect all values from databse
     conn = dbConn("ACS_V1_1")
-    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
-    cbsd_list = conn.select(sql,SNlist)
+    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist['snDict'])))
+    cbsd_list = conn.select(sql,SNlist['snDict'])
 
     
     rel = []
