@@ -15,16 +15,16 @@ class lockedThread (threading.Thread):
    def run(self,cbsds,typeOfCalling):
       logging.info("Starting thread" + self.name)
       # Get lock to synchronize threads
-      # threadLock.acquire()
+      threadLock.acquire()
       sasHandler.Handle_Request(cbsds,typeOfCalling)
       # Free lock to release next thread
-      # threadLock.release()
+      threadLock.release()
    def hbThread(self):
-      # threadLock.acquire()
+      threadLock.acquire()
       print("heartbeat")
       conn = dbConn("ACS_V1_1")
       cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.HEART)
       conn.dbClose()
       if cbsd_list !=():
             sasHandler.Handle_Request(cbsd_list,consts.HEART)
-      # threadLock.release()
+      threadLock.release()
