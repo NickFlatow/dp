@@ -70,6 +70,7 @@ def errorModule(errorDict,typeOfCalling):
                 log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
 
             time.sleep(30)
+
             #were there any state changes to the cbsd while we were sleeping
             for cbsd in errorDict[errorCode]: 
                 #update cbsd from sas
@@ -79,7 +80,7 @@ def errorModule(errorDict,typeOfCalling):
                 if c[0]['sasStage'] != consts.REL or c[0]['sasStage'] != consts.DEREG:
                     retry.append(c[0])
 
-            if bool(c):
+            if bool(retry):
                 sasHandler.Handle_Request(retry,typeOfCalling)
 
         elif errorCode == 400:
