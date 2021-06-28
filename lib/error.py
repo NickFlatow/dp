@@ -77,7 +77,7 @@ def errorModule(errorDict,typeOfCalling):
                 conn = dbConn(consts.DB)
                 c = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",cbsd['SN'])
                 conn.dbClose()
-                if c[0]['sasStage'] != consts.REL or c[0]['sasStage'] != consts.DEREG:
+                if c[0]['sasStage'] != consts.REL and c[0]['sasStage'] != consts.DEREG:
                     retry.append(c[0])
 
             if bool(retry):

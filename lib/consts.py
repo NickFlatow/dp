@@ -472,12 +472,6 @@ ERR106 = {
                 "responseCode": 106,
                 "responseMessage": "NOT_PROCESSED"
             }
-        },
-        {
-            "response": {
-                "responseCode": 106,
-                "responseMessage": "NOT_PROCESSED"
-            }
         }
     ]
 }
