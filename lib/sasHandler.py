@@ -478,6 +478,7 @@ def setParameterValues(parameterList,cbsd,typeOfCalling = None):
         #send connection request to cell
         response = requests.get(cbsd['connreqURL'], auth= HTTPDigestAuth(cbsd['connreqUname'],cbsd['connreqPass']))
         
+        startTime = datetime.now()
         #check if conncetion if accepted by the cell
         if response.status_code == 200:
             #wait until parameters are set
@@ -491,7 +492,7 @@ def setParameterValues(parameterList,cbsd,typeOfCalling = None):
                 database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",cbsd['SN'])
                 # logging.info(f"after query: {endTime}")
                 
-                if database == ():
+                if database == (): 
                     logging.info(f"Paramters set successfully for {cbsd['SN']}")
                     settingParameters = False
                 else:
