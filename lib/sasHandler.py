@@ -264,34 +264,11 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
                     #power off ASAP
                     setParameterValues(setList,cbsd_list[i])
 
-            # #update operational state to granted/ what if operational state is already authorized
-            # if not expired(response['heartbeatResponse'][i]['transmitExpireTime']):
-            #     update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
-            #     conn.update(update_operational_state)
-            # elif cbsd_list[i]['AdminState'] == 1:
-            #         #if the heartbeat is expired 
-            #         setList  = [consts.ADMIN_POWER_OFF]
-            #         #power off ASAP
-            #         setParameterValues(setList,cbsd_list[i])
-
 
             #update transmist expire time
             update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + response['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
             conn.update(update_transmit_time)
             
-
-            # #collect SN from dp_device_info where cbsdId = $cbsdid
-            # if cbsd_list[i]['operationalState'] == 'GRANTED':
-            #     print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
-            #     # turn on RF in cell
-            #     # cbsdAction(cbsd_list[i]['SN'],"RF_ON",str(datetime.now()))
-            #     if cbsd_list[i]['AdminState'] != 1:
-            #         pList = [consts.ADMIN_POWER_ON]
-            #         setParameterValues(pList,cbsd_list[i])
-
-            # else:
-            #     dp_deregister()
-
             #if response has new grantTime update databas
             if 'grantExpireTime' in response['heartbeatResponse'][i]:
                 updateGrantTime(response['heartbeatResponse'][i]['grantExpireTime'],cbsd_list[i]['SN'])
@@ -454,17 +431,6 @@ def getNextCalling(typeOfCalling):
         return consts.HEART
     else:
         return False
-
-    # if typeOfCalling == consts.HEART:
-    #     return False
-    # if typeOfCalling == consts.SUB_HEART:
-    #     return False
-    # if typeOfCalling == consts.REL:
-    #     return False
-    # if typeOfCalling == consts.DEREG:
-    #     return False
-    # if typeOfCalling == False:
-    #     return False
 
 def setParameterValues(parameterList,cbsd,typeOfCalling = None):
     #setParamterValues will take in a parameterList and a cbsd.

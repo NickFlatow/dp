@@ -27,12 +27,12 @@ def heartbeat():
         hb = lockedThread("hbThread")
         while True:
             hb.hbThread()
-            time.sleep(5)    
+            time.sleep(30)    
 
 def start():
-    conn = dbConn("ACS_V1_1")
-    conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE maxEIRP = '22'")
-    conn.dbClose()
+    # conn = dbConn("ACS_V1_1")
+    # conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE maxEIRP = '22'")
+    # conn.dbClose()
     try:
         #if using args a comma for tuple is needed 
         thread = threading.Thread(target=registration, args=())
