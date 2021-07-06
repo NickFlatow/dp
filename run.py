@@ -19,14 +19,14 @@ def registration():
     meth = [consts.REG,consts.SPECTRUM,consts.GRANT]
     reg = lockedThread("regThread")
     while True:
-        reg.regThread()
+        reg.regThread() 
         time.sleep(30)
 
 def heartbeat():
         hb = lockedThread("hbThread")
         while True:
             hb.hbThread()
-            time.sleep(30)    
+            time.sleep(5)    
 
 def start():
     # conn = dbConn("ACS_V1_1")
