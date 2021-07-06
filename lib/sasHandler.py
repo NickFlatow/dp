@@ -17,7 +17,7 @@ def Handle_Request(cbsd_list,typeOfCalling):
     '''
     handles all requests sent to the SAS
     '''
-    if typeOfCalling == consts.HEART or consts.SUB_HEART:
+    if typeOfCalling == consts.HEART or typeOfCalling == consts.SUB_HEART:
         requestMessageType = str(consts.HEART + "Request")
     else:
         requestMessageType = str(typeOfCalling +"Request")
@@ -74,7 +74,7 @@ def Handle_Request(cbsd_list,typeOfCalling):
                     "cbsdId":cbsd['cbsdID'],
                     "grantId":cbsd['grantID'],
                     "operationState":'GRANTED',
-                    "grantRenew":'False'
+                    "grantRenew":False
                 }
             )
 
@@ -161,7 +161,7 @@ def Handle_Request(cbsd_list,typeOfCalling):
 
 def Handle_Response(cbsd_list,response,typeOfCalling):
     #HTTP address that is in place e.g.(reg,spectrum,grant heartbeat)
-    if typeOfCalling == consts.HEART or consts.SUB_HEART:
+    if typeOfCalling == consts.HEART or typeOfCalling == consts.SUB_HEART:
         resposneMessageType = str(consts.HEART + "Response")
     else:
         resposneMessageType = str(typeOfCalling +"Response")
@@ -229,13 +229,25 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #nextCalling = consts.HEART
 
         elif typeOfCalling == consts.HEART:
-            if not expired(response['heartbeatResponse'][i]['transmitExpireTime']) and cbsd_list[i]['AdminState'] != 1:
-                pass 
-            #turn on cbsd
 
-                #swich from granted to auth state
+            conn = dbConn("ACS_V1_1")
+            conn.update("UPDATE dp_device_info SET operationalState = 'AUTHORIZED' WHERE SN = %s",cbsd_list[i]['SN'])
+            #if the transmiteExpireTime is not expired and the AdminState of cbsd is off
+            if not expired(response['heartbeatResponse'][i]['transmitExpireTime']) and cbsd_list[i]['AdminState'] != 1:
+                print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
+                #then turn on cbsd
+                pList = [consts.ADMIN_POWER_ON]
+                setParameterValues(pList,cbsd_list[i])
+                #update operationalState
+                
 
             #update transmitExpireTime
+            update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + response['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
+            conn.update(update_transmit_time)
+
+            #update sasStage to sub_heart
+            
+            conn.dbClose()
         
         elif typeOfCalling == consts.SUB_HEART: 
             #TODO what if no reply... lost in the internet
@@ -246,15 +258,21 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
             conn = dbConn("ACS_V1_1")
             
-            #update operational state to granted/ what if operational state is already authorized
-            if not expired(response['heartbeatResponse'][i]['transmitExpireTime']):
-                update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
-                conn.update(update_operational_state)
-            elif cbsd_list[i]['AdminState'] == 1:
+            if expired(response['heartbeatResponse'][i]['transmitExpireTime']) and cbsd_list[i]['AdminState'] == 1:
                     #if the heartbeat is expired 
                     setList  = [consts.ADMIN_POWER_OFF]
                     #power off ASAP
                     setParameterValues(setList,cbsd_list[i])
+
+            # #update operational state to granted/ what if operational state is already authorized
+            # if not expired(response['heartbeatResponse'][i]['transmitExpireTime']):
+            #     update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
+            #     conn.update(update_operational_state)
+            # elif cbsd_list[i]['AdminState'] == 1:
+            #         #if the heartbeat is expired 
+            #         setList  = [consts.ADMIN_POWER_OFF]
+            #         #power off ASAP
+            #         setParameterValues(setList,cbsd_list[i])
 
 
             #update transmist expire time
@@ -262,14 +280,14 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             conn.update(update_transmit_time)
             
 
-            #collect SN from dp_device_info where cbsdId = $cbsdid
-            if cbsd_list[i]['operationalState'] == 'GRANTED':
-                print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
-                # turn on RF in cell
-                # cbsdAction(cbsd_list[i]['SN'],"RF_ON",str(datetime.now()))
-                if cbsd_list[i]['AdminState'] != 1:
-                    pList = [consts.ADMIN_POWER_ON]
-                    setParameterValues(pList,cbsd_list[i])
+            # #collect SN from dp_device_info where cbsdId = $cbsdid
+            # if cbsd_list[i]['operationalState'] == 'GRANTED':
+            #     print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
+            #     # turn on RF in cell
+            #     # cbsdAction(cbsd_list[i]['SN'],"RF_ON",str(datetime.now()))
+            #     if cbsd_list[i]['AdminState'] != 1:
+            #         pList = [consts.ADMIN_POWER_ON]
+            #         setParameterValues(pList,cbsd_list[i])
 
             # else:
             #     dp_deregister()
@@ -300,6 +318,14 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
         cbsd_list[:] = [cbsd for cbsd in cbsd_list if not hasError(cbsd,errorList)]
 
     if bool(cbsd_list):
+        #update sasStage for subheart
+        if typeOfCalling == consts.HEART:
+            conn = dbConn(consts.DB)
+            for cbsd in cbsd_list:
+                conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.SUB_HEART,cbsd['SN']))
+            conn.dbClose()
+
+
         nextCalling = getNextCalling(typeOfCalling)
         #should rather make cbsd a class
         #update cbsd list properties
@@ -323,6 +349,9 @@ def contactSAS(request,method):
     # request - json array to pass to SAS
     # method - which method SAS you would like to contact registration, spectrum, grant, heartbeat 
     # logger.info(f"{app.config['SAS']}  {method}")
+
+    if method == consts.SUB_HEART:
+        method = consts.HEART
 
     try:
         return requests.post(app.config['SAS']+method, 
@@ -423,16 +452,19 @@ def getNextCalling(typeOfCalling):
         return consts.GRANT
     if typeOfCalling == consts.GRANT:
         return consts.HEART
-    if typeOfCalling == consts.HEART:
-        return consts.SUB_HEART
-    if typeOfCalling == consts.SUB_HEART:
+    else:
         return False
-    if typeOfCalling == consts.REL:
-        return False
-    if typeOfCalling == consts.DEREG:
-        return False
-    if typeOfCalling == False:
-        return False
+
+    # if typeOfCalling == consts.HEART:
+    #     return False
+    # if typeOfCalling == consts.SUB_HEART:
+    #     return False
+    # if typeOfCalling == consts.REL:
+    #     return False
+    # if typeOfCalling == consts.DEREG:
+    #     return False
+    # if typeOfCalling == False:
+    #     return False
 
 def setParameterValues(parameterList,cbsd,typeOfCalling = None):
     #setParamterValues will take in a parameterList and a cbsd.

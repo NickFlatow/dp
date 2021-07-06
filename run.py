@@ -1,3 +1,4 @@
+from lib.dbConn import dbConn
 from lib.thread import lockedThread
 from config.default import SAS
 from lib.log import logger
@@ -29,9 +30,9 @@ def heartbeat():
             time.sleep(5)    
 
 def start():
-    # conn = dbConn("ACS_V1_1")
-    # conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE fccID = '2AQ68T99B226'")
-    # conn.dbClose()
+    conn = dbConn("ACS_V1_1")
+    conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE maxEIRP = '22'")
+    conn.dbClose()
     try:
         #if using args a comma for tuple is needed 
         thread = threading.Thread(target=registration, args=())

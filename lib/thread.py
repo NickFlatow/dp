@@ -23,10 +23,10 @@ class lockedThread (threading.Thread):
       threadLock.acquire()
       print("heartbeat")
       conn = dbConn("ACS_V1_1")
-      cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.HEART)
+      cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.SUB_HEART)
       conn.dbClose()
       if cbsd_list !=():
-            sasHandler.Handle_Request(cbsd_list,consts.HEART)
+            sasHandler.Handle_Request(cbsd_list,consts.SUB_HEART)
       threadLock.release()
    def regThread(self):
       print("registration")
