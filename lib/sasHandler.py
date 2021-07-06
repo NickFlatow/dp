@@ -15,9 +15,12 @@ from test import app
 
 def Handle_Request(cbsd_list,typeOfCalling):
     '''
-    handles all requests send to SAS
+    handles all requests sent to the SAS
     '''
-    requestMessageType = str(typeOfCalling +"Request")
+    if typeOfCalling == consts.HEART or consts.SUB_HEART:
+        requestMessageType = str(consts.HEART + "Request")
+    else:
+        requestMessageType = str(typeOfCalling +"Request")
 
     req = {requestMessageType:[]}
 
@@ -66,12 +69,20 @@ def Handle_Request(cbsd_list,typeOfCalling):
                     }
                 )
         elif typeOfCalling == consts.HEART:
+            req[requestMessageType].append(
+                {
+                    "cbsdId":cbsd['cbsdID'],
+                    "grantId":cbsd['grantID'],
+                    "operationState":'GRANTED',
+                    "grantRenew":'False'
+                }
+            )
+
+
+        elif typeOfCalling == consts.SUB_HEART:
 
             grantRenew = False
            
-            
-            # logging.info(f"GRANT EXPIRE TIME: {cbsd['grantExpireTime']}")
-            
             #check if grant is expired
             if expired(cbsd['grantExpireTime'],True):
                 grantRenew = True 
@@ -150,7 +161,10 @@ def Handle_Request(cbsd_list,typeOfCalling):
 
 def Handle_Response(cbsd_list,response,typeOfCalling):
     #HTTP address that is in place e.g.(reg,spectrum,grant heartbeat)
-    resposneMessageType = str(typeOfCalling +"Response")
+    if typeOfCalling == consts.HEART or consts.SUB_HEART:
+        resposneMessageType = str(consts.HEART + "Response")
+    else:
+        resposneMessageType = str(typeOfCalling +"Response")
     
  
     #check if any cbsds need to be turned off
@@ -214,7 +228,16 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
             #nextCalling = consts.HEART
 
-        elif typeOfCalling == consts.HEART or typeOfCalling == consts.SUB_HEART: 
+        elif typeOfCalling == consts.HEART:
+            if not expired(response['heartbeatResponse'][i]['transmitExpireTime']) and cbsd_list[i]['AdminState'] != 1:
+                pass 
+            #turn on cbsd
+
+                #swich from granted to auth state
+
+            #update transmitExpireTime
+        
+        elif typeOfCalling == consts.SUB_HEART: 
             #TODO what if no reply... lost in the internet
             #TODO check if reply is recieved from all cbsds
             #TODO WHAT IF MEAS REPORT
@@ -303,13 +326,13 @@ def contactSAS(request,method):
 
     try:
         return requests.post(app.config['SAS']+method, 
-        cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
-        verify=('googleCerts/ca.cert'),
-        json=request)
-
-        # cert=('certs/client.cert','certs/client.key'),
-        # verify=('certs/ca.cert'),
+        # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+        # verify=('googleCerts/ca.cert'),
         # json=request)
+
+        cert=('certs/client.cert','certs/client.key'),
+        verify=('certs/ca.cert'),
+        json=request)
         # timeout=5
         
     except Exception as e:
@@ -401,6 +424,8 @@ def getNextCalling(typeOfCalling):
     if typeOfCalling == consts.GRANT:
         return consts.HEART
     if typeOfCalling == consts.HEART:
+        return consts.SUB_HEART
+    if typeOfCalling == consts.SUB_HEART:
         return False
     if typeOfCalling == consts.REL:
         return False
@@ -418,6 +443,7 @@ def setParameterValues(parameterList,cbsd,typeOfCalling = None):
     #cbsd is  dict of current values on the cell 
 
     #list of parameters to set on the cell 
+    startTime = datetime.now()
     setList = []
     try:
 
@@ -478,7 +504,7 @@ def setParameterValues(parameterList,cbsd,typeOfCalling = None):
         #send connection request to cell
         response = requests.get(cbsd['connreqURL'], auth= HTTPDigestAuth(cbsd['connreqUname'],cbsd['connreqPass']))
         
-        startTime = datetime.now()
+        
         #check if conncetion if accepted by the cell
         if response.status_code == 200:
             #wait until parameters are set
