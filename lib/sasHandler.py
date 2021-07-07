@@ -147,14 +147,15 @@ def Handle_Request(cbsd_list,typeOfCalling):
             conn.dbClose()
 
     dpLogger.log_json(req,len(cbsd_list))
-    SASresponse = contactSAS(req,typeOfCalling)
-    # SASresponse = False
+    # SASresponse = contactSAS(req,typeOfCalling)
+    SASresponse = True
 
     if SASresponse != False:
         conn = dbConn("ACS_V1_1")
         updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",typeOfCalling)
         conn.dbClose()
-        Handle_Response(updated_cbsd_list,SASresponse.json(),typeOfCalling)
+        Handle_Response(updated_cbsd_list,consts.GR,typeOfCalling)
+        # Handle_Response(updated_cbsd_list,SASresponse.json(),typeOfCalling)
 
     #if we get no reply from sas and we are in the initial heartbeat stage switch to subsequent heartbeat and keep trying
     elif SASresponse == False and typeOfCalling == consts.HEART:
@@ -182,6 +183,8 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
     
     for i in range(len(response[resposneMessageType])):
 
+        print(response[resposneMessageType][i])
+
         #check for errors in response
         if response[resposneMessageType][i]['response']['responseCode'] != 0:
 
@@ -192,7 +195,6 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
                     setList  = [consts.ADMIN_POWER_OFF]
                     #power off ASAP
                     setParameterValues(setList,cbsd_list[i])
-
 
             #include resposne when sending cbsd to error module
             cbsd_list[i]['response'] = response[resposneMessageType][i]

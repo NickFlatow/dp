@@ -444,26 +444,64 @@ GRANT_EIRP = {
     ]
 }
 
-HB501 = {  
-   "heartbeatResponse":[  
-      {  
-         "cbsdId":"<SAS-assigned device ID>",
-         "grantId":"<SAS-assigned grant ID>",
-         "transmitExpireTime":str(datetime.now()),
-         "operationParam":{
-            "maxEirp":11,
-            "operationFrequencyRange":{
-               "lowFrequency":3660000000,
-               "highFrequency":3680000000
+# HB500 = {  
+#    "heartbeatResponse":[  
+#       {  
+#          "cbsdId":"2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982",
+#          "grantId":"2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982/1750595678109855402",
+#          "transmitExpireTime":str(datetime.now()),
+#          "operationParam":{
+#             "maxEirp":25,
+#             "operationFrequencyRange":{
+#                "lowFrequency":3660000000,
+#                "highFrequency":3680000000
+#             }
+#          },
+#          "response":{  
+#             "responseCode":500,
+#             "responseMessage":"TERMINATED_GRANT"
+#          }
+#       }
+#    ]
+# }
+
+GR = {    
+  "grantResponse": [
+        {
+            "cbsdId": "2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982",
+            "channelType": "GAA",
+            "grantExpireTime": "2022-07-07T20:15:30Z",
+            "grantId": "2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982/4386536123950778856",
+            "heartbeatInterval": 60,
+            "response": {
+                "responseCode": 0
             }
-         },
-         "response":{  
-            "responseCode":500,
-            "responseMessage":"TERMINATED_GRANT"
-         }
-      }
-   ]
+        }
+      ]
+    }
+
+HB500 = {  
+    "heartbeatResponse": [
+        {
+            "cbsdId": "2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982",
+            "grantId": "2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982/14299188259055949944",
+            "heartbeatInterval": 60,
+            "operationParam": {
+                "maxEirp": 19,
+                "operationFrequencyRange": {
+                    "highFrequency": 3655000000,
+                    "lowFrequency": 3635000000
+                }
+            },
+            "response": {
+                "responseCode": 500,
+                "responseMessage": "TERMINATED_GRANT"
+            },
+            # "transmitExpireTime": "2021-07-07T20:15:00Z"
+        }
+    ]
 }
+
 
 ERR106 = {
     "grantResponse": [

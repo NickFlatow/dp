@@ -67,5 +67,13 @@ def start():
     runFlaskSever() 
 
 
-start()
+def err500():
+    conn = dbConn(consts.DB)
+    cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = 'DCE994613163'")
+    sasHandler.Handle_Response(cbsd,consts.HB500,consts.SUB_HEART)
+
+# start()
+err500()
+
+
 
