@@ -156,8 +156,13 @@ def Handle_Request(cbsd_list,typeOfCalling):
         conn.dbClose()
         Handle_Response(updated_cbsd_list,SASresponse.json(),typeOfCalling)
 
-    # if SASresponse != False:
-    #     Handle_Response(cbsd_list,SASresponse,typeOfCalling)
+    #if we get no reply from sas and we are in the initial heartbeat stage switch to subsequent heartbeat and keep trying
+    elif SASresponse == False and typeOfCalling == consts.HEART:
+        conn = dbConn(consts.DB)
+        for cbsd in cbsd_list:
+            cbsd['sasStage'] = consts.SUB_HEART
+            conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.SUB_HEART,cbsd['SN']))
+        conn.dbClose()
 
 def Handle_Response(cbsd_list,response,typeOfCalling):
     #HTTP address that is in place e.g.(reg,spectrum,grant heartbeat)
@@ -231,51 +236,12 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #nextCalling = consts.HEART
 
         elif typeOfCalling == consts.HEART:
+           
+           heartbeat(cbsd_list[i],response['heartbeatResponse'][i])
 
-            conn = dbConn("ACS_V1_1")
-            conn.update("UPDATE dp_device_info SET operationalState = 'AUTHORIZED' WHERE SN = %s",cbsd_list[i]['SN'])
-            #if the transmiteExpireTime is not expired and the AdminState of cbsd is off
-
-                
-
-            #update transmitExpireTime
-            update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + response['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
-            conn.update(update_transmit_time)
-            
-            conn.dbClose()
-        
         elif typeOfCalling == consts.SUB_HEART: 
 
-            def heartbeat(cbsd):
-                conn = dbConn("ACS_V1_1")
-
-                #if opState is granted switch to authorized otherwise stay authorized
-                update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
-                conn.update(update_operational_state)
-
-                if not expired(response['heartbeatResponse'][i]['transmitExpireTime']) and cbsd_list[i]['AdminState'] != 1:
-                    print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
-                    #then turn on cbsd
-                    pList = [consts.ADMIN_POWER_ON]
-                    setParameterValues(pList,cbsd_list[i])
-                    #update operationalState
-                
-                if expired(response['heartbeatResponse'][i]['transmitExpireTime']) and cbsd_list[i]['AdminState'] == 1:
-                    #if the heartbeat is expired 
-                    setList  = [consts.ADMIN_POWER_OFF]
-                    #power off ASAP
-                    setParameterValues(setList,cbsd_list[i])
-
-
-                #update transmist expire time
-                update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + response['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
-                conn.update(update_transmit_time)
-                
-                #if response has new grantTime update database
-                if 'grantExpireTime' in response['heartbeatResponse'][i]:
-                    updateGrantTime(response['heartbeatResponse'][i]['grantExpireTime'],cbsd_list[i]['SN'])
-
-                conn.dbClose()
+           heartbeat(cbsd_list[i],response['heartbeatResponse'][i])
 
         elif typeOfCalling == consts.DEREG:
             pass
@@ -334,14 +300,15 @@ def contactSAS(request,method):
 
     try:
         return requests.post(app.config['SAS']+method, 
-        # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
-        # verify=('googleCerts/ca.cert'),
-        # json=request)
+        cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+        verify=('googleCerts/ca.cert'),
+        json=request,
+        timeout=5)
 
-        cert=('certs/client.cert','certs/client.key'),
-        verify=('certs/ca.cert'),
-        json=request)
-        # timeout=5
+        # cert=('certs/client.cert','certs/client.key'),
+        # verify=('certs/ca.cert'),
+        # json=request,
+        # timeout=5)
         
     except Exception as e:
         print(f"your connection has failed: {e}")
@@ -719,6 +686,38 @@ def updateFreq(cbsd,earfcn):
     #update cbsd 
     cbsd['lowFrequency'] = MHz - 10
     cbsd['highFrequency'] = MHz + 10
+
+def heartbeat(cbsd,response):
+
+            conn = dbConn("ACS_V1_1")
+
+            #if opState is granted switch to authorized otherwise stay authorized
+            update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['cbsdId'] + "\'"
+            conn.update(update_operational_state)
+
+            if not expired(response['transmitExpireTime']) and cbsd['AdminState'] != 1:
+                print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
+                #then turn on cbsd
+                pList = [consts.ADMIN_POWER_ON]
+                setParameterValues(pList,cbsd)
+                #update operationalState
+            
+            if expired(response['transmitExpireTime']) and cbsd['AdminState'] == 1:
+                #if the heartbeat is expired 
+                setList  = [consts.ADMIN_POWER_OFF]
+                #power off ASAP
+                setParameterValues(setList,cbsd)
+
+
+            #update transmist expire time
+            update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + response['transmitExpireTime'] + "\' where cbsdID = \'" + response['cbsdId'] + "\'"
+            conn.update(update_transmit_time)
+            
+            #if response has new grantTime update database
+            if 'grantExpireTime' in response:
+                updateGrantTime(response['grantExpireTime'],cbsd['SN'])
+
+            conn.dbClose()
 
 def dp_deregister():
     #Get cbsd SNs from FeMS    

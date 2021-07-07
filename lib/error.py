@@ -137,8 +137,11 @@ def errorModule(errorDict,typeOfCalling):
                     cbsd['operationalState'] = 'GRANTED'
                     conn.dbClose()
                 log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
-            
-            sasHandler.Handle_Request(errorDict[errorCode],consts.HEART)
+                #update each cbsd sasStage to sub heartbeat
+                conn = dbConn(consts.DB)
+                conn.update("UPDATE dp_device_info SET sasStage =%s WHERE SN = %s",(consts.SUB_HEART,cbsd['SN']))
+                cbsd['sasStage'] = consts.SUB_HEART
+                conn.dbClose()
 
         elif errorCode == 502:
 

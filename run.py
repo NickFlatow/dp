@@ -38,7 +38,7 @@ def heartbeat():
             conn.dbClose()
             if cbsd_list !=():
                 sasHandler.Handle_Request(cbsd_list,consts.SUB_HEART)
-            time.sleep(10)    
+            time.sleep(30)    
 
 def start():
     # conn = dbConn("ACS_V1_1")
@@ -48,6 +48,7 @@ def start():
     # conn = dbConn("ACS_V1_1")
     # conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE SN = 'DCE994613163'")
     # conn.dbClose()
+
     try:
         #if using args a comma for tuple is needed 
         thread = threading.Thread(target=registration, args=())
