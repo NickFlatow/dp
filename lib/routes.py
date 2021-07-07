@@ -41,9 +41,9 @@ def dp_register():
     conn.dbClose()
 
     #create thread with threadLock so we do not get interference from heartbeat thread.
-    registrationThread = lockedThread("FeMS_reg_thread")
+    # registrationThread = lockedThread("FeMS_reg_thread")
     
-    registrationThread.run(cbsd_list,consts.REG)
+    sasHandler.Handle_Request(cbsd_list,consts.REG)
 
     return "success"
 
@@ -79,12 +79,12 @@ def dp_deregister():
 
     conn.dbClose()
 
-    deregistrationThread = lockedThread("FeMS_de-reg_thread")
+    # deregistrationThread = lockedThread("FeMS_de-reg_thread")
     
     if bool(rel):
-        deregistrationThread.run(rel,consts.REL)
-        deregistrationThread.run(rel,consts.DEREG)
+        sasHandler.Handle_Request(rel,consts.REL)
+        sasHandler.Handle_Request(rel,consts.DEREG)
     if bool(dereg):
-        deregistrationThread.run(dereg,consts.DEREG)
+        sasHandler.Handle_Request(dereg,consts.DEREG)
     
     return "success"

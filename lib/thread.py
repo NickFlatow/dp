@@ -21,17 +21,21 @@ class lockedThread (threading.Thread):
       # threadLock.release()
    def hbThread(self):
       # threadLock.acquire()
-      print("heartbeat")
-      conn = dbConn("ACS_V1_1")
-      cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.SUB_HEART)
-      conn.dbClose()
-      if cbsd_list !=():
-            sasHandler.Handle_Request(cbsd_list,consts.SUB_HEART)
+      while True:
+         print("heartbeat")
+         conn = dbConn("ACS_V1_1")
+         cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.SUB_HEART)
+         conn.dbClose()
+         if cbsd_list !=():
+               sasHandler.Handle_Request(cbsd_list,consts.SUB_HEART)
+         time.sleep(1)
       # threadLock.release()
    def regThread(self):
       print("registration")
-      conn = dbConn("ACS_V1_1")
-      cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.REG)
-      conn.dbClose()
-      if cbsd_list !=():
-         sasHandler.Handle_Request(cbsd_list, consts.REG)
+      while True:
+         conn = dbConn("ACS_V1_1")
+         cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.REG)
+         conn.dbClose()
+         if cbsd_list !=():
+            sasHandler.Handle_Request(cbsd_list, consts.REG)
+         time.sleep(1)

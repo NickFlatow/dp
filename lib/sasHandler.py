@@ -212,8 +212,10 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             channels = response['spectrumInquiryResponse'][0]['availableChannel']
             
             #scans EARFCN list for open channel on SAS
-            selectFrequency(cbsd_list[i],channels,typeOfCalling)
+            r = selectFrequency(cbsd_list[i],channels,typeOfCalling)
 
+            if r == 0:
+                return 0
 
             sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
             conn.update(sqlUpdate)
@@ -233,47 +235,47 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             conn = dbConn("ACS_V1_1")
             conn.update("UPDATE dp_device_info SET operationalState = 'AUTHORIZED' WHERE SN = %s",cbsd_list[i]['SN'])
             #if the transmiteExpireTime is not expired and the AdminState of cbsd is off
-            if not expired(response['heartbeatResponse'][i]['transmitExpireTime']) and cbsd_list[i]['AdminState'] != 1:
-                print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
-                #then turn on cbsd
-                pList = [consts.ADMIN_POWER_ON]
-                setParameterValues(pList,cbsd_list[i])
-                #update operationalState
+
                 
 
             #update transmitExpireTime
             update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + response['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
             conn.update(update_transmit_time)
-
-            #update sasStage to sub_heart
             
             conn.dbClose()
         
         elif typeOfCalling == consts.SUB_HEART: 
-            #TODO what if no reply... lost in the internet
-            #TODO check if reply is recieved from all cbsds
-            #TODO WHAT IF MEAS REPORT
-            #TODO
 
+            def heartbeat(cbsd):
+                conn = dbConn("ACS_V1_1")
 
-            conn = dbConn("ACS_V1_1")
-            
-            if expired(response['heartbeatResponse'][i]['transmitExpireTime']) and cbsd_list[i]['AdminState'] == 1:
+                #if opState is granted switch to authorized otherwise stay authorized
+                update_operational_state = "UPDATE dp_device_info SET operationalState = CASE WHEN operationalState = 'GRANTED' THEN 'AUTHORIZED' ELSE 'AUTHORIZED' END WHERE cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
+                conn.update(update_operational_state)
+
+                if not expired(response['heartbeatResponse'][i]['transmitExpireTime']) and cbsd_list[i]['AdminState'] != 1:
+                    print("!!!!!!!!!!!!!!!!GRATNED!!!!!!!!!!!!!!!!!!!!!!!!")
+                    #then turn on cbsd
+                    pList = [consts.ADMIN_POWER_ON]
+                    setParameterValues(pList,cbsd_list[i])
+                    #update operationalState
+                
+                if expired(response['heartbeatResponse'][i]['transmitExpireTime']) and cbsd_list[i]['AdminState'] == 1:
                     #if the heartbeat is expired 
                     setList  = [consts.ADMIN_POWER_OFF]
                     #power off ASAP
                     setParameterValues(setList,cbsd_list[i])
 
 
-            #update transmist expire time
-            update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + response['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
-            conn.update(update_transmit_time)
-            
-            #if response has new grantTime update databas
-            if 'grantExpireTime' in response['heartbeatResponse'][i]:
-                updateGrantTime(response['heartbeatResponse'][i]['grantExpireTime'],cbsd_list[i]['SN'])
+                #update transmist expire time
+                update_transmit_time = "UPDATE dp_device_info SET transmitExpireTime = \'" + response['heartbeatResponse'][i]['transmitExpireTime'] + "\' where cbsdID = \'" + response['heartbeatResponse'][i]['cbsdId'] + "\'"
+                conn.update(update_transmit_time)
+                
+                #if response has new grantTime update database
+                if 'grantExpireTime' in response['heartbeatResponse'][i]:
+                    updateGrantTime(response['heartbeatResponse'][i]['grantExpireTime'],cbsd_list[i]['SN'])
 
-            conn.dbClose()
+                conn.dbClose()
 
         elif typeOfCalling == consts.DEREG:
             pass
@@ -660,7 +662,8 @@ def selectFrequency(cbsd,channels,typeOfCalling = None):
         #log error to FeMS (Try to expand spectrum)
         err.log_error_to_FeMS_alarm("CRITICAL",cbsd,400,consts.SPECTRUM)
         #stop trying
-        Handle_Request(cbsd,False)
+        return 0
+        # Handle_Request(cbsd,False)
 
 #pass cbsd; Check if TxPower if txpower is already lower than SAS txpower leave alone
 def buildParameterList(parameterDict,cbsd):

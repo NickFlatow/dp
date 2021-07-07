@@ -138,7 +138,7 @@ def errorModule(errorDict,typeOfCalling):
                     conn.dbClose()
                 log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode,typeOfCalling)
             
-            # sasHandler.Handle_Request(errorDict[errorCode],consts.HEART)
+            sasHandler.Handle_Request(errorDict[errorCode],consts.HEART)
 
         elif errorCode == 502:
 

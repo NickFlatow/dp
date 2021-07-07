@@ -1,5 +1,6 @@
 from lib.dbConn import dbConn
 from lib.thread import lockedThread
+from lib import sasHandler
 from config.default import SAS
 from lib.log import logger
 from test import app, runFlaskSever
@@ -18,20 +19,34 @@ threadLock = threading.Lock()
 
 def registration():
     meth = [consts.REG,consts.SPECTRUM,consts.GRANT]
-    reg = lockedThread("regThread")
+    # reg = lockedThread("regThread")
     while True:
-        reg.regThread() 
+        print("registration")
+        conn = dbConn("ACS_V1_1")
+        cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.REG)
+        conn.dbClose()
+        if cbsd_list !=():
+            sasHandler.Handle_Request(cbsd_list, consts.REG)
         time.sleep(30)
 
 def heartbeat():
-        hb = lockedThread("hbThread")
+        # hb = lockedThread("hbThread")
         while True:
-            hb.hbThread()
-            time.sleep(30)    
+            print("heartbeat")
+            conn = dbConn("ACS_V1_1")
+            cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.SUB_HEART)
+            conn.dbClose()
+            if cbsd_list !=():
+                sasHandler.Handle_Request(cbsd_list,consts.SUB_HEART)
+            time.sleep(10)    
 
 def start():
     # conn = dbConn("ACS_V1_1")
     # conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE maxEIRP = '22'")
+    # conn.dbClose()
+
+    # conn = dbConn("ACS_V1_1")
+    # conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE SN = 'DCE994613163'")
     # conn.dbClose()
     try:
         #if using args a comma for tuple is needed 
