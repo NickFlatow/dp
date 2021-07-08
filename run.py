@@ -31,14 +31,14 @@ def registration():
 
 def heartbeat():
         # hb = lockedThread("hbThread")
-        while True:
-            print("heartbeat")
-            conn = dbConn("ACS_V1_1")
-            cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.SUB_HEART)
-            conn.dbClose()
-            if cbsd_list !=():
-                sasHandler.Handle_Request(cbsd_list,consts.SUB_HEART)
-            time.sleep(30)    
+    while True:
+        print("heartbeat")
+        conn = dbConn("ACS_V1_1")
+        cbsd_list = conn.select('SELECT * FROM dp_device_info WHERE sasStage = %s',consts.SUB_HEART)
+        conn.dbClose()
+        if cbsd_list !=():
+            sasHandler.Handle_Request(cbsd_list,consts.SUB_HEART)
+        time.sleep(30)    
 
 def start():
     # conn = dbConn("ACS_V1_1")
@@ -72,8 +72,8 @@ def err500():
     cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = 'DCE994613163'")
     sasHandler.Handle_Response(cbsd,consts.HB500,consts.SUB_HEART)
 
-# start()
-err500()
+start()
+# err500()
 
 
 

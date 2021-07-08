@@ -147,15 +147,15 @@ def Handle_Request(cbsd_list,typeOfCalling):
             conn.dbClose()
 
     dpLogger.log_json(req,len(cbsd_list))
-    # SASresponse = contactSAS(req,typeOfCalling)
-    SASresponse = True
+    SASresponse = contactSAS(req,typeOfCalling)
+    # SASresponse = True
 
     if SASresponse != False:
         conn = dbConn("ACS_V1_1")
         updated_cbsd_list = conn.select("SELECT * FROM dp_device_info WHERE sasStage = %s",typeOfCalling)
         conn.dbClose()
-        Handle_Response(updated_cbsd_list,consts.GR,typeOfCalling)
-        # Handle_Response(updated_cbsd_list,SASresponse.json(),typeOfCalling)
+        # Handle_Response(updated_cbsd_list,consts.GR,typeOfCalling)
+        Handle_Response(updated_cbsd_list,SASresponse.json(),typeOfCalling)
 
     #if we get no reply from sas and we are in the initial heartbeat stage switch to subsequent heartbeat and keep trying
     elif SASresponse == False and typeOfCalling == consts.HEART:
@@ -172,8 +172,6 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
     else:
         resposneMessageType = str(typeOfCalling +"Response")
     
- 
-    #check if any cbsds need to be turned off
 
     #init dict to pass to error module
     errorDict = {}
@@ -183,7 +181,6 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
     
     for i in range(len(response[resposneMessageType])):
 
-        print(response[resposneMessageType][i])
 
         #check for errors in response
         if response[resposneMessageType][i]['response']['responseCode'] != 0:
@@ -237,13 +234,13 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
             #nextCalling = consts.HEART
 
-        elif typeOfCalling == consts.HEART:
+        elif typeOfCalling == consts.HEART or typeOfCalling == consts.SUB_HEART:
            
            heartbeat(cbsd_list[i],response['heartbeatResponse'][i])
 
-        elif typeOfCalling == consts.SUB_HEART: 
+        # elif typeOfCalling == consts.SUB_HEART: 
 
-           heartbeat(cbsd_list[i],response['heartbeatResponse'][i])
+        #    heartbeat(cbsd_list[i],response['heartbeatResponse'][i])
 
         elif typeOfCalling == consts.DEREG:
             pass

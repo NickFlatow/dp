@@ -93,6 +93,7 @@ def errorModule(errorDict,typeOfCalling):
             rel = []
             grant = []
 
+            conn = dbConn(consts.DB)
             #check if any cbsds are expired
             for cbsd in errorDict[errorCode]:
 
@@ -113,6 +114,8 @@ def errorModule(errorDict,typeOfCalling):
 
                     sasHandler.setParameterValues(paramList,cbsd)
 
+                    cbsd['sasStage'] = consts.GRANT
+                    conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.GRANT,cbsd['SN']))
                     grant.append(cbsd)
                 else:
                     #if no suggested operational paramters from SAS do spectrum inquiry
@@ -120,6 +123,7 @@ def errorModule(errorDict,typeOfCalling):
                     #reliquish existing grant and apply for new specturm
                     rel.append(cbsd)
 
+            conn.dbClose()
             if bool(rel):
                 sasHandler.Handle_Request(rel,consts.REL)
                 sasHandler.Handle_Request(rel,consts.SPECTRUM) 
@@ -210,67 +214,3 @@ def updateCbsdParameters(cbsd):
 
 
 
-    # reposne 200 example
-    # REQUEST TIMESTAMP: 2021-05-06T19:14:50 (UTC: 2021-05-07T00:14:50)
-    # SAS URL: https://sas.goog/v1.2/registration
-    # SAS METHOD: registration
-    # JSON REQUEST: 3 CBSDs
-    # {
-    #   "registrationRequest": [
-    #     {
-    #       "userId": "AFE-inc",
-    #       "fccId": "PIDAS1030A",
-    #       "cbsdSerialNumber": "E8585101AAA4",
-    #       "cbsdCategory": "B",
-    #       "airInterface": {
-    #         "radioTechnology": "E_UTRA"
-    #       },
-    #       "cbsdFeatureCapabilityList": []
-    #     },
-    #     {
-    #       "userId": "AFE-inc",
-    #       "fccId": "PIDAS1030A",
-    #       "cbsdSerialNumber": "E8585101A98E",
-    #       "cbsdCategory": "B",
-    #       "airInterface": {
-    #         "radioTechnology": "E_UTRA"
-    #       },
-    #       "cbsdFeatureCapabilityList": []
-    #     },
-    #     {
-    #       "userId": "AFE-inc",
-    #       "fccId": "PIDAS1030A",
-    #       "cbsdSerialNumber": "E8585101A6CA",
-    #       "cbsdCategory": "B",
-    #       "airInterface": {
-    #         "radioTechnology": "E_UTRA"
-    #       },
-    #       "cbsdFeatureCapabilityList": []
-    #     }
-    #   ]
-    # }
-    # RESPONSE TIMESTAMP: 2021-05-06T19:14:51 (UTC: 2021-05-07T00:14:51)
-    # HTTP STATUS: 200 OK
-    # JSON RESPONSE:
-    # {
-    #   "registrationResponse": [
-    #     {
-    #       "response": {
-    #         "responseCode": 200,
-    #         "responseMessage": "A Category B device must be installed by a CPI"
-    #       }
-    #     },
-    #     {
-    #       "response": {
-    #         "responseCode": 200,
-    #         "responseMessage": "A Category B device must be installed by a CPI"
-    #       }
-    #     },
-    #     {
-    #       "response": {
-    #         "responseCode": 200,
-    #         "responseMessage": "A Category B device must be installed by a CPI"
-    #       }
-    #     }
-    #   ]
-    # }
