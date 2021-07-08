@@ -72,8 +72,31 @@ def err500():
     cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = 'DCE994613163'")
     sasHandler.Handle_Response(cbsd,consts.HB500,consts.SUB_HEART)
 
+
+def reprov(SNlist):
+    # #Get cbsd SNs from FeMS    
+    # SNlist = request.form['json']
+
+    # #convert to json
+    # SNlist = json.loads(SNlist)
+
+    #if granted relinquish grant 
+    conn = dbConn(consts.DB)
+    cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SNlist)
+
+
+    if cbsd[0]['grantID'] != None:
+        conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REL,cbsd[0]['SN']))
+        cbsd[0]['sasStage'] = consts.REL
+        sasHandler.Handle_Request(cbsd[0],consts.REL)        
+
+    #update cbsd sasStage for registration
+    conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REPROV,cbsd[0]['SN']))
+    conn.dbClose()
+
 start()
-# err500()
+# reprov('DCE99461317E')
+
 
 
 

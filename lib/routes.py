@@ -3,6 +3,7 @@ from flask import request
 from lib.dbConn import dbConn
 from lib import sasHandler
 from lib.thread import lockedThread
+import time
 
 from test import app
 
@@ -87,4 +88,29 @@ def dp_deregister():
     if bool(dereg):
         sasHandler.Handle_Request(dereg,consts.DEREG)
     
+    return "success"
+
+@app.route('/dp/v1/reprovision', methods=['POST'])
+@cross_origin()
+def dp_reprovision():
+    #Get cbsd SNs from FeMS    
+    SNlist = request.form['json']
+
+    #convert to json
+    SNlist = json.loads(SNlist)
+
+    #if granted relinquish grant 
+    conn = dbConn(consts.DB)
+    cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SNlist['SN'])
+    
+
+    if cbsd[0]['grantID'] != None:
+        conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REL,cbsd[0]['SN']))
+        cbsd[0]['sasStage'] = consts.REL
+        sasHandler.Handle_Request(cbsd,consts.REL)        
+
+    #update cbsd sasStage for registration
+    conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REPROV,cbsd[0]['SN']))
+    conn.dbClose()
+
     return "success"

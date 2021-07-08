@@ -301,8 +301,8 @@ def contactSAS(request,method):
         return requests.post(app.config['SAS']+method, 
         cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
         verify=('googleCerts/ca.cert'),
-        json=request,
-        timeout=5)
+        json=request)
+        # timeout=5
 
         # cert=('certs/client.cert','certs/client.key'),
         # verify=('certs/ca.cert'),
@@ -358,16 +358,10 @@ def EARFCNtoMHZ(earfcn):
     print("EARFCN: " + str(earfcn))
     if int(earfcn) > 56739 or int(earfcn) < 55240:
         logging.info("SPECTRUM IS OUTSIDE OF BOUNDS")
-        L_frq = 0
-        H_frq = 0
         F = 0
     elif earfcn == 55240:
-        L_frq = 3550
-        H_frq = 3570
         F = 3560
     elif earfcn == 56739:
-        L_frq = 3680
-        H_frq = 3700
         F = 3690
     else:
         F = math.ceil(3550 + (0.1 * (int(earfcn) - 55240)))
@@ -470,11 +464,12 @@ def setParameterValues(parameterList,cbsd,typeOfCalling = None):
         #send connection request to cell
         response = requests.get(cbsd['connreqURL'], auth= HTTPDigestAuth(cbsd['connreqUname'],cbsd['connreqPass']))
         
+        #wait until parameters are set
+        startTime = datetime.now()
         
         #check if conncetion if accepted by the cell
         if response.status_code == 200:
-            #wait until parameters are set
-            startTime = datetime.now()
+
             logging.info(f"startTime: {startTime}")
             settingParameters = True
             while settingParameters:
@@ -625,8 +620,8 @@ def selectFrequency(cbsd,channels,typeOfCalling = None):
     #if no spectrum is found for any channels on cbsd
     if not low or not high:
         print("no spectrum")
-        #log error to FeMS (Try to expand spectrum)
         err.log_error_to_FeMS_alarm("CRITICAL",cbsd,400,consts.SPECTRUM)
+
         #stop trying
         return 0
         # Handle_Request(cbsd,False)

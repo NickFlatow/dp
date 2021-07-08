@@ -11,6 +11,7 @@ HEART = 'heartbeat'
 SUB_HEART = 'subsequent_heartbeat'
 DEREG = 'deregistration'
 REL = 'relinquishment'
+REPROV = 'unreg'
 
 
 #DATA MODEL PATHS
@@ -544,3 +545,17 @@ ERR501 = {
         }
     ]
 }
+
+# ERR400 = {
+#     {  
+#     "grantResponse":[  
+#         {  
+#           "cbsdId":"2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982",
+#           "response":{  
+#               "responseCode":400,
+#               "responseMessage":"Inside GWPZ"
+#           }
+#         }
+#     ]
+#   }
+# }

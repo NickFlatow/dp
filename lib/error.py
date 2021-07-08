@@ -84,7 +84,8 @@ def errorModule(errorDict,typeOfCalling):
                 sasHandler.Handle_Request(retry,typeOfCalling)
 
         elif errorCode == 400:
-            pass
+            #if there was some incumbent that has come into the area between spectrum and grant. Retry to get new spectrum for all cbsds with error 400
+            sasHandler.Handle_Request(errorDict[errorCode],consts.SPECTRUM) 
 
         elif errorCode == 401:
             pass
