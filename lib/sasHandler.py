@@ -38,9 +38,6 @@ def Handle_Request(cbsd_list,typeOfCalling):
     
         elif typeOfCalling == consts.SPECTRUM:
             
-            #calculate MHz and MaxEirp
-            # FreqDict = EARFCNtoMHZ(cbsd['SN'])
-
             req[requestMessageType].append(
                 {
                     "cbsdId":cbsd['cbsdID'],
@@ -208,8 +205,7 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #nextCalling = conts.SPECTRUM
 
         elif typeOfCalling == consts.SPECTRUM:
-            #ensure Eirp reflects current antenna and txPower values
-            updateMaxEirp(cbsd_list[i])
+
             conn = dbConn("ACS_V1_1")
 
             #grab all avaialbe channels provided by SAS reply
