@@ -42,7 +42,7 @@ def heartbeat():
 
 def start():
     # conn = dbConn("ACS_V1_1")
-    # conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE maxEIRP = '22'")
+    # conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE maxEIRP = '19'")
     # conn.dbClose()
 
     # conn = dbConn("ACS_V1_1")
@@ -72,6 +72,11 @@ def err500():
     cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = 'DCE994613163'")
     sasHandler.Handle_Response(cbsd,consts.HB500,consts.SUB_HEART)
 
+def specSelect():
+    conn = dbConn(consts.DB)
+    cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = 'DCE994613163'")
+    sasHandler.Handle_Response(cbsd,consts.FS1,consts.SPECTRUM)
+
 
 def reprov(SNlist):
     # #Get cbsd SNs from FeMS    
@@ -96,7 +101,7 @@ def reprov(SNlist):
 
 start()
 # reprov('DCE99461317E')
-
+# specSelect()
 
 
 

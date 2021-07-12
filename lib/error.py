@@ -85,6 +85,12 @@ def errorModule(errorDict,typeOfCalling):
 
         elif errorCode == 400:
             #if there was some incumbent that has come into the area between spectrum and grant. Retry to get new spectrum for all cbsds with error 400
+            conn = dbConn(consts.DB)
+            for cbsd in errorDict[errorCode]:
+                cbsd['sasStage'] = consts.SPECTRUM
+                conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.SPECTRUM,cbsd['SN']))
+
+            time.sleep(3)
             sasHandler.Handle_Request(errorDict[errorCode],consts.SPECTRUM) 
 
         elif errorCode == 401:

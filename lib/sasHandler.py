@@ -52,19 +52,31 @@ def Handle_Request(cbsd_list,typeOfCalling):
         
         elif typeOfCalling == consts.GRANT:
             
+            # req[requestMessageType].append(
+            #         { 
+            #             "cbsdId":cbsd['cbsdID'],
+            #             "operationParam":{
+            #                 "maxEirp":cbsd['maxEIRP'],
+            #                 "operationFrequencyRange":{
+            #                     "lowFrequency":cbsd['lowFrequency'] * 1000000,
+            #                     "highFrequency":cbsd['highFrequency'] * 1000000
+            #                 }
+            #             }
+            #         }
+            #     )
+
             req[requestMessageType].append(
-                    { 
-                        "cbsdId":cbsd['cbsdID'],
-                        "operationParam":{
-                            # grab antennaGain from web interface
-                            "maxEirp":cbsd['maxEIRP'],
-                            "operationFrequencyRange":{
-                                "lowFrequency":cbsd['lowFrequency'] * 1000000,
-                                "highFrequency":cbsd['highFrequency'] * 1000000
-                            }
+                { 
+                    "cbsdId":cbsd['cbsdID'],
+                    "operationParam":{
+                        "maxEirp":cbsd['maxEIRP'],
+                        "operationFrequencyRange":{
+                            "lowFrequency":3660 * 1000000,
+                            "highFrequency":3680 * 1000000
                         }
                     }
-                )
+                }
+            )
         elif typeOfCalling == consts.HEART:
             req[requestMessageType].append(
                 {
@@ -214,29 +226,24 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #scans EARFCN list for open channel on SAS
             r = selectFrequency(cbsd_list[i],channels,typeOfCalling)
 
+            #if there is no specturm exit the program(select Frequecny has logged error 400 to FeMS)
             if r == 0:
                 return 0
 
             sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
             conn.update(sqlUpdate)
 
-        elif typeOfCalling == consts.GRANT:
-            #TODO Check for measurement Report
-            
+        elif typeOfCalling == consts.GRANT:            
             conn = dbConn("ACS_V1_1")
             sql_update = "UPDATE `dp_device_info` SET `grantID` = %s , `grantExpireTime` = %s, `operationalState` = \'GRANTED\', `sasStage` = \'heartbeat\' WHERE `cbsdID` = %s"
             conn.update(sql_update,(response['grantResponse'][i]['grantId'],response['grantResponse'][i]['grantExpireTime'],response['grantResponse'][i]['cbsdId']))
             conn.dbClose()
 
-            #nextCalling = consts.HEART
 
         elif typeOfCalling == consts.HEART or typeOfCalling == consts.SUB_HEART:
            
            heartbeat(cbsd_list[i],response['heartbeatResponse'][i])
 
-        # elif typeOfCalling == consts.SUB_HEART: 
-
-        #    heartbeat(cbsd_list[i],response['heartbeatResponse'][i])
 
         elif typeOfCalling == consts.DEREG:
             pass
@@ -616,6 +623,7 @@ def selectFrequency(cbsd,channels,typeOfCalling = None):
     #if no spectrum is found for any channels on cbsd
     if not low or not high:
         print("no spectrum")
+        logging.info("no spectrum")
         err.log_error_to_FeMS_alarm("CRITICAL",cbsd,400,consts.SPECTRUM)
 
         #stop trying
@@ -651,21 +659,25 @@ def getEarfcnList(cbsd):
     #get eutra values(all possible earfcns provided by user in the subscription table)
     eutra = parameters['EUTRACarrierARFCNDL']['value']
     
-    #convert to list
-    earfcnList = list(eutra.split(","))
+    if eutra != '':
+        #convert to list
+        earfcnList = list(eutra.split(","))
 
-    #convert all values to ints
-    earfcnList = [int(i) for i in earfcnList]
-        
-    #get current earfcn in use(currently assigned to the cell from SON) 
-    earfcn = conn.select("SELECT EARFCN FROM dp_device_info WHERE SN = %s",cbsd['SN'])
-    #add to the front of the list
-    if earfcn not in earfcnList:
-        earfcnList.insert(0,earfcn[0]['EARFCN'])
+        #convert all values to ints
+        earfcnList = [int(i) for i in earfcnList]
+            
+        #get current earfcn in use(currently assigned to the cell from SON) 
+        earfcn = conn.select("SELECT EARFCN FROM dp_device_info WHERE SN = %s",cbsd['SN'])
+        #add to the front of the list
+        if earfcn not in earfcnList:
+            earfcnList.insert(0,earfcn[0]['EARFCN'])
 
-    conn.dbClose()
+        conn.dbClose()
 
-    return earfcnList
+        return earfcnList
+    else:
+        earfcn = conn.select("SELECT EARFCN FROM dp_device_info WHERE SN = %s",cbsd['SN'])
+        return [earfcn[0]['EARFCN']]
 
 #given an earfcn value and a cbsd; The fucntion will update the low and high freq in the dp_device_info database table
 def updateFreq(cbsd,earfcn):

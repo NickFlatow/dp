@@ -11,7 +11,7 @@ HEART = 'heartbeat'
 SUB_HEART = 'authorized_heartbeat'
 DEREG = 'deregistration'
 REL = 'relinquishment'
-REPROV = 'unreg'
+REPROV = 'provisioning'
 
 
 #DATA MODEL PATHS
