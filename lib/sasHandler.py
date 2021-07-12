@@ -52,31 +52,31 @@ def Handle_Request(cbsd_list,typeOfCalling):
         
         elif typeOfCalling == consts.GRANT:
             
-            # req[requestMessageType].append(
-            #         { 
-            #             "cbsdId":cbsd['cbsdID'],
-            #             "operationParam":{
-            #                 "maxEirp":cbsd['maxEIRP'],
-            #                 "operationFrequencyRange":{
-            #                     "lowFrequency":cbsd['lowFrequency'] * 1000000,
-            #                     "highFrequency":cbsd['highFrequency'] * 1000000
-            #                 }
-            #             }
-            #         }
-            #     )
-
             req[requestMessageType].append(
-                { 
-                    "cbsdId":cbsd['cbsdID'],
-                    "operationParam":{
-                        "maxEirp":cbsd['maxEIRP'],
-                        "operationFrequencyRange":{
-                            "lowFrequency":3660 * 1000000,
-                            "highFrequency":3680 * 1000000
+                    { 
+                        "cbsdId":cbsd['cbsdID'],
+                        "operationParam":{
+                            "maxEirp":cbsd['maxEIRP'],
+                            "operationFrequencyRange":{
+                                "lowFrequency":cbsd['lowFrequency'] * 1000000,
+                                "highFrequency":cbsd['highFrequency'] * 1000000
+                            }
                         }
                     }
-                }
-            )
+                )
+
+            # req[requestMessageType].append(
+            #     { 
+            #         "cbsdId":cbsd['cbsdID'],
+            #         "operationParam":{
+            #             "maxEirp":cbsd['maxEIRP'],
+            #             "operationFrequencyRange":{
+            #                 "lowFrequency":3660 * 1000000,
+            #                 "highFrequency":3680 * 1000000
+            #             }
+            #         }
+            #     }
+            # )
         elif typeOfCalling == consts.HEART:
             req[requestMessageType].append(
                 {
@@ -226,9 +226,10 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             #scans EARFCN list for open channel on SAS
             r = selectFrequency(cbsd_list[i],channels,typeOfCalling)
 
-            #if there is no specturm exit the program(select Frequecny has logged error 400 to FeMS)
+            #if there is no specturm continue to the next element in the loop(select Frequecny has logged error 400 to FeMS)
             if r == 0:
-                return 0
+                errorList.append(cbsd_list[i])
+                continue
 
             sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
             conn.update(sqlUpdate)
@@ -623,7 +624,7 @@ def selectFrequency(cbsd,channels,typeOfCalling = None):
     #if no spectrum is found for any channels on cbsd
     if not low or not high:
         print("no spectrum")
-        logging.info("no spectrum")
+        logging.info(f"no spectrum for {cbsd['SN']}")
         err.log_error_to_FeMS_alarm("CRITICAL",cbsd,400,consts.SPECTRUM)
 
         #stop trying
