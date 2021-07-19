@@ -17,7 +17,7 @@ def Handle_Request(cbsd_list,typeOfCalling):
     '''
     handles all requests sent to the SAS
     '''
-    if typeOfCalling == consts.HEART or typeOfCalling == consts.SUB_HEART:
+    if typeOfCalling == consts.SUB_HEART:
         requestMessageType = str(consts.HEART + "Request")
     else:
         requestMessageType = str(typeOfCalling +"Request")
@@ -155,7 +155,9 @@ def Handle_Request(cbsd_list,typeOfCalling):
             conn.update(update_grantID,(consts.REL,cbsd['SN']))
             conn.dbClose()
 
+    #log request
     dpLogger.log_json(req,len(cbsd_list))
+    
     SASresponse = contactSAS(req,typeOfCalling)
     # SASresponse = True
 

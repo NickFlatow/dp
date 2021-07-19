@@ -13,6 +13,8 @@ DEREG = 'deregistration'
 REL = 'relinquishment'
 REPROV = 'provisioning'
 
+FUNC_MODE_ALL = 0
+FUNC_MODE_DOMAIN_PROXY = 5
 
 #DATA MODEL PATHS
 TXPOWER_PATH  = 'Device.X_FOXCONN_FAP.CellConfig.SonMaxTxPower_Max'  
