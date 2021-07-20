@@ -7,6 +7,7 @@ from config.default import SAS
 from lib.log import logger
 from test import app, runFlaskSever
 from numpy.ctypeslib import ndpointer
+import lib.authLicense as l 
 
 import time
 import threading 
@@ -57,26 +58,28 @@ def start():
 
     authType = getLicenseAuthType()
 
-    if authType == consts.FUNC_MODE_ALL or authType == consts.FUNC_MODE_DOMAIN_PROXY:
+    # if authType == consts.FUNC_MODE_ALL or authType == consts.FUNC_MODE_DOMAIN_PROXY:
 
-        try:
-            #if using args a comma for tuple is needed 
-            thread = threading.Thread(target=registration, args=())
-            thread.name = 'registration-thread'
-            thread.start()
-        except Exception as e:
-            print(f"Registration thread failed: {e}")
-        try:
-            #if using args a comma for tuple is needed 
-            hbthread = threading.Thread(target=heartbeat, args=())
-            hbthread.name = 'heartbeat-thread'
-            hbthread.start()
+    try:
+        #if using args a comma for tuple is needed 
+        thread = threading.Thread(target=registration, args=())
+        thread.name = 'registration-thread'
+        thread.start()
+    except Exception as e:
+        print(f"Registration thread failed: {e}")
 
-        except Exception as e:
-            print(f"Heartbeat thread failed reason: {e}")
-        runFlaskSever() 
-    else:
-        print("Non authorized licesen for Domain Proxy")
+    try:
+        #if using args a comma for tuple is needed 
+        hbthread = threading.Thread(target=heartbeat, args=())
+        hbthread.name = 'heartbeat-thread'
+        hbthread.start()
+
+    except Exception as e:
+        print(f"Heartbeat thread failed: {e}")
+        
+    runFlaskSever() 
+# else:
+#     print("Non authorized licesen for Domain Proxy")
 
 
 def err500():
@@ -112,40 +115,7 @@ def reprov(SNlist):
     conn.dbClose()
 
 def getLicenseAuthType():
-    license = ctypes.CDLL("/home/gtadmin/license_control/key_decoder_kim/license.so")
-
-    # license.getFuncVals.restype = ndpointer(dtype=ctypes.c_int, shape=(5,))
-    # test = license.getFuncVals()
-    # print(f"test: {test}")
-
-    authType = license.getFuncValAuth()
-
-    return authType
-    # b = license.getRemainingTime()
-    # y = id(z)
-    # x = ctypes.cast(y,ctypes.POINTER(z)).value
-   
-    # ctypes.POINTER(ctypes.c_int)
-    # print(x)
-
-
- 
-
-    # # d = ctypes.cast(a,ctypes.POINTER(a))
-    # d = ctypes.cast(abc,ctypes.POINTER(ctypes.c_int))
-    
-
-    # print(abc)
-    # print(f"getRemainingTime {b}")
-    # print(d)
-
-    # fun.myFunction.argtypes = [ctypes.c_int]
-
-    # returnVale = fun.myFunction(4)
-    # print(returnVale)
-
-    # data = open("/var/local/pub/license_tmp","r")
-    # print(data)
+    l.testAuthLicense()
 
 # getLicenseAuthType()
 
