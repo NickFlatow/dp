@@ -90,8 +90,8 @@ def errorModule(errorDict,typeOfCalling):
                 cbsd['sasStage'] = consts.SPECTRUM
                 conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.SPECTRUM,cbsd['SN']))
 
-            time.sleep(3)
-            sasHandler.Handle_Request(errorDict[errorCode],consts.SPECTRUM) 
+            # time.sleep(3)
+            # sasHandler.Handle_Request(errorDict[errorCode],consts.SPECTRUM) 
 
         elif errorCode == 401:
             pass
