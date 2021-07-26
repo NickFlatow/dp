@@ -62,7 +62,7 @@ def errorModule(errorDict,typeOfCalling):
             #deregister 
             sasHandler.Handle_Request(errorDict[errorCode],consts.DEREG)
             #try to reregister
-            sasHandler.Handle_Request(errorDict[errorCode],consts.REG)
+            # sasHandler.Handle_Request(errorDict[errorCode],consts.REG)
 
         elif errorCode == 106:
             retry = []
@@ -133,9 +133,10 @@ def errorModule(errorDict,typeOfCalling):
             conn.dbClose()
             if bool(rel):
                 sasHandler.Handle_Request(rel,consts.REL)
-                sasHandler.Handle_Request(rel,consts.SPECTRUM) 
+                # sasHandler.Handle_Request(rel,consts.SPECTRUM) 
             if bool(grant):
-                sasHandler.Handle_Request(grant,consts.GRANT)
+                pass
+                # sasHandler.Handle_Request(grant,consts.GRANT)
                 
 
         elif errorCode == 501:
@@ -159,7 +160,7 @@ def errorModule(errorDict,typeOfCalling):
             #send grant rel requests
             sasHandler.Handle_Request(errorDict[errorCode],consts.REL)
             #send new grant requets
-            sasHandler.Handle_Request(errorDict[errorCode],consts.GRANT)
+            # sasHandler.Handle_Request(errorDict[errorCode],consts.GRANT)
 
         else: #error code 102, 200, 201
             #Severity is CRITICAL OR WARNING
