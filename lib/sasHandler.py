@@ -232,16 +232,21 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             # #grab all avaialbe channels provided by SAS reply
             channels = response['spectrumInquiryResponse'][0]['availableChannel']
             
-            #scans EARFCN list for open channel on SAS
-            r = selectFrequency(cbsd_list[i],channels,typeOfCalling)
 
-            #if there is no specturm continue to the next element in the loop(select Frequecny has logged error 400 to FeMS)
-            if r == 0:
-                errorList.append(cbsd_list[i])
+            if channels[0]['frequencyRange']['lowFrequency'] == 3550000000 and channels[0]['frequencyRange']['highFrequency'] == 3555000000:
                 continue
+            else:
+                #scans EARFCN list for open channel on SAS
+                r = selectFrequency(cbsd_list[i],channels,typeOfCalling)
 
-            sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
-            conn.update(sqlUpdate)
+                #if there is no specturm continue to the next element in the loop(select Frequecny has logged error 400 to FeMS)
+                if r == 0:
+                    errorList.append(cbsd_list[i])
+                    continue
+
+                sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
+                conn.update(sqlUpdate)
+            
 
         elif typeOfCalling == consts.GRANT:            
             conn = dbConn("ACS_V1_1")
@@ -312,13 +317,8 @@ def contactSAS(request,method):
 
     try:
         return requests.post(app.config['SAS']+method, 
-        # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
-        # verify=('googleCerts/ca.cert'),
-        # json=request)
-        # timeout=5
-
-        cert=('certs/client.cert','certs/client.key'),
-        verify=('certs/ca.cert'),
+        cert=('/home/gtadmin/dp/certs/client.cert','/home/gtadmin/dp/certs/client.key'),
+        verify=('/home/gtadmin/dp/certs/ca.cert'),
         json=request,
         timeout=5)
         
@@ -384,8 +384,25 @@ def EARFCNtoMHZ(earfcn):
 
 def updateMaxEirp(cbsd):
     conn = dbConn(consts.DB)
-    conn.update("UPDATE dp_device_info SET maxEIRP = %s WHERE SN = %s",( (cbsd['TxPower'] + cbsd['antennaGain']), str(cbsd['SN'])))
-    cbsd['maxEIRP'] = (cbsd['TxPower'] + cbsd['antennaGain'])
+
+    #If maxEirp is higher than 47dBm/10Mhz
+    EIRP = conn.select("SELECT TxPower, antennaGain FROM dp_device_info WHERE %s",cbsd['SN'])
+
+    if EIRP[0]['TxPower'] + EIRP[0]['antennaGain'] > 37:
+
+        txpower = 37  - EIRP[0]['antennaGain']
+        parameterList = [{'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txpower}]
+        setParameterValues(parameterList,cbsd)
+        
+        conn.update("UPDATE dp_device_info SET maxEIRP = %s WHERE SN = %s",( (cbsd['TxPower'] + cbsd['antennaGain']), str(cbsd['SN'])))
+
+        cbsd['maxEIRP'] = (cbsd['TxPower'] + cbsd['antennaGain'])
+
+    else:
+        conn.update("UPDATE dp_device_info SET maxEIRP = %s WHERE SN = %s",( (cbsd['TxPower'] + cbsd['antennaGain']), str(cbsd['SN'])))
+        
+        cbsd['maxEIRP'] = (cbsd['TxPower'] + cbsd['antennaGain'])
+
     conn.dbClose()
 
 def EirpToTxPower(maxEirp,cbsd):
@@ -732,92 +749,27 @@ def heartbeat(cbsd,response):
 
             conn.dbClose()
 
-def dp_deregister():
-    #Get cbsd SNs from FeMS    
-    # SNlist = request.form['json']
+# def dp_deregister():
 
-    # #convert to json
-    # SN_json_dict = json.loads(SNlist)
+#     SNlist = ['DCE994613163','DCE99461317E']
 
-    # #select only the values
-    # SNlist = list(SN_json_dict.values())
-    # print(f"output of SNlist: {SNlist}")
-    SNlist = ['DCE994613163','DCE99461317E']
+#     #collect all values from databse
+#     conn = dbConn("ACS_V1_1")
+#     sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
+#     cbsd_list = conn.select(sql,SNlist)
 
-    #collect all values from databse
-    conn = dbConn("ACS_V1_1")
-    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist)))
-    cbsd_list = conn.select(sql,SNlist)
+#     #Relinquish grant if the cbsd is currently granted to transmit
+#     rel = []
+#     print(cbsd_list)
+#     for cbsd in cbsd_list:
+#         if cbsd['grantID'] != None:
+#             rel.append(cbsd)
 
-    #Relinquish grant if the cbsd is currently granted to transmit
-    rel = []
-    print(cbsd_list)
-    for cbsd in cbsd_list:
-        if cbsd['grantID'] != None:
-            rel.append(cbsd)
+#     if bool(rel):
+#         Handle_Request(rel,consts.REL)
+#     Handle_Request(cbsd_list,consts.DEREG)
+#     return "success"
 
-    if bool(rel):
-        Handle_Request(rel,consts.REL)
-    Handle_Request(cbsd_list,consts.DEREG)
-    return "success"
-
-def channel_search(earfcnList,cbsd,channels,second_radio = False):
-    for earfcn in earfcnList:
-
-        pref = EARFCNtoMHZ(earfcn) * consts.Hz  
-        low = False
-        high = False
-        setList = []
-        
-        for channel in channels:
-            if channel['channelType'] == 'GAA':
-                lowFreq = pref - consts.TEN_MHz
-                if (lowFreq) >= channel['frequencyRange']['lowFrequency'] and (lowFreq) <= channel['frequencyRange']['highFrequency']:
-                    low = True
-
-                    if 'maxEirp' in channel:
-                        lowChannelEirp = channel['maxEirp']
-                #refactor to plusbandWidth(cbsd) to get how many MHz to offset middle freq
-                highFreq = pref + consts.TEN_MHz
-                if (highFreq) >= channel['frequencyRange']['lowFrequency'] and (highFreq) <= channel['frequencyRange']['highFrequency']:
-                    high = True
-
-                    if 'maxEirp' in channel:
-                        highChannelEirp = channel['maxEirp']
-                if low and high:
-                    #convert perf back to EARFCN
-                    if earfcn != cbsd['EARFCN'] :
-                        selected_earfcn = MHZtoEARFCN((pref/consts.Hz))
-                        setList.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':selected_earfcn})
-                    else:
-                        # update frequency on cbsd and database
-                        updateFreq(cbsd,earfcn)
-                    
-                    if 'maxEirp' in channel:
-                    #what if one channels eirp is lower than the other?
-                        if lowChannelEirp <= highChannelEirp:
-                            maxEirp = lowChannelEirp
-                        else: 
-                            maxEirp = highChannelEirp
-                        if maxEirp < cbsd['maxEIRP']:
-                            txPower = maxEirp - cbsd['antennaGain']
-                            setList.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txPower})
-                        
-                    if bool(setList):
-                        setParameterValues(setList,cbsd)
-
-                    #exit for loops
-                    return
-
-    #if no spectrum is found for any channels on cbsd
-    if not low or not high:
-        print("no spectrum")
-        logging.info(f"no spectrum for {cbsd['SN']}")
-        err.log_error_to_FeMS_alarm("CRITICAL",cbsd,400,consts.SPECTRUM)
-
-        #stop trying
-        return 0
-        # Handle_Request(cbsd,False)
 
 def setFreq(cbsd):
     conn = dbConn(consts.DB)
