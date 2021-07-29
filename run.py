@@ -55,11 +55,6 @@ def start():
     # conn.update("UPDATE dp_device_info SET sasStage = 'registration', grantID = NULL, operationalState = NULL, transmitExpireTime = NULL, grantExpireTime = NULL WHERE SN = 'DCE994613163'")
     # conn.dbClose()
 
-
-    authType = getLicenseAuthType()
-
-    # if authType == consts.FUNC_MODE_ALL or authType == consts.FUNC_MODE_DOMAIN_PROXY:
-
     try:
         #if using args a comma for tuple is needed 
         thread = threading.Thread(target=registration, args=())
@@ -78,19 +73,7 @@ def start():
         print(f"Heartbeat thread failed: {e}")
         
     runFlaskSever() 
-# else:
-#     print("Non authorized licesen for Domain Proxy")
 
-
-def err500():
-    conn = dbConn(consts.DB)
-    cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = 'DCE994613163'")
-    sasHandler.Handle_Response(cbsd,consts.HB500,consts.SUB_HEART)
-
-def specSelect():
-    conn = dbConn(consts.DB)
-    cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = 'DCE994613163'")
-    sasHandler.Handle_Response(cbsd,consts.FS1,consts.SPECTRUM)
 
 
 def reprov(SNlist):
@@ -114,14 +97,13 @@ def reprov(SNlist):
     conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REPROV,cbsd[0]['SN']))
     conn.dbClose()
 
-def getLicenseAuthType():
-    l.testAuthLicense()
+def test():
+    conn = dbConn(consts.DB)
+    cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
 
-# getLicenseAuthType()
+    sasHandler.updateMaxEirp(cbsd[0])
 
 start()
-# reprov('DCE99461317E')
-# specSelect()
-
+# test()
 
 

@@ -232,21 +232,17 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
             # #grab all avaialbe channels provided by SAS reply
             channels = response['spectrumInquiryResponse'][0]['availableChannel']
             
-
-            if channels[0]['frequencyRange']['lowFrequency'] == 3550000000 and channels[0]['frequencyRange']['highFrequency'] == 3555000000:
-                continue
-            else:
                 #scans EARFCN list for open channel on SAS
-                r = selectFrequency(cbsd_list[i],channels,typeOfCalling)
+            r = selectFrequency(cbsd_list[i],channels,typeOfCalling)
 
-                #if there is no specturm continue to the next element in the loop(select Frequecny has logged error 400 to FeMS)
-                if r == 0:
-                    errorList.append(cbsd_list[i])
-                    continue
+            #if there is no specturm continue to the next element in the loop(select Frequecny has logged error 400 to FeMS)
+            if r == 0:
+                errorList.append(cbsd_list[i])
+                continue
 
-                sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
-                conn.update(sqlUpdate)
-            
+            sqlUpdate = "update `dp_device_info` SET sasStage = 'grant' where cbsdID= \'" + response['spectrumInquiryResponse'][i]['cbsdId'] +"\'"
+            conn.update(sqlUpdate)
+        
 
         elif typeOfCalling == consts.GRANT:            
             conn = dbConn("ACS_V1_1")
@@ -386,7 +382,7 @@ def updateMaxEirp(cbsd):
     conn = dbConn(consts.DB)
 
     #If maxEirp is higher than 47dBm/10Mhz
-    EIRP = conn.select("SELECT TxPower, antennaGain FROM dp_device_info WHERE %s",cbsd['SN'])
+    EIRP = conn.select("SELECT TxPower, antennaGain FROM dp_device_info WHERE SN = %s",cbsd['SN'])
 
     if EIRP[0]['TxPower'] + EIRP[0]['antennaGain'] > 37:
 
