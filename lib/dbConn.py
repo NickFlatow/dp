@@ -1,14 +1,20 @@
 import pymysql
-from test import app
+# from test import app
 import logging
-import lib.consts as consts
+# import lib.consts as consts
 
 class dbConn():
     def __init__(self,db):
         try:
-            self.conn = pymysql.connect(host = app.config['HOST'], 
-                                    user = app.config["USER"], 
-                                    passwd = app.config["PASSWORD"], 
+            # self.conn = pymysql.connect(host = app.config['HOST'], 
+            #                         user = app.config["USER"], 
+            #                         passwd = app.config["PASSWORD"], 
+            #                         database=db,
+            #                         cursorclass = pymysql.cursors.DictCursor,
+            #                         autocommit = True)
+            self.conn = pymysql.connect(host = 'localhost', 
+                                    user = 'root', 
+                                    passwd = 'N3wPr1vateNw', 
                                     database=db,
                                     cursorclass = pymysql.cursors.DictCursor,
                                     autocommit = True)
