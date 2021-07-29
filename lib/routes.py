@@ -47,7 +47,7 @@ def dp_register():
     sasHandler.Handle_Request(cbsd_list,consts.REG)
 
     return "success"
-
+ 
 @app.route('/dp/v1/deregister', methods=['POST'])
 @cross_origin()
 def dp_deregister():
