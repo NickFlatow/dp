@@ -61,7 +61,33 @@ class Cbsd:
         self.connreqUname = sqlCbsd['connreqUname']
         self.connreqPass = sqlCbsd['connreqPass']
         self.connreqURL = sqlCbsd['connreqURL']
+        
+        #set maxEirp
+        self.compute_maxEirp()
+        #set Low and high Frequcy
+        
 
+
+    def toggleAdminState(self,adminState: int):
+        if adminState == 'false':
+            # logging.info("Turn RF OFF for %s",cbsd['SN'])
+            self.adminState = 0
+        else:
+            # logging.info("Turn on RF for %s",cbsd['SN'])
+            self.adminState = 1
+
+    def adjustPower(self,power):
+        # logging.info("adjust to power to %s dBm",power)
+        self.txPower = power
+        self.compute_maxEirp()
+
+    def set_low_and_high_frequncy(self,earfcn):
+        pass
+
+    def compute_maxEirp(self):
+        self.maxEirp = self.txPower + self.antennaGain
+        # logging.info("adjust to maxEirp to %s dBm",maxEirp)
+    
 
     def setParamterValue(self,parameterValueList)-> None:
         '''
@@ -78,17 +104,18 @@ class Cbsd:
 
         for i in range(len(parameterValueList)):
             
-            
-            #admin state if off
-            if parameterValueList[i]['data_path'] == consts.ADMIN_STATE: 
-                if parameterValueList[i]['data_value'] == 'false':
-                    # logging.info("Turn RF OFF for %s",cbsd['SN'])
-                    # conn.update("UPDATE dp_device_info SET AdminState = %s WHERE SN = %s",(0,self.SN))
-                    self.adminState = 0
-                else:
-                    # logging.info("Turn on RF for %s",cbsd['SN'])
-                    # conn.update("UPDATE dp_device_info SET AdminState = %s WHERE SN = %s",(1,self.SN))
-                    self.adminState = 1
+            #toggle Power on or off
+            if parameterValueList[i]['data_path'] == consts.ADMIN_STATE:
+                self.toggleAdminState(parameterValueList[i]['data_value'])
+
+            #change cell power
+            if parameterValueList[i]['data_path'] == consts.TXPOWER_PATH:
+                self.adjustPower(parameterValueList[i]['data_value'])
+
+            #change cell frequency
+            if parameterValueList[i]['data_path'] == consts.EARFCN_LIST:
+                pass
+
 
             #add parameterValues datamodel, type and value to spv database table
             conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(self.SN,i,parameterValueList[i]['data_path'],parameterValueList[i]['data_type'],parameterValueList[i]['data_value']))
@@ -137,8 +164,10 @@ class Cbsd:
 
         self.cbsdID = cbsdID
 
-    def compute_maxEirp(self):
-         return self.txPower + self.antennaGain
+
+    #deregister method(clear all values associtaed with SAS)
+
+
 
 
 if __name__ == '__main__':
