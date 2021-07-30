@@ -1,5 +1,3 @@
-from datetime import datetime
-
 #program constants
 
 #CBSD SAS states
@@ -13,6 +11,8 @@ DEREG = 'deregistration'
 REL = 'relinquishment'
 REPROV = 'provisioning'
 
+
+#LICENSE FILE CONSTS
 FUNC_MODE_ALL = 0
 FUNC_MODE_DOMAIN_PROXY = 5
 
@@ -27,15 +27,24 @@ PERIODIC_ONE    = {'data_path':PERIODIC,'data_type':'unsignedInt','data_value':1
 ADMIN_POWER_OFF = {'data_path':ADMIN_STATE,'data_type':'boolean','data_value':'false'}
 ADMIN_POWER_ON  = {'data_path':ADMIN_STATE,'data_type':'boolean','data_value':'true'}
 
-
+#FREQUENCY CONTS
 HIGH_FREQUENCY = 3700000000
 LOW_FREQUENCY = 3550000000
 
 Hz = 1000000
 TEN_MHz = 10000000
 
+
+
+
 DB = 'ACS_V1_1'
 
+#TEST CONSTS
+TEST_CBSD_SN = '900F0C732A02'
+
+
+
+#SAS HANDLER CONSTS
 FS = {
   "spectrumInquiryResponse": [
     {
