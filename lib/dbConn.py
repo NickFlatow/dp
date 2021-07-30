@@ -43,6 +43,7 @@ class dbConn():
     def update(self, sql, params=None):
             self.cursor = self.conn.cursor()
             logging.debug("SQL COMMAND: " + sql + " params: " +  str(params))
+            print("SQL COMMAND: " + sql + " params: " +  str(params))
             try:
                 if params:
                     self.cursor.execute(sql, params)

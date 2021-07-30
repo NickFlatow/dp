@@ -1,6 +1,7 @@
 import consts
 import requests
 import time
+from abc import ABC, abstractmethod
 from dbConn import dbConn
 from datetime import datetime
 from requests.auth import HTTPDigestAuth
@@ -41,7 +42,7 @@ from requests.auth import HTTPDigestAuth
 
     #set highFreq
 
-class Cbsd:
+class CbsdInfo(ABC):
     '''
     Contains information specific to CBSD and cbsdActions such as ipaddress, power, earfcn, connection request URL...etc
     Contains methods whcich preform action on CBSD such as setParamterValues
@@ -49,23 +50,53 @@ class Cbsd:
     '''
 
     def __init__(self, sqlCbsd):
-        self.SN = sqlCbsd['SN']
-        self.userID = sqlCbsd['userID']
-        self.fccID = sqlCbsd['fccID']
-        self.sasStage = sqlCbsd['sasStage']
-        self.txPower = sqlCbsd['TxPower']
-        self.earfcn = sqlCbsd['EARFCN']
-        self.antennaGain = sqlCbsd['antennaGain']
-        self.adminState = 0
-        self.ipAddress = sqlCbsd['IPAddress']
-        self.connreqUname = sqlCbsd['connreqUname']
-        self.connreqPass = sqlCbsd['connreqPass']
-        self.connreqURL = sqlCbsd['connreqURL']
+        self.userID =            sqlCbsd['userID']
+        self.fccID =             sqlCbsd['fccID']
+        self.SN =                sqlCbsd['SN']
+        self.cbsdCat =           sqlCbsd['cbsdCategory']
+        self.sasStage =          sqlCbsd['sasStage']
+        self.txPower =           sqlCbsd['TxPower']
+        self.earfcn =            sqlCbsd['EARFCN']
+        self.antennaGain =       sqlCbsd['antennaGain']
+        self.adminState =        0
+        self.grantID =           sqlCbsd['grantID']
+        self.operationalState =  sqlCbsd['operationalState']
+        self.transmitExpireTime =sqlCbsd['transmitExpireTime']
+        self.grantExpireTime =   sqlCbsd['grantExpireTime']
+        self.cellIdenity =       sqlCbsd['CellIdentity']
+        self.ipAddress =         sqlCbsd['IPAddress']
+        self.connreqUname =      sqlCbsd['connreqUname']
+        self.connreqPass =       sqlCbsd['connreqPass']
+        self.connreqURL =        sqlCbsd['connreqURL']
+        self.hclass =            sqlCbsd['hclass']
         
         #set maxEirp
         self.compute_maxEirp()
         #set Low and high Frequcy
+        self.set_low_and_high_frequncy(self.earfcn)
+
         
+    @abstractmethod
+    def set_low_and_high_frequncy(self,earfcn):
+        pass
+
+    @abstractmethod
+    def select_frequency(self,channels):
+        pass
+
+    def update_cbsd_attribute_database(self,column: str ,attribute) -> None:
+        '''
+        Given a database column and an attribute. We will update the database
+        '''
+        conn = dbConn(consts.DB)
+        # sql = "UPDATE dp_device_info SET %s = %s WHERE SN = %s",(column,attribute,self.SN)
+        # print(sql)
+        conn.update("UPDATE dp_device_info SET %s = %s WHERE SN = %s",(column,attribute,self.SN))
+        # conn.update("UPDATE `dp_device_info` SET ({}) WHERE SN IN %s".format(','.join(['%s'] * len(attribute))),(attribute,self.SN))
+        conn.dbClose()
+
+    def updateGrantTime(self,grantTime):
+        self.grantExpireTime = grantTime
 
 
     def toggleAdminState(self,adminState: int):
@@ -81,13 +112,12 @@ class Cbsd:
         self.txPower = power
         self.compute_maxEirp()
 
-    def set_low_and_high_frequncy(self,earfcn):
-        pass
-
     def compute_maxEirp(self):
         self.maxEirp = self.txPower + self.antennaGain
         # logging.info("adjust to maxEirp to %s dBm",maxEirp)
-    
+
+    def wait_for_execution():
+        pass
 
     def setParamterValue(self,parameterValueList)-> None:
         '''
@@ -114,7 +144,7 @@ class Cbsd:
 
             #change cell frequency
             if parameterValueList[i]['data_path'] == consts.EARFCN_LIST:
-                pass
+                self.set_low_and_high_frequncy(parameterValueList[i]['data_value'])
 
 
             #add parameterValues datamodel, type and value to spv database table
@@ -168,17 +198,48 @@ class Cbsd:
     #deregister method(clear all values associtaed with SAS)
 
 
+class OneCA(CbsdInfo):
 
+    def __init__(self,sqlCbsd):
+        super(OneCA,self).__init__(sqlCbsd)
+    
+    def set_low_and_high_frequncy(self,earfcn):
+        self.lowFrequency = 5
+    
+    def select_frequency(self,channels):
+        pass
+
+
+class TwoCA(CbsdInfo):
+
+    def __init__(self,sqlCbsd):
+        #to extend from 1CA add new varaibles here and use where applicaple in methods
+        #ex self.earfcn2 = sqlCbsd['earfcn2']
+        #must be before the call to super
+        # self.earfcn2 = 2
+        super(TwoCA,self).__init__(sqlCbsd)
+       
+    def set_low_and_high_frequncy(self,earfcn):
+        self.lowFrequency = 8
+        # print(self.earfcn2)
+
+    def select_frequency(self,channels):
+        #select freq with self.earfcn2
+        pass
 
 if __name__ == '__main__':
     conn = dbConn("ACS_V1_1")
     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
-    # a = CbsdInfo(sqlCbsd[0])
-    # b = Cbsd(sqlCbsd[0])
-    # b.setParamterValue([consts.ADMIN_POWER_OFF])
-    # b.sasStage = 'test'
-    print(type(consts.ADMIN_POWER_OFF))
+
+    # sql = "UPDATE `dp_device_info` SET ({}) WHERE SN IN %s".format(','.join(['%s'] * len(parameter)))
+
+    # print(f"sql: {sql}")
+
+    a = OneCA(sqlCbsd[0])
+    b = TwoCA(sqlCbsd[0])
+
+    a.update_cbsd_attribute_database('AdminState',1)
+    print(f"1CA lowFreq: {a.lowFrequency}")
+    print(f"2CA lowFreq: {b.lowFrequency}")
 
 
-
-    print('test')
