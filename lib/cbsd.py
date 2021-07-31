@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dbConn import dbConn
-from datetime import datetime
+from datetime import datetime,timedelta
 from requests.auth import HTTPDigestAuth
 from pymysql import TIMESTAMP
 import consts
@@ -86,25 +86,49 @@ class CbsdInfo(ABC):
     def select_frequency(self,channels):
         pass
 
-    def MHZtoEARFCN(MHz):
+    def expired(self,SASexpireTime: str, isGrantTime = False) -> bool:
+        '''
+        Move to SAS client
+        expireTime: str representing UTC expire time\n
+        Time expired returns true
+        else false
+        '''
+        if SASexpireTime == None:
+            return False
 
-        EARFCN = math.ceil(((MHz - 3550)/0.1) + 55240)
+        expireTime = datetime.strptime(SASexpireTime,"%Y-%m-%dT%H:%M:%SZ")
+
+        #Renew grant five minues before it expires
+        if isGrantTime:
+            expireTime = expireTime - timedelta(seconds=300)
+    
+        if datetime.utcnow() > expireTime:
+            return True
+        else: 
+            return False
+
+    def MHZtoEARFCN(self,MHz):
+
+        EARFCN = math.floor(((MHz - 3550)/0.1) + 55240)
         return EARFCN
     
-    def EARFCNtoMHZ(earfcn):
+    def EARFCNtoMHZ(self,earfcn):
         MHz = math.ceil(3550 + (0.1 * (int(earfcn) - 55240)))
         return MHz
 
     def select_cbsd_database_value(self,column: str) -> None:
-        
+        '''
+        UPDATE TO JUST PASS A SQL STRING TO SELECT
+        '''
         conn = dbConn(consts.DB)
         r = conn.select("SELECT " + column + " FROM dp_device_info WHERE SN = %s",self.SN)
         conn.dbClose()
         return r
 
     def update_cbsd_database_value(self,column: str ,value) -> None:
+
         '''
-        Given a database column and an attribute. We will update the database
+        UPDATE TO JUST PASS A SQL STRING TO UPDATE 
         '''
         conn = dbConn(consts.DB)
         conn.update("UPDATE dp_device_info SET " + column + " = %s WHERE SN = %s",(value,self.SN))
@@ -204,6 +228,10 @@ class CbsdInfo(ABC):
                 # remove action from action queue
                 conn.update("DELETE FROM apt_action_queue WHERE SN = 'DCE994613163'")
 
+
+            
+        conn.dbClose()
+
                 #and then retry
 
 
@@ -230,13 +258,27 @@ class CbsdInfo(ABC):
 class OneCA(CbsdInfo):
 
     def __init__(self,sqlCbsd):
-        super(OneCA,self).__init__(sqlCbsd)
+        super(OneCA,self).__init__(sqlCbsd) 
     
     def set_low_and_high_frequncy(self,earfcn):
-        self.lowFrequency = 5
+        MHz = self.EARFCNtoMHZ(earfcn)
+        self.lowFrequency  = MHz - 10
+        self.highFrequency = MHz + 10
     
-    def select_frequency(self,channels):
+    def select_frequency(self,channels: dict) -> None:
+        '''
+        Given a list of avaible channels from the SAS. The Domain Proxy will scan the availabe channels on the cell and look for a match. If the selected channel is
+        different the one currenly set on the cell the Domain Proxy will provision the cell to change its value.
+        '''
         pass
+
+        #step one is the frequency already selected for the cell avialble?
+        for channel in channels:
+            pass
+
+
+
+
 
 
 class TwoCA(CbsdInfo):

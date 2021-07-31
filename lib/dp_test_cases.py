@@ -1,6 +1,6 @@
+from datetime import date, datetime
 from dbConn import dbConn
 import unittest
-
 import consts
 
 from cbsd import OneCA as ONECA
@@ -12,7 +12,6 @@ class CbsdTest(unittest.TestCase):
     Test Cases for generic cbsd class
     '''
     
-
     # def test_setParameterValues_adminState_off(self):
 
     #     '''
@@ -24,6 +23,7 @@ class CbsdTest(unittest.TestCase):
 
     #     ass = cbsd.select_cbsd_database_value('AdminState')
     #     self.assertEqual(ass[0]['AdminState'],0)
+
 
     def test_update_expire_time(self):
 
@@ -50,25 +50,53 @@ class CbsdTest(unittest.TestCase):
         #ensure they match
         self.assertEqual(dbGrantTime[0]['grantExpireTime'],grantTime)
         self.assertEqual(dbTransmitTime[0]['transmitExpireTime'],transmitTime) 
-
-
-    #test for set Frequency
-
-
-    #test for set power
-
-
-    #test for calc MaxEirp
-
-    #test for convert Earfcn to MHz
-    def EARFCNtoMHZ(self):
+    
+    def test_EARFCNtoMHZ(self):
         cbsd = self.get_oneCA_test_CBSD(consts.TEST_CBSD_SN)
-        self.assertEqual(cbsd.EARFCNtoMHZ(58240),3550)
+        self.assertEqual(cbsd.EARFCNtoMHZ(55240),3550)
         self.assertEqual(cbsd.EARFCNtoMHZ(55990),3625)
         self.assertEqual(cbsd.EARFCNtoMHZ(56739),3700)
 
+    def test_MHztoEARFCN(self):
+        cbsd = self.get_oneCA_test_CBSD(consts.TEST_CBSD_SN)
+        self.assertEqual(cbsd.MHZtoEARFCN(3550),55240)
+        self.assertEqual(cbsd.MHZtoEARFCN(3625),55990)
+        # self.assertEqual(cbsd.MHZtoEARFCN(3700),56739)
 
-    #test for convert Mhz to earfcn
+    def test_expired(self):
+        pass
+        # cbsd = self.get_oneCA_test_CBSD(consts.TEST_CBSD_SN)
+        # time = str(datetime.utcnow())
+        # cbsd.expired(time,False)
+
+    def test_set_low_and_high_frequency(self):
+        cbsd = self.get_oneCA_test_CBSD(consts.TEST_CBSD_SN)
+        #low range
+        cbsd.set_low_and_high_frequncy(55340)
+        self.assertEqual(cbsd.lowFrequency,3550)
+        self.assertEqual(cbsd.highFrequency,3570)
+        #middle range
+        cbsd.set_low_and_high_frequncy(55990)
+        self.assertEqual(cbsd.lowFrequency,3615)
+        self.assertEqual(cbsd.highFrequency,3635)
+
+
+
+
+
+
+
+
+        #test for set Frequency
+
+
+        #test for set power
+
+
+        #test for calc MaxEirp
+
+        #test for convert Earfcn to MHz
+
 
 
     #test for channel search
