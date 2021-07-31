@@ -1,10 +1,12 @@
-import consts
-import requests
-import time
 from abc import ABC, abstractmethod
 from dbConn import dbConn
 from datetime import datetime
 from requests.auth import HTTPDigestAuth
+from pymysql import TIMESTAMP
+import consts
+import requests
+import time
+import math
 
 # class CbsdInfo:
 #     '''
@@ -50,25 +52,25 @@ class CbsdInfo(ABC):
     '''
 
     def __init__(self, sqlCbsd):
-        self.userID =            sqlCbsd['userID']
-        self.fccID =             sqlCbsd['fccID']
-        self.SN =                sqlCbsd['SN']
-        self.cbsdCat =           sqlCbsd['cbsdCategory']
-        self.sasStage =          sqlCbsd['sasStage']
-        self.txPower =           sqlCbsd['TxPower']
-        self.earfcn =            sqlCbsd['EARFCN']
-        self.antennaGain =       sqlCbsd['antennaGain']
-        self.adminState =        0
-        self.grantID =           sqlCbsd['grantID']
-        self.operationalState =  sqlCbsd['operationalState']
-        self.transmitExpireTime =sqlCbsd['transmitExpireTime']
-        self.grantExpireTime =   sqlCbsd['grantExpireTime']
-        self.cellIdenity =       sqlCbsd['CellIdentity']
-        self.ipAddress =         sqlCbsd['IPAddress']
-        self.connreqUname =      sqlCbsd['connreqUname']
-        self.connreqPass =       sqlCbsd['connreqPass']
-        self.connreqURL =        sqlCbsd['connreqURL']
-        self.hclass =            sqlCbsd['hclass']
+        self.userID =             sqlCbsd['userID']
+        self.fccID =              sqlCbsd['fccID']
+        self.SN =                 sqlCbsd['SN']
+        self.cbsdCat =            sqlCbsd['cbsdCategory']
+        self.sasStage =           sqlCbsd['sasStage']
+        self.txPower =            sqlCbsd['TxPower']
+        self.earfcn =             sqlCbsd['EARFCN']
+        self.antennaGain =        sqlCbsd['antennaGain']
+        self.adminState =         0
+        self.grantID =            sqlCbsd['grantID']
+        self.operationalState =   sqlCbsd['operationalState']
+        self.transmitExpireTime = sqlCbsd['transmitExpireTime']
+        self.grantExpireTime =    sqlCbsd['grantExpireTime']
+        self.cellIdenity =        sqlCbsd['CellIdentity']
+        self.ipAddress =          sqlCbsd['IPAddress']
+        self.connreqUname =       sqlCbsd['connreqUname']
+        self.connreqPass =        sqlCbsd['connreqPass']
+        self.connreqURL =         sqlCbsd['connreqURL']
+        self.hclass =             sqlCbsd['hclass']
         
         #set maxEirp
         self.compute_maxEirp()
@@ -84,19 +86,46 @@ class CbsdInfo(ABC):
     def select_frequency(self,channels):
         pass
 
-    def update_cbsd_attribute_database(self,column: str ,attribute) -> None:
+    def MHZtoEARFCN(MHz):
+
+        EARFCN = math.ceil(((MHz - 3550)/0.1) + 55240)
+        return EARFCN
+    
+    def EARFCNtoMHZ(earfcn):
+        MHz = math.ceil(3550 + (0.1 * (int(earfcn) - 55240)))
+        return MHz
+
+    def select_cbsd_database_value(self,column: str) -> None:
+        
+        conn = dbConn(consts.DB)
+        r = conn.select("SELECT " + column + " FROM dp_device_info WHERE SN = %s",self.SN)
+        conn.dbClose()
+        return r
+
+    def update_cbsd_database_value(self,column: str ,value) -> None:
         '''
         Given a database column and an attribute. We will update the database
         '''
         conn = dbConn(consts.DB)
-        # sql = "UPDATE dp_device_info SET %s = %s WHERE SN = %s",(column,attribute,self.SN)
-        # print(sql)
-        conn.update("UPDATE dp_device_info SET %s = %s WHERE SN = %s",(column,attribute,self.SN))
-        # conn.update("UPDATE `dp_device_info` SET ({}) WHERE SN IN %s".format(','.join(['%s'] * len(attribute))),(attribute,self.SN))
+        conn.update("UPDATE dp_device_info SET " + column + " = %s WHERE SN = %s",(value,self.SN))
         conn.dbClose()
 
-    def updateGrantTime(self,grantTime):
-        self.grantExpireTime = grantTime
+    def updateExpireTime(self, time:str, timeType: str):
+        '''
+        updates time locally and in the database(to display on FeMS cbrs status page) for grant and tranmit time specified by type
+        timeTypes = 'grant' or 'transmit'
+        '''
+        timeTypes = ['grant','transmit']
+        if timeType not in timeTypes:
+            raise ValueError("Invalid timeType must be grant or transmit")
+
+        if timeType == 'grant':
+            self.grantExpireTime = time
+            self.update_cbsd_database_value('grantExpireTime',time)
+
+        if timeType == 'transmit':
+            self.transmitExpireTime = time
+            self.update_cbsd_database_value('transmitExpireTime',time)
 
 
     def toggleAdminState(self,adminState: int):
@@ -109,7 +138,7 @@ class CbsdInfo(ABC):
 
     def adjustPower(self,power):
         # logging.info("adjust to power to %s dBm",power)
-        self.txPower = power
+        self.txPower = power 
         self.compute_maxEirp()
 
     def compute_maxEirp(self):
@@ -229,16 +258,16 @@ class TwoCA(CbsdInfo):
 
 if __name__ == '__main__':
     conn = dbConn("ACS_V1_1")
-    sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
+    sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE994613163')
 
     # sql = "UPDATE `dp_device_info` SET ({}) WHERE SN IN %s".format(','.join(['%s'] * len(parameter)))
 
-    # print(f"sql: {sql}")
+    # print(f"sql: {sql}")    
+
 
     a = OneCA(sqlCbsd[0])
     b = TwoCA(sqlCbsd[0])
 
-    a.update_cbsd_attribute_database('AdminState',1)
     print(f"1CA lowFreq: {a.lowFrequency}")
     print(f"2CA lowFreq: {b.lowFrequency}")
 
