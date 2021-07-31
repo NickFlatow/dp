@@ -300,15 +300,15 @@ FS_MISING_55590 = {
           "ruleApplied": "FCC_PART_96",
           "maxEirp": 30
         },
-        {
-          "frequencyRange": {
-            "lowFrequency": 3580000000,
-            "highFrequency": 3590000000
-          },
-          "channelType": "GAA",
-          "ruleApplied": "FCC_PART_96",
-          "maxEirp": 30
-        },
+        # {
+        #   "frequencyRange": {
+        #     "lowFrequency": 3580000000,
+        #     "highFrequency": 3590000000
+        #   },
+        #   "channelType": "GAA",
+        #   "ruleApplied": "FCC_PART_96",
+        #   "maxEirp": 30
+        # },
         {
           "frequencyRange": {
             "lowFrequency": 3550000000,
@@ -326,8 +326,7 @@ FS_MISING_55590 = {
           "channelType": "GAA",
           "ruleApplied": "FCC_PART_96",
           "maxEirp": 30
-        }
-        ,
+        },
         {
           "frequencyRange": {
             "lowFrequency": 3570000000,

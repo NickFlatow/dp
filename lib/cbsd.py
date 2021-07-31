@@ -243,32 +243,32 @@ class CbsdInfo(ABC):
 
 
             #add parameterValues datamodel, type and value to spv database table
-            conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(self.SN,i,parameterValueList[i]['data_path'],parameterValueList[i]['data_type'],parameterValueList[i]['data_value']))
+            # conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(self.SN,i,parameterValueList[i]['data_path'],parameterValueList[i]['data_type'],parameterValueList[i]['data_value']))
 
-            #place action in apt_action_queue
-            self.cbsdAction(self.SN,'Set Parameter Value',str(datetime.now()))
+            # #place action in apt_action_queue
+            # self.cbsdAction(self.SN,'Set Parameter Value',str(datetime.now()))
             
-            #Make connection request
-            response = requests.get(self.connreqURL, auth= HTTPDigestAuth(self.connreqUname,self.connreqPass))
+            # #Make connection request
+            # response = requests.get(self.connreqURL, auth= HTTPDigestAuth(self.connreqUname,self.connreqPass))
 
-            #if connection request returns 200
-            if response.status_code == 200:
-                #Wait for conenction request to complete
-                settingParameters = True
-                while settingParameters:
-                    # logging.info(f"Setting Parameters for {cbsd['SN']}")
-                    database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",self.SN)
+            # #if connection request returns 200
+            # if response.status_code == 200:
+            #     #Wait for conenction request to complete
+            #     settingParameters = True
+            #     while settingParameters:
+            #         # logging.info(f"Setting Parameters for {cbsd['SN']}")
+            #         database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",self.SN)
                     
-                    if database == (): 
-                        # logging.info(f"Paramters set successfully for {cbsd['SN']}")
-                        settingParameters = False
-                    else:
-                        time.sleep(1)
-                        # endTime = datetime.now()
-                        # logging.info(f"end time in loop: {endTime}")
-            else:
-                # remove action from action queue
-                conn.update("DELETE FROM apt_action_queue WHERE SN = 'DCE994613163'")
+            #         if database == (): 
+            #             # logging.info(f"Paramters set successfully for {cbsd['SN']}")
+            #             settingParameters = False
+            #         else:
+            #             time.sleep(1)
+            #             # endTime = datetime.now()
+            #             # logging.info(f"end time in loop: {endTime}")
+            # else:
+            #     # remove action from action queue
+            #     conn.update("DELETE FROM apt_action_queue WHERE SN = %s",self.SN)
 
 
             
@@ -320,18 +320,16 @@ class OneCA(CbsdInfo):
 
         for earfcn in self.earfcnList:
 
-            if earfcn != self.earfcn:
-                #TODO convert back to self.earfcn if no channel is found
-                self.set_low_and_high_frequncy(earfcn)
-
             #convert low and high frequncy to Hz
-            lowFreqHz  = self.lowFrequency * consts.Hz
-            highFreqHz = self.highFrequency * consts.Hz
+            lowFreqHz  = (self.EARFCNtoMHZ(earfcn) - 10) * consts.Hz
+            highFreqHz = (self.EARFCNtoMHZ(earfcn) + 10) * consts.Hz
 
             #step one is the frequency already selected for the cell avialble?
             for channel in channels:
 
-                if lowFreqHz >= channel['frequencyRange']['lowFrequency'] and highFreqHz <= channel['frequencyRange']['highFrequency']:
+                low = channel['frequencyRange']['lowFrequency']
+                high = channel['frequencyRange']['highFrequency']
+                if lowFreqHz >= channel['frequencyRange']['lowFrequency'] and lowFreqHz <= channel['frequencyRange']['highFrequency']:
                     low_frequeny_channel_found = True
 
                     if 'maxEirp' in channel:
@@ -356,7 +354,7 @@ class OneCA(CbsdInfo):
                             maxEirp = lowChannelMaxEirp
                         else: 
                             maxEirp = highChannelMaxEirp
-                        if maxEirp < self.compute_maxEirp:
+                        if maxEirp < self.maxEirp:
                             txPower = maxEirp - self.antennaGain
                             paramterValueList.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txPower})
 
