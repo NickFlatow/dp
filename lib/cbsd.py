@@ -7,6 +7,7 @@ import consts
 import requests
 import time
 import math
+import json
 
 # class CbsdInfo:
 #     '''
@@ -76,6 +77,8 @@ class CbsdInfo(ABC):
         self.compute_maxEirp()
         #set Low and high Frequcy
         self.set_low_and_high_frequncy(self.earfcn)
+        #populate earfcnList
+        self.getEarfcnList()
 
         
     @abstractmethod
@@ -85,6 +88,43 @@ class CbsdInfo(ABC):
     @abstractmethod
     def select_frequency(self,channels):
         pass
+
+    def getEarfcnList(self):
+        '''
+        earfcnInUse will always be at the first element in the list\n
+        Collects user defined earfcn network plan for SAS spectrum inquery channel scan
+        '''
+        conn = dbConn(consts.DB)
+        
+        #collect all parameters from subscription table (update to json ajax send or add more value so there is no case of duplicated entires with same SN in apt_subscription table)
+        parameters = conn.select("SELECT parameter FROM apt_subscription WHERE SN = %s",self.SN)
+
+        conn.dbClose()
+        
+        #convert to json
+        parameters = json.loads(parameters[0]['parameter'])
+        
+        #get eutra values(all possible earfcns provided by user in the subscription table)
+        eutra = parameters['EUTRACarrierARFCNDL']['value']
+        
+        if eutra != '':
+            #convert to list
+            earfcnList = list(eutra.split(","))
+
+            # #convert all values to ints
+            # earfcnList = [int(i) for i in earfcnList]
+                
+            #add to the front of the list
+            if self.earfcn not in earfcnList:
+                earfcnList.insert(0,self.earfcn)
+            
+            #move to the front of the list
+            else: 
+                earfcnList.insert(0, earfcnList.pop(earfcnList.index(self.earfcn)))
+
+            self.earfcnList = earfcnList
+        else:
+            self.earfcnList = [self.earfcn]
 
     def expired(self,SASexpireTime: str, isGrantTime = False) -> bool:
         '''
@@ -197,6 +237,8 @@ class CbsdInfo(ABC):
 
             #change cell frequency
             if parameterValueList[i]['data_path'] == consts.EARFCN_LIST:
+                #TODO can we make database script to do this for us on each periodic inform?
+                self.earfcn = parameterValueList[i]['data_value']
                 self.set_low_and_high_frequncy(parameterValueList[i]['data_value'])
 
 
@@ -258,23 +300,76 @@ class CbsdInfo(ABC):
 class OneCA(CbsdInfo):
 
     def __init__(self,sqlCbsd):
-        super(OneCA,self).__init__(sqlCbsd) 
+        super(OneCA,self).__init__(sqlCbsd)  
     
     def set_low_and_high_frequncy(self,earfcn):
         MHz = self.EARFCNtoMHZ(earfcn)
         self.lowFrequency  = MHz - 10
         self.highFrequency = MHz + 10
     
-    def select_frequency(self,channels: dict) -> None:
+    def select_frequency(self,channels: dict) -> bool:
         '''
         Given a list of avaible channels from the SAS. The Domain Proxy will scan the availabe channels on the cell and look for a match. If the selected channel is
         different the one currenly set on the cell the Domain Proxy will provision the cell to change its value.
         '''
-        pass
+        low_frequeny_channel_found   = False
+        high_frequency_channel_found = False   
 
-        #step one is the frequency already selected for the cell avialble?
-        for channel in channels:
-            pass
+        #list of values to change on the cell if needed
+        paramterValueList = []      
+
+        for earfcn in self.earfcnList:
+
+            if earfcn != self.earfcn:
+                #TODO convert back to self.earfcn if no channel is found
+                self.set_low_and_high_frequncy(earfcn)
+
+            #convert low and high frequncy to Hz
+            lowFreqHz  = self.lowFrequency * consts.Hz
+            highFreqHz = self.highFrequency * consts.Hz
+
+            #step one is the frequency already selected for the cell avialble?
+            for channel in channels:
+
+                if lowFreqHz >= channel['frequencyRange']['lowFrequency'] and highFreqHz <= channel['frequencyRange']['highFrequency']:
+                    low_frequeny_channel_found = True
+
+                    if 'maxEirp' in channel:
+                        lowChannelMaxEirp = channel['maxEirp']
+
+                elif highFreqHz >= channel['frequencyRange']['lowFrequency'] and highFreqHz <= channel['frequencyRange']['highFrequency']:
+                    high_frequency_channel_found = True
+
+                    if 'maxEirp' in channel:
+                        highChannelMaxEirp = channel['maxEirp']
+
+                if low_frequeny_channel_found and high_frequency_channel_found:
+                    #determine if we need to chnage the earfcn value or txPower on the cell
+                    if earfcn != self.earfcn:
+                        #add the datamodel path, data_type and data_value to be changed on the cell
+                        paramterValueList.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value':earfcn})
+
+                    #determine if the power if too high for SAS requirements
+                    if 'maxEirp' in channel:
+                        #what if one channels maxEirp is lower than the other?
+                        if lowChannelMaxEirp <= highChannelMaxEirp:
+                            maxEirp = lowChannelMaxEirp
+                        else: 
+                            maxEirp = highChannelMaxEirp
+                        if maxEirp < self.compute_maxEirp:
+                            txPower = maxEirp - self.antennaGain
+                            paramterValueList.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value':txPower})
+
+                    #if parameterValueList is not empty change update the cell with new values
+                    if paramterValueList:
+                        self.setParamterValue(paramterValueList)
+
+                    #we have found spectrum
+                    return True
+        if not low_frequeny_channel_found or not high_frequency_channel_found:
+            #TODO log no specrum error to FeMS
+            #we have not found spectrum
+            return False
 
 
 

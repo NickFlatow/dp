@@ -76,30 +76,50 @@ class CbsdTest(unittest.TestCase):
         self.assertEqual(cbsd.lowFrequency,3550)
         self.assertEqual(cbsd.highFrequency,3570)
         #middle range
-        cbsd.set_low_and_high_frequncy(55990)
+        cbsd.set_low_and_high_frequncy(55990) 
         self.assertEqual(cbsd.lowFrequency,3615)
         self.assertEqual(cbsd.highFrequency,3635)
 
 
-
-
-
-
-
-
-        #test for set Frequency
-
-
-        #test for set power
-
-
-        #test for calc MaxEirp
-
-        #test for convert Earfcn to MHz
-
+    def test_get_earfcnList(self):
+        cbsd = self.get_oneCA_test_CBSD(consts.TEST_CBSD_SN)
+        self.assertEqual(cbsd.earfcnList,['55590','55190','55490'])
+        # self.assertEqual(cbsd.earfcnList,['55590'])
 
 
     #test for channel search
+    def test_select_frequency(self):
+        cbsd = self.get_oneCA_test_CBSD(consts.TEST_CBSD_SN)
+
+        #one where no frequcy is avalbile
+        self.assertEqual(cbsd.select_frequency(consts.SPEC_EIRP),False)
+
+        #one where earfcnInUse is used
+        cbsd.select_frequency(consts.FS)
+        self.assertEqual(cbsd.earfcn,'55590')
+
+        #check database earfcn is equal to 55590
+        self.assertEqual(cbsd.select_cbsd_database_value('EARFCN'),'55590')
+
+
+        #one where one of the backup earfcns are used from apt_subscription
+        cbsd.select_frequency(consts.FS_MISING_55590)
+        self.assertEqual(cbsd.earfcn,'55190')
+
+        #check database earfcn is equal to 55190
+        self.assertEqual(cbsd.select_cbsd_database_value('EARFCN'),'55190')
+
+
+        #TODO test for set Frequency
+
+
+        #TODO test for set power
+            #TODO test for calc MaxEirp
+
+
+
+
+    
 
     def get_oneCA_test_CBSD(self,test_cbsd_sn) -> ONECA:
         conn = dbConn("ACS_V1_1")
