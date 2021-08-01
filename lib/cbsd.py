@@ -2,48 +2,11 @@ from abc import ABC, abstractmethod
 from dbConn import dbConn
 from datetime import datetime,timedelta
 from requests.auth import HTTPDigestAuth
-from pymysql import TIMESTAMP
 import consts
 import requests
 import time
 import math
 import json
-
-# class CbsdInfo:
-#     '''
-#     Contains persistant cbsd information userID, fccID, antennaGain ..... 
-#     '''
-
-#     cbsdID: str
-#     lowFrequency: int
-#     highFrequency: int
-#     # attributes = ['userID','fccID','sasStage','TxPower','EARFCN','antennaGain','IPAddress','connreqUname','connreqPass','connreqURL']
-
-#     def __init__(self,sqlCbsd):        
-#         self.userID = sqlCbsd['userID']
-#         self.fccID = sqlCbsd['fccID']
-#         self.sasStage = sqlCbsd['sasStage']
-#         self.txPower = sqlCbsd['TxPower']
-#         self.earfcn = sqlCbsd['EARFCN']
-#         self.antennaGain = sqlCbsd['antennaGain']
-#         self.adminState = 0
-#         self.ipAddress = sqlCbsd['IPAddress']
-#         self.connreqUname = sqlCbsd['connreqUname']
-#         self.connreqPass = sqlCbsd['connreqPass']
-#         self.connreqURL = sqlCbsd['connreqURL']
-
-#     def set_cbsdID(self,cbsdID):
-#         self.cbsdID = cbsdID
-
-#     def compute_maxEirp(self):
-#          return self.txPower + self.antennaGain
-
-
-    #set txPower
-
-    #set lowFreq
-
-    #set highFreq
 
 class CbsdInfo(ABC):
     '''
@@ -387,34 +350,25 @@ class TwoCA(CbsdInfo):
         #select freq with self.earfcn2
         pass
 
-
-def getCbsdModel(dbObj: dict) -> CbsdInfo:
+class CbsdModelExporter():
+    '''Factory for creating cbsd modles '''
+    def getCbsd(dbObj: dict) -> CbsdInfo:
+            
+        if dbObj['hclass'] == 'FAP_FC40641CA':
+            return OneCA(dbObj)
         
-    if dbObj['hclass'] == 'FAP_FC40641CA':
-        return OneCA(dbObj)
-    
-    elif dbObj['hclass'] == 'FAP_FC40642CA':
-        return TwoCA(dbObj) 
+        elif dbObj['hclass'] == 'FAP_FC40642CA':
+            return TwoCA(dbObj) 
 
 if __name__ == '__main__':
     conn = dbConn("ACS_V1_1")
     # sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE994613163')
-    sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE userID = %s",'Test-inc')
+    sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE994613163')
     conn.dbClose()
 
     # sql = "UPDATE `dp_device_info` SET ({}) WHERE SN IN %s".format(','.join(['%s'] * len(parameter)))
 
     # print(f"sql: {sql}")    
-
-    myList = []
-
-    for sql in sqlCbsd:
-        myList.append(getCbsdModel(sql))
-
-
-    for cbsd in myList:
-        print(cbsd.sasStage)
-
 
     # a = OneCA(sqlCbsd[0])
     # b = TwoCA(sqlCbsd[0])

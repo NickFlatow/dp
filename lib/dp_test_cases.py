@@ -88,36 +88,36 @@ class CbsdTest(unittest.TestCase):
 
 
     #test for channel search
-    def test_select_frequency(self):
-        cbsd = self.get_oneCA_test_CBSD(consts.TEST_CBSD_SN)
+    # def test_select_frequency(self):
+    #     cbsd = self.get_oneCA_test_CBSD(consts.TEST_CBSD_SN)
 
-        channels1 = consts.SPEC_EIRP
-        avaiableChannels1 = channels1['spectrumInquiryResponse'][0]['availableChannel']
-        #one where no frequcy is avalbile
-        self.assertEqual(cbsd.select_frequency(avaiableChannels1),False)
-
-
-        channels2 = consts.FS
-        avaiableChannels2 = channels2['spectrumInquiryResponse'][0]['availableChannel']
-
-        #one where earfcnInUse is used
-        self.assertEqual(cbsd.select_frequency(avaiableChannels2),True)
-        self.assertEqual(cbsd.earfcn,'55590')
-
-        # check database earfcn is equal to 55590
-        # self.assertEqual(cbsd.select_cbsd_database_value('EARFCN'),'55590')
+    #     channels1 = consts.SPEC_EIRP
+    #     avaiableChannels1 = channels1['spectrumInquiryResponse'][0]['availableChannel']
+    #     #one where no frequcy is avalbile
+    #     self.assertEqual(cbsd.select_frequency(avaiableChannels1),False)
 
 
+    #     channels2 = consts.FS
+    #     avaiableChannels2 = channels2['spectrumInquiryResponse'][0]['availableChannel']
 
-        channels3 = consts.FS_MISING_55590
-        avaiableChannels3 = channels3['spectrumInquiryResponse'][0]['availableChannel']
+    #     #one where earfcnInUse is used
+    #     self.assertEqual(cbsd.select_frequency(avaiableChannels2),True)
+    #     self.assertEqual(cbsd.earfcn,'55590')
 
-        #one where one of the backup earfcns are used from apt_subscription
-        self.assertEqual(cbsd.select_frequency(avaiableChannels3),True)
-        self.assertEqual(cbsd.earfcn,'55790')
+    #     # check database earfcn is equal to 55590
+    #     self.assertEqual(cbsd.select_cbsd_database_value('EARFCN'),'55590')
 
-        #check database earfcn is equal to 55190
-        # self.assertEqual(cbsd.select_cbsd_database_value('EARFCN'),'55190')
+
+
+    #     channels3 = consts.FS_MISING_55590
+    #     avaiableChannels3 = channels3['spectrumInquiryResponse'][0]['availableChannel']
+
+    #     #one where one of the backup earfcns are used from apt_subscription
+    #     self.assertEqual(cbsd.select_frequency(avaiableChannels3),True)
+    #     self.assertEqual(cbsd.earfcn,'55790')
+
+    #     #check database earfcn is equal to 55190
+    #     self.assertEqual(cbsd.select_cbsd_database_value('EARFCN'),'55190')
 
 
         #TODO test for set Frequency
