@@ -243,32 +243,32 @@ class CbsdInfo(ABC):
 
 
             #add parameterValues datamodel, type and value to spv database table
-            # conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(self.SN,i,parameterValueList[i]['data_path'],parameterValueList[i]['data_type'],parameterValueList[i]['data_value']))
+            conn.update('INSERT INTO fems_spv(`SN`, `spv_index`,`dbpath`, `setValueType`, `setValue`) VALUES(%s,%s,%s,%s,%s)',(self.SN,i,parameterValueList[i]['data_path'],parameterValueList[i]['data_type'],parameterValueList[i]['data_value']))
 
-            # #place action in apt_action_queue
-            # self.cbsdAction(self.SN,'Set Parameter Value',str(datetime.now()))
+            #place action in apt_action_queue
+            self.cbsdAction(self.SN,'Set Parameter Value',str(datetime.now()))
             
-            # #Make connection request
-            # response = requests.get(self.connreqURL, auth= HTTPDigestAuth(self.connreqUname,self.connreqPass))
+            #Make connection request
+            response = requests.get(self.connreqURL, auth= HTTPDigestAuth(self.connreqUname,self.connreqPass))
 
-            # #if connection request returns 200
-            # if response.status_code == 200:
-            #     #Wait for conenction request to complete
-            #     settingParameters = True
-            #     while settingParameters:
-            #         # logging.info(f"Setting Parameters for {cbsd['SN']}")
-            #         database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",self.SN)
+            #if connection request returns 200
+            if response.status_code == 200:
+                #Wait for conenction request to complete
+                settingParameters = True
+                while settingParameters:
+                    # logging.info(f"Setting Parameters for {cbsd['SN']}")
+                    database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",self.SN)
                     
-            #         if database == (): 
-            #             # logging.info(f"Paramters set successfully for {cbsd['SN']}")
-            #             settingParameters = False
-            #         else:
-            #             time.sleep(1)
-            #             # endTime = datetime.now()
-            #             # logging.info(f"end time in loop: {endTime}")
-            # else:
-            #     # remove action from action queue
-            #     conn.update("DELETE FROM apt_action_queue WHERE SN = %s",self.SN)
+                    if database == (): 
+                        # logging.info(f"Paramters set successfully for {cbsd['SN']}")
+                        settingParameters = False
+                    else:
+                        time.sleep(1)
+                        # endTime = datetime.now()
+                        # logging.info(f"end time in loop: {endTime}")
+            else:
+                # remove action from action queue
+                conn.update("DELETE FROM apt_action_queue WHERE SN = %s",self.SN)
 
 
             
@@ -370,10 +370,6 @@ class OneCA(CbsdInfo):
             return False
 
 
-
-
-
-
 class TwoCA(CbsdInfo):
 
     def __init__(self,sqlCbsd):
@@ -391,19 +387,39 @@ class TwoCA(CbsdInfo):
         #select freq with self.earfcn2
         pass
 
+
+def getCbsdModel(dbObj: dict) -> CbsdInfo:
+        
+    if dbObj['hclass'] == 'FAP_FC40641CA':
+        return OneCA(dbObj)
+    
+    elif dbObj['hclass'] == 'FAP_FC40642CA':
+        return TwoCA(dbObj) 
+
 if __name__ == '__main__':
     conn = dbConn("ACS_V1_1")
-    sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE994613163')
+    # sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE994613163')
+    sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE userID = %s",'Test-inc')
+    conn.dbClose()
 
     # sql = "UPDATE `dp_device_info` SET ({}) WHERE SN IN %s".format(','.join(['%s'] * len(parameter)))
 
     # print(f"sql: {sql}")    
 
+    myList = []
 
-    a = OneCA(sqlCbsd[0])
-    b = TwoCA(sqlCbsd[0])
+    for sql in sqlCbsd:
+        myList.append(getCbsdModel(sql))
 
-    print(f"1CA lowFreq: {a.lowFrequency}")
-    print(f"2CA lowFreq: {b.lowFrequency}")
+
+    for cbsd in myList:
+        print(cbsd.sasStage)
+
+
+    # a = OneCA(sqlCbsd[0])
+    # b = TwoCA(sqlCbsd[0])
+
+    # print(f"1CA lowFreq: {a.lowFrequency}")
+    # print(f"2CA lowFreq: {b.lowFrequency}") 
 
 
