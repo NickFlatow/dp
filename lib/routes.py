@@ -114,3 +114,7 @@ def dp_reprovision():
     conn.dbClose()
 
     return "success"
+
+def select_cbsds_from_database(snList: list) -> dict:
+    '''Given a list of Serial Number will return a dict of cbsd info for each Serial Number'''
+    pass
