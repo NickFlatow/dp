@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from dbConn import dbConn
 from datetime import datetime,timedelta
 from requests.auth import HTTPDigestAuth
+from dbConn import dbConn
 import consts
 import requests
 import time
@@ -35,7 +35,10 @@ class CbsdInfo(ABC):
         self.connreqPass =        sqlCbsd['connreqPass']
         self.connreqURL =         sqlCbsd['connreqURL']
         self.hclass =             sqlCbsd['hclass']
-        
+
+        # self.cbsdID = 'test'
+        # self.maxEirp = 0
+
         #set maxEirp
         self.compute_maxEirp()
         #set Low and high Frequcy
