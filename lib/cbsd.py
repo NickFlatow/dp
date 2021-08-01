@@ -36,8 +36,8 @@ class CbsdInfo(ABC):
         self.connreqURL =         sqlCbsd['connreqURL']
         self.hclass =             sqlCbsd['hclass']
 
-        # self.cbsdID = 'test'
-        # self.maxEirp = 0
+        self.cbsdID = 'test'
+        self.maxEirp = 0
 
         #set maxEirp
         self.compute_maxEirp()

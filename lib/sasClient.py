@@ -1,4 +1,5 @@
 # from flask.globals import request
+from lib.sasHandler import contactSAS
 from dbConn import dbConn
 from cbsd import CbsdModelExporter
 import consts
@@ -26,7 +27,21 @@ class sasClient():
         request: json request to pass to SAS server
         method:  method to pass json request to: registration,spectrum,grant,heartbeat
         '''
-        pass
+        try:
+            return requests.post("https://192.168.4.223:5001/v1.2/"+method, 
+            # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+            # verify=('googleCerts/ca.cert'),
+            # json=request)
+            # timeout=5
+
+            cert=('certs/client.cert','certs/client.key'),
+            verify=('certs/ca.cert'),
+            json=request,
+            timeout=5)
+        
+        except Exception as e:
+            print(f"your connection has failed: {e}")
+            return False
 
     def get_cbsd_database_row(self,SN: str) -> dict:
         '''Given a cbsd Serial Number the fucntion will return a dict with cbsd attributes'''
@@ -64,8 +79,8 @@ class sasClient():
                         "userId": cbsd.userID
                     }
                 )
+
             elif typeOfCalling == consts.SPECTRUM:
-            
                 req[requestMessageType].append(
                     { 
                         "cbsdId":cbsd.cbsdID,
@@ -79,7 +94,6 @@ class sasClient():
                 )
 
             elif typeOfCalling == consts.GRANT:
-            
                 req[requestMessageType].append(
                         { 
                             "cbsdId":cbsd.cbsdID,
@@ -94,7 +108,6 @@ class sasClient():
                     )
 
             elif typeOfCalling == consts.HEART:
-
                 req[requestMessageType].append(
                     {
                         "cbsdId":cbsd.cbsdID,
@@ -103,9 +116,6 @@ class sasClient():
                         "grantRenew":False
                     }
                 )
-            
-
-
         print(json.dumps(req, indent=4))
     
     def getNextCalling(typeOfCalling):
@@ -122,14 +132,17 @@ class sasClient():
 
     def SAS_request(self,typeOfCalling: str) -> dict:
         '''
-        passses json for registration method to sas 
-        returns SAS response
+        passses json to SAS with typeOfCalling method 
+        returns the resposne from SAS
         '''
-        #filter cbsdList where cbsd.sasStage 
+        #filter cbsdList where cbsd.sasStage
+         
         #build json
-        self.buildJsonRequest(typeOfCalling)
-        #contactSAS 
-        #return SASresponse
+        sasRequest = self.buildJsonRequest(typeOfCalling)
+        #contactSAS
+        # sasResponse = contactSAS(sasRequest,typeOfCalling)
+        
+        # return sasResponse
     
     def SAS_response(self, cbsds: list, typeOfCalling: str) -> None:
         #check for errors
@@ -148,7 +161,7 @@ class sasClient():
         #buildJsonrequest()
     
 
-    def registration(self,cbsds: list) -> None:
+    def registration(self) -> None:
         '''Runs a list of cbsds through the SAS registratrion process, stops at grant; then adds list of cbsds to hearbeat list'''
 
         #if cbsd is not in cbsdList or heartbeatList:
@@ -157,7 +170,7 @@ class sasClient():
             #print to log/FeMS already registered or heartbeating
 
 
-        typeOfCallings = [consts.REG,consts.SPECTRUM,consts.GRANT]
+        typeOfCallings = [consts.REG,consts.SPECTRUM,consts.GRANT,consts.HEART]
         
         for typeOfCalling in typeOfCallings:
             sasResponse = self.SAS_request(typeOfCalling)
@@ -197,9 +210,14 @@ class sasClient():
 if __name__ == '__main__':
     
     s = sasClient()
+    #takes cbsd add it to list of cbsds to be registered
     s.create_cbsd('DCE994613163')
-    s.cbsdList[0].sasStage = consts.REG
-    s.registration(s.cbsdList)
+
+    #registers cbsds
+    s.registration()
+
+    #while True:
+        #keep heartbeating all cbsds in hb stage
     # s.buildJsonRequest(s.cbsdList,consts.REG)
 
 

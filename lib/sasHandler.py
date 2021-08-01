@@ -288,10 +288,6 @@ def Handle_Response(cbsd_list,response,typeOfCalling):
 
 
 
-def updateGrantTime(grantExpireTime,SN):
-    conn = dbConn("ACS_V1_1")
-    conn.update("UPDATE dp_device_info SET grantExpireTime = %s WHERE SN = %s",(grantExpireTime,SN))
-    conn.dbClose()
 
 
 def contactSAS(request,method):
@@ -337,43 +333,7 @@ def getOpState(cbsd):
 
     return opState
 
-def cbsdAction(cbsdSN,action,time):
 
-    #check note field for EXEC
-    logging.critical("Triggering CBSD action")
-    conn = dbConn("ACS_V1_1")
-    sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+cbsdSN+"\',\'"+action+"\',\'"+time+"\')"
-    logging.critical(cbsdSN + " : SQL cmd " + sql_action)
-    conn.update(sql_action)
-    conn.dbClose()
-
-def MHZtoEARFCN(MHz):
-    
-    #take low freq in MHz and 10(to get the middle freq)
-    # MHz = int(cbsd['lowFrequency']) + 10
-    #then convert to EARFCN
-    EARFCN = math.ceil(((MHz - 3550)/0.1) + 55240)
-
-    return EARFCN
-
-def EARFCNtoMHZ(earfcn):
-    # Function to convert frequency from EARFCN  to MHz 3660 - 3700
-    # hz add 6 zeros
-
-    logging.info("////////////////////////////////EARFCN CONVERTION\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\'")
-    print("EARFCN: " + str(earfcn))
-    if int(earfcn) > 56739 or int(earfcn) < 55240:
-        logging.info("SPECTRUM IS OUTSIDE OF BOUNDS")
-        F = 0
-    elif earfcn == 55240:
-        F = 3560
-    elif earfcn == 56739:
-        F = 3690
-    else:
-        F = math.ceil(3550 + (0.1 * (int(earfcn) - 55240)))
-
-    #return middle frequency
-    return F
 
 def updateMaxEirp(cbsd):
     conn = dbConn(consts.DB)
@@ -381,8 +341,7 @@ def updateMaxEirp(cbsd):
     cbsd['maxEIRP'] = (cbsd['TxPower'] + cbsd['antennaGain'])
     conn.dbClose()
 
-def EirpToTxPower(maxEirp,cbsd):
-    return maxEirp - cbsd['antennaGain']
+
 
 def hasError(cbsd,errorList):
     if cbsd['SN'] in errorList:
