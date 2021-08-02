@@ -188,7 +188,6 @@ def hasAlarmIdentifier(ai):
     '''
     checks if alarm already exisits in apt_alarm_latest
     '''
-
     conn = dbConn("ACS_V1_1")
     alarmIdentifier = conn.select('SELECT alarmIdentifier FROM apt_alarm_latest WHERE alarmIdentifier = %s',ai)
     conn.dbClose()

@@ -20,7 +20,8 @@ class CbsdInfo(ABC):
         self.fccID =              sqlCbsd['fccID']
         self.SN =                 sqlCbsd['SN']
         self.cbsdCat =            sqlCbsd['cbsdCategory']
-        self.sasStage =           sqlCbsd['sasStage']
+        # self.sasStage =           sqlCbsd['sasStage']
+        self.sasStage =           consts.REG
         self.txPower =            sqlCbsd['TxPower']
         self.earfcn =             sqlCbsd['EARFCN']
         self.antennaGain =        sqlCbsd['antennaGain']
@@ -36,15 +37,16 @@ class CbsdInfo(ABC):
         self.connreqURL =         sqlCbsd['connreqURL']
         self.hclass =             sqlCbsd['hclass']
 
-        self.cbsdID = 'test'
         self.maxEirp = 0
-
+        #set sasStage
+        self.setSasStage(consts.REG)
         #set maxEirp
         self.compute_maxEirp()
         #set Low and high Frequcy
         self.set_low_and_high_frequncy(self.earfcn)
         #populate earfcnList
         self.getEarfcnList()
+
 
         
     @abstractmethod
@@ -268,10 +270,15 @@ class CbsdInfo(ABC):
         conn.update(sql_action)
         conn.dbClose()
 
-    def set_cbsdID(self,cbsdID):
+    def setCbsdID(self,cbsdID):
         #TODO update new value to database to relect changes on cbrsStatus page
-
+        self.update_cbsd_database_value("cbsdID",cbsdID)
         self.cbsdID = cbsdID
+
+    def setSasStage(self,sasStage):
+        #TODO update new value to database to relect changes on cbrsStatus page
+        self.update_cbsd_database_value("sasStage",sasStage)
+        self.sasStage = sasStage
 
 
     #deregister method(clear all values associtaed with SAS)

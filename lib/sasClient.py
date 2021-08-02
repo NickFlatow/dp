@@ -1,7 +1,6 @@
-# from flask.globals import request
-# from lib.sasHandler import contactSAS
 from dbConn import dbConn
 from cbsd import CbsdModelExporter
+from abc import ABC, abstractmethod
 import consts
 import requests
 
@@ -28,7 +27,7 @@ class sasClient():
         method:  method to pass json request to: registration,spectrum,grant,heartbeat
         '''
         try:
-            return requests.post("https://192.168.4.223:5001/v1.2/"+method, 
+            return requests.post("https://192.168.4.222:5001/v1.2/"+method, 
             # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
             # verify=('googleCerts/ca.cert'),
             # json=request)
@@ -117,6 +116,10 @@ class sasClient():
                     }
                 )
         print(json.dumps(req, indent=4))
+        return req
+
+
+        
     
     def getNextCalling(typeOfCalling):
         if typeOfCalling == consts.REG:
@@ -140,7 +143,11 @@ class sasClient():
         #build json
         sasRequest = self.buildJsonRequest(typeOfCalling)
         #contactSAS
-        # sasResponse = contactSAS(sasRequest,typeOfCalling)
+        response = self.contactSAS(sasRequest,typeOfCalling)
+
+        if response.status_code == 200:
+            return 
+        print(response)
         
         # return sasResponse
     
@@ -181,6 +188,102 @@ class sasClient():
             # if sasResponse.status_code == 200:
             #     self.SAS_response(sasResponse)
 
+    def filter_sas_stage(self,sasStage):
+        
+        filtered = []
+
+        for cbsd in self.cbsdList:
+            if cbsd.sasStage == sasStage:
+                filtered.append(cbsd)
+        return filtered
+
+    def reg(self):
+       reg = SASRegistrationMethod(self.cbsdList)
+       reg.buildJsonRequest()
+       reg.contactSAS()
+       reg.handleReply()
+
+class SASMethod(ABC):
+    
+    @abstractmethod
+    def buildJsonRequest():
+        pass
+    
+    @abstractmethod
+    def handleReply():
+        pass
+
+    def handleError():
+        pass
+
+
+    def contactSAS(self,method):
+        ''''
+        send json dict to sas
+        '''
+        try:
+            self.sasResponse = requests.post("https://192.168.4.222:5001/v1.2/"+method, 
+            # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+            # verify=('googleCerts/ca.cert'),
+            # json=request)
+            # timeout=5
+            cert=('certs/client.cert','certs/client.key'),
+            verify=('certs/ca.cert'),
+            json=self.req,
+            timeout=5)
+        
+        except Exception as e:
+            print(f"your connection has failed: {e}")
+            return False
+
+
+class SASRegistrationMethod(SASMethod):
+
+
+    def __init__(self,cbsds: list):
+            self.method = str(consts.REG + "Request")
+            self.resposneMethod = str(consts.REG + "Response")
+            self.cbsds = cbsds
+
+    def buildJsonRequest(self):
+        """
+        produces json dict to send to SAS
+        """
+        self.req = {self.method:[]}
+        
+        for cbsd in self.cbsds:
+            self.req[self.method].append(
+                    {
+                        "cbsdSerialNumber": cbsd.SN,
+                        "fccId": cbsd.fccID,
+                        "cbsdCategory": cbsd.cbsdCat,
+                        "userId": cbsd.userID
+                    }
+                )
+        print(json.dumps(self.req, indent = 4))
+
+
+    def contactSAS(self):
+        return super().contactSAS("registration")
+
+
+    def handleReply(self):
+        #TODO dump the log to the log file
+        print(json.dumps(self.sasResponse.json(),indent=4))
+        
+        response = self.sasResponse.json()
+
+        #iterate through the reposne for errors
+        for i in range(len(self.cbsds)):
+            if response['registrationResponse'][i]['response']['responseCode'] != 0:
+                pass
+                #add to errorList
+            else:
+                self.cbsds[i].setCbsdID(response['registrationResponse'][i]['cbsdId'])
+                self.cbsds[i].setSasStage(consts.SPECTRUM)
+        
+        #if errorList
+            #send to error class
 
     
 
@@ -189,13 +292,26 @@ if __name__ == '__main__':
     s = sasClient()
     #takes cbsd add it to list of cbsds to be registered
     s.create_cbsd('900F0C732A02')
+    s.create_cbsd('DCE99461317E')
 
-    #registers cbsds
-    s.registration()
+    # s.cbsdList[1].sasStage = consts.SPECTRUM
+    registration_list = s.filter_sas_stage(consts.REG)
+    s.reg()
+    spectrum_list = s.filter_sas_stage(consts.SPECTRUM)
+    # s.spec()
+
+
+
+    for cbsd in s.cbsdList:
+        print(cbsd.sasStage)
+
+    # for f in registration_list:
+    #     print(f.SN)
 
     #while True:
         #keep heartbeating all cbsds in hb stage
     # s.buildJsonRequest(s.cbsdList,consts.REG)
+
 
 
 
