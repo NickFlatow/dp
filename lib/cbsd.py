@@ -55,6 +55,14 @@ class CbsdInfo(ABC):
     def select_frequency(self,channels):
         pass
 
+    def powerOn(self):
+        parameterValueList = [consts.ADMIN_POWER_ON]
+        self.setParamterValue(parameterValueList)
+
+    def powerOff(self):
+        parameterValueList = [consts.ADMIN_POWER_OFF]
+        self.setParamterValue(parameterValueList)
+
     def getEarfcnList(self):
         '''
         earfcnInUse will always be at the first element in the list\n
@@ -185,6 +193,12 @@ class CbsdInfo(ABC):
         '''
         #connect to database
         conn = dbConn("ACS_V1_1")
+
+
+        #remove previous values in spv table where SN = self.SN
+        conn.update("DELETE FROM fems_spv WHERE SN = %s",self.SN)
+
+
 
         #add perodicInform to parameterValueList(sets new database values immediately after setting)
         parameterValueList.append(consts.PERIODIC_ONE)
@@ -357,23 +371,25 @@ class CbsdModelExporter():
     '''Factory for creating cbsd modles '''
     def getCbsd(dbObj: dict) -> CbsdInfo:
             
-        if dbObj['hclass'] == 'FAP_FC40641CA':
+        if dbObj['hclass'] == 'FAP_FC4064Q1CA':
             return OneCA(dbObj)
         
-        elif dbObj['hclass'] == 'FAP_FC40642CA':
+        elif dbObj['hclass'] == 'FAP_FC4064Q2CA':
             return TwoCA(dbObj) 
 
 if __name__ == '__main__':
     conn = dbConn("ACS_V1_1")
     # sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE994613163')
-    sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE994613163')
+    sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
     conn.dbClose()
 
     # sql = "UPDATE `dp_device_info` SET ({}) WHERE SN IN %s".format(','.join(['%s'] * len(parameter)))
 
     # print(f"sql: {sql}")    
 
-    # a = OneCA(sqlCbsd[0])
+    a = OneCA(sqlCbsd[0])
+    a.powerOff()
+    # a.powerOff()
     # b = TwoCA(sqlCbsd[0])
 
     # print(f"1CA lowFreq: {a.lowFrequency}")

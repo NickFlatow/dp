@@ -56,7 +56,7 @@ class sasClient():
         sqlCbsd = self.get_cbsd_database_row(SN)
         a = CbsdModelExporter.getCbsd(sqlCbsd[0])
         
-        a.userID
+        # a.userID
         self.cbsdList.append(CbsdModelExporter.getCbsd(sqlCbsd[0]))
 
     def buildJsonRequest(self,typeOfCalling: str) -> dict:
@@ -182,39 +182,13 @@ class sasClient():
             #     self.SAS_response(sasResponse)
 
 
-        
-        # registration_request()
-            
-
-        # def registration_response(self):
-        #     pass
-
-        # def specturm_inquiry_request(self):
-        #     pass
-        
-        # def spectrum_inquiry_response(self):
-        #     pass
-
-        # def grant_request(self):
-        #     pass
-
-        # def grant_response(self):
-        #     pass
-
-    #HEARTBEAT
-        # def heartbeat_request():
-        #     pass 
-
-        # def heartbeat_reponse():
-        #     pass
-
-            
+    
 
 if __name__ == '__main__':
     
     s = sasClient()
     #takes cbsd add it to list of cbsds to be registered
-    s.create_cbsd('DCE994613163')
+    s.create_cbsd('900F0C732A02')
 
     #registers cbsds
     s.registration()
