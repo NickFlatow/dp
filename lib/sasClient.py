@@ -1,5 +1,5 @@
 # from flask.globals import request
-from lib.sasHandler import contactSAS
+# from lib.sasHandler import contactSAS
 from dbConn import dbConn
 from cbsd import CbsdModelExporter
 import consts
@@ -147,8 +147,11 @@ class sasClient():
     def SAS_response(self, cbsds: list, typeOfCalling: str) -> None:
         #check for errors
         #call individuial reponse methods
-        #update cbsd to next sasStage
-        pass
+
+        for cbsd in self.cbsdList:
+            
+            cbsd.sasStage = self.getNextCalling(typeOfCalling)
+            #update cbsd to next sasStage
 
     def registration_response(self):
         pass
