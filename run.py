@@ -13,6 +13,9 @@ import threading
 import lib.consts as consts
 import ctypes
 
+from lib.sasClient import sasClient
+
+
 #needed here to make routes work
 from lib import routes
 
@@ -49,28 +52,59 @@ def start():
 
     try:
         #if using args a comma for tuple is needed 
-        thread = threading.Thread(target=registration, args=())
+        thread = threading.Thread(target=test, args=())
         thread.name = 'registration-thread'
         thread.start()
     except Exception as e:
         print(f"Registration thread failed: {e}")
-    try:
-        #if using args a comma for tuple is needed 
-        hbthread = threading.Thread(target=heartbeat, args=())
-        hbthread.name = 'heartbeat-thread'
-        hbthread.start()
+    # try:
+    #     #if using args a comma for tuple is needed 
+    #     hbthread = threading.Thread(target=heartbeat, args=())
+    #     hbthread.name = 'heartbeat-thread'
+    #     hbthread.start()
 
-    except Exception as e:
-        print(f"Heartbeat thread failed reason: {e}")
+    # except Exception as e:
+    #     print(f"Heartbeat thread failed reason: {e}")
         
     runFlaskSever() 
 
 
 
+def test():
+    # runFlaskSever() 
+    s = sasClient()
+    #takes cbsd add it to list of cbsds to be registered
+    s.create_cbsd('900F0C732A02')
+    # s.create_cbsd('DCE99461317E')
 
+    # s.cbsdList[1].sasStage = consts.SPECTRUM
+
+
+    registration_list = s.filter_sas_stage(consts.REG)
+    if registration_list:
+        s.makeSASRequest(registration_list,consts.REG)
+
+    
+    spectrum_list = s.filter_sas_stage(consts.SPECTRUM)
+    if spectrum_list:
+        s.makeSASRequest(spectrum_list,consts.SPECTRUM)
+
+        grant_list = s.filter_sas_stage(consts.GRANT)
+        s.makeSASRequest(grant_list,consts.GRANT)
+
+
+
+        for cbsd in s.cbsdList:
+            print(cbsd.sasStage)
+
+
+        while True:
+            heartbeat_list = s.filter_sas_stage(consts.HEART)
+            s.makeSASRequest(heartbeat_list,consts.HEART)
+            time.sleep(10)
 
 
 start()
-
+# test()
 
 

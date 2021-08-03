@@ -1,10 +1,13 @@
-from dbConn import dbConn
-from cbsd import CbsdModelExporter
-from sasMethods import SASRegistrationMethod
-import consts
+import lib.consts as consts
 import requests
+import time
+from lib.dbConn import dbConn
+from lib.cbsd import CbsdModelExporter
+# from sasMethods import SASRegistrationMethod
+from datetime import datetime,timedelta
 
-import threading
+
+# from flaksconf import app, runFlaskSever
 
 
 import json
@@ -21,6 +24,8 @@ class sasClient():
         self.cbsdList = []
         #list of cbsd objects currently heartbeating
         self.heartbeatList = []
+        #keep list of cell that have errors
+        self.err = []
 
 
     def contactSAS(self,request:dict,method:str):
@@ -28,21 +33,20 @@ class sasClient():
         request: json request to pass to SAS server
         method:  method to pass json request to: registration,spectrum,grant,heartbeat
         '''
-        try:
-            return requests.post("https://192.168.4.222:5001/v1.2/"+method, 
-            # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
-            # verify=('googleCerts/ca.cert'),
-            # json=request)
-            # timeout=5
+        # try:
+        return requests.post("https://192.168.4.222:5001/v1.2/"+method, 
+        # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+        # verify=('googleCerts/ca.cert'),
+        # json=request)
+        # timeout=5
 
-            cert=('certs/client.cert','certs/client.key'),
-            verify=('certs/ca.cert'),
-            json=request,
-            timeout=5)
+        cert=('certs/client.cert','certs/client.key'),
+        verify=('certs/ca.cert'),
+        json=request,
+        timeout=5)
         
-        except Exception as e:
-            print(f"your connection has failed: {e}")
-            return False
+        # except Exception as e:
+        #     raise e
 
     def get_cbsd_database_row(self,SN: str) -> dict:
         '''Given a cbsd Serial Number the fucntion will return a dict with cbsd attributes'''
@@ -113,7 +117,7 @@ class sasClient():
                     {
                         "cbsdId":cbsd.cbsdID,
                         "grantId":cbsd.grantID,
-                        "operationState":'GRANTED',
+                        "operationState":cbsd.operationalState,
                         "grantRenew":False
                     }
                 )
@@ -130,6 +134,29 @@ class sasClient():
         else:
             return False
 
+
+    def expired(self,SASexpireTime: str, isGrantTime = False) -> bool:
+        '''
+        Move to SAS client
+        expireTime: str representing UTC expire time\n
+        Time expired returns true
+        else false
+        '''
+        if SASexpireTime == None:
+            return False
+
+        expireTime = datetime.strptime(SASexpireTime,"%Y-%m-%dT%H:%M:%SZ")
+
+        #Renew grant five minues before it expires
+        if isGrantTime:
+            expireTime = expireTime - timedelta(seconds=300)
+    
+        if datetime.utcnow() <= expireTime:
+            print("Expired")
+            return True
+        else: 
+            print("Not Expired")
+            return False
 
 
     def SAS_request(self,typeOfCalling: str) -> dict:
@@ -156,21 +183,58 @@ class sasClient():
         cbsd.setSasStage(consts.SPECTRUM)
 
     def spectrumResposne(self,cbsd,channels):
-        pass
 
-    
+        # channelSelected = cbsd.select_frequency(channels)
+        channelSelected = True
+
+        if channelSelected:
+            cbsd.setSasStage(consts.GRANT)
+        else: 
+            self.err = [cbsd]
+            # cbsd.setSasStage("error")
+
+    def grantResposne(self,cbsd,sasResponse):
+        #set grant expire time
+        cbsd.setGrantExpireTime(sasResponse['grantExpireTime'])
+
+        cbsd.grantID = sasResponse['grantId']
+        #operationalState to granted
+        cbsd.operationalState = 'GRANTED'
+
+        #set sasStage to heartbeat
+        cbsd.setSasStage(consts.HEART)
+
+    def heartbeatResposne(self,cbsd,sasResponse):
+        print(f"utcnow: {datetime.utcnow()}")
+        cbsd.setTransmitExpireTime(sasResponse['transmitExpireTime'])
+
+        if self.expired(sasResponse['transmitExpireTime']) and cbsd.adminState == 1:
+            cbsd.operationalState = 'GRANTED'
+            print("!!!!Power Off!!!!!!")
+            cbsd.powerOff()
+        
+        elif not self.expired(sasResponse['transmitExpireTime']) and cbsd.adminState == 0:
+            cbsd.operationalState = 'AUTHORIZED'
+            print("!!!!Power On!!!!!!")
+            cbsd.powerOn()
+
+    def test(self):
+        for cbsd in self.cbsdList:
+            print(cbsd.SN)
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!TEST_TEST_TEST_TEST_TEST_TEST_TEST_TEST_TEST!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
+
     def processSasResposne(self, sasResponse: dict, cbsds: list, typeOfCalling: str) -> None:
 
         responseMessageType = typeOfCalling + "Response"
-        err = []
 
         print(json.dumps(sasResponse,indent=4))
 
-        #iterate through the reposne for errors
+        #iterate through the response for errors
         for i in range(len(cbsds)):
             if sasResponse[responseMessageType][i]['response']['responseCode'] != 0:
+                
                 #TODO what to do about sasStage for cbsd
-                err.append(cbsds[i])
+                self.err.append(cbsds[i])
                 continue
             
             elif typeOfCalling == consts.REG:
@@ -179,39 +243,18 @@ class sasClient():
             elif typeOfCalling == consts.SPECTRUM:
                 self.spectrumResposne(cbsds[i],sasResponse[responseMessageType][i]['availableChannel'])
 
+            elif typeOfCalling == consts.GRANT:
+                self.grantResposne(cbsds[i],sasResponse[responseMessageType][i])
+
+            elif typeOfCalling == consts.HEART:
+                self.heartbeatResposne(cbsds[i],sasResponse[responseMessageType][i])                
+
                 
-        if err:
+        if self.err:
             print("errror")
 
-    def registration_response(self):
-        pass
-        #update all cbsds to have sasStage = conts.SPECTRUM
-
-    def deregistration_request(self):
-        pass
-        #cbsd.deregister()
-        #filter list where cbsd.sasStage = consts.DEREG
-        #buildJsonrequest()
-    
-
-    def registration(self) -> None:
-        '''Runs a list of cbsds through the SAS registratrion process, stops at grant; then adds list of cbsds to hearbeat list'''
-
-        #if cbsd is not in cbsdList or heartbeatList:
-            #create cbsd
-        #else:
-            #print to log/FeMS already registered or heartbeating
-
-        typeOfCallings = [consts.REG,consts.SPECTRUM,consts.GRANT,consts.HEART]
-        
-        for typeOfCalling in typeOfCallings:
-            sasResponse = self.SAS_request(typeOfCalling)
-            
-            # if sasResponse.status_code == 200:
-            #     self.SAS_response(sasResponse)
-
     def filter_sas_stage(self,sasStage):
-        
+
         filtered = []
 
         for cbsd in self.cbsdList:
@@ -221,37 +264,49 @@ class sasClient():
         return filtered
 
     def makeSASRequest(self,cbsds:list,typeOfCalling:str):
+        
         req = self.buildJsonRequest(cbsds,typeOfCalling)
+        
         sasReponse = self.contactSAS(req,typeOfCalling)
-        self.processSasResposne(sasReponse.json(),cbsds,typeOfCalling)
-    #    reg = SASRegistrationMethod(self.cbsdList)
-    #    reg.buildJsonRequest()
-    #    reg.contactSAS()
-    #    reg.handleReply()
-
+        
+        if sasReponse.status_code == 200:
+            self.processSasResposne(sasReponse.json(),cbsds,typeOfCalling)
+        else:
+            print(f"conenction error {sasReponse.status_code}")
 
 if __name__ == '__main__':
-    
+
     s = sasClient()
     #takes cbsd add it to list of cbsds to be registered
     s.create_cbsd('900F0C732A02')
-    s.create_cbsd('DCE99461317E')
+    # s.create_cbsd('DCE99461317E')
 
     # s.cbsdList[1].sasStage = consts.SPECTRUM
+
+
     registration_list = s.filter_sas_stage(consts.REG)
-    s.makeSASRequest(registration_list,consts.REG)
+    if registration_list:
+        s.makeSASRequest(registration_list,consts.REG)
+
+    
     spectrum_list = s.filter_sas_stage(consts.SPECTRUM)
-    s.makeSASRequest(spectrum_list,consts.SPECTRUM)
+    if spectrum_list:
+        s.makeSASRequest(spectrum_list,consts.SPECTRUM)
+
+        grant_list = s.filter_sas_stage(consts.GRANT)
+        s.makeSASRequest(grant_list,consts.GRANT)
 
 
 
-    for cbsd in s.cbsdList:
-        print(cbsd.sasStage)
+        for cbsd in s.cbsdList:
+            print(cbsd.sasStage)
 
 
-    # while True:
-        heartbeat_list = s.filter_sas_stage(consts.HEART)
-    # for f in registration_list:
+        while True:
+            heartbeat_list = s.filter_sas_stage(consts.HEART)
+            s.makeSASRequest(heartbeat_list,consts.HEART)
+            time.sleep(10)
+        # for f in registration_list:
     #     print(f.SN)
 
     #while True:

@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from datetime import datetime,timedelta
+from datetime import datetime
 from requests.auth import HTTPDigestAuth
-from dbConn import dbConn
-import consts
+from lib.dbConn import dbConn
+import lib.consts as consts
 import requests
 import time
 import math
@@ -26,8 +26,8 @@ class CbsdInfo(ABC):
         self.earfcn =             sqlCbsd['EARFCN']
         self.antennaGain =        sqlCbsd['antennaGain']
         self.adminState =         0
-        self.grantID =            sqlCbsd['grantID']
-        self.operationalState =   sqlCbsd['operationalState']
+        self.grantID =            None
+        self.operationalState =   None
         self.transmitExpireTime = sqlCbsd['transmitExpireTime']
         self.grantExpireTime =    sqlCbsd['grantExpireTime']
         self.cellIdenity =        sqlCbsd['CellIdentity']
@@ -102,27 +102,6 @@ class CbsdInfo(ABC):
         else:
             self.earfcnList = [self.earfcn]
 
-    def expired(self,SASexpireTime: str, isGrantTime = False) -> bool:
-        '''
-        Move to SAS client
-        expireTime: str representing UTC expire time\n
-        Time expired returns true
-        else false
-        '''
-        if SASexpireTime == None:
-            return False
-
-        expireTime = datetime.strptime(SASexpireTime,"%Y-%m-%dT%H:%M:%SZ")
-
-        #Renew grant five minues before it expires
-        if isGrantTime:
-            expireTime = expireTime - timedelta(seconds=300)
-    
-        if datetime.utcnow() > expireTime:
-            return True
-        else: 
-            return False
-
     def MHZtoEARFCN(self,MHz):
 
         EARFCN = math.floor(((MHz - 3550)/0.1) + 55240)
@@ -150,22 +129,22 @@ class CbsdInfo(ABC):
         conn.update("UPDATE dp_device_info SET " + column + " = %s WHERE SN = %s",(value,self.SN))
         conn.dbClose()
 
-    def updateExpireTime(self, time:str, timeType: str):
-        '''
-        updates time locally and in the database(to display on FeMS cbrs status page) for grant and tranmit time specified by type
-        timeTypes = 'grant' or 'transmit'
-        '''
-        timeTypes = ['grant','transmit']
-        if timeType not in timeTypes:
-            raise ValueError("Invalid timeType must be grant or transmit")
+    # def updateExpireTime(self, time:str, timeType: str):
+    #     '''
+    #     updates time locally and in the database(to display on FeMS cbrs status page) for grant and tranmit time specified by type
+    #     timeTypes = 'grant' or 'transmit'
+    #     '''
+    #     timeTypes = ['grant','transmit']
+    #     if timeType not in timeTypes:
+    #         raise ValueError("Invalid timeType must be grant or transmit")
 
-        if timeType == 'grant':
-            self.grantExpireTime = time
-            self.update_cbsd_database_value('grantExpireTime',time)
+    #     if timeType == 'grant':
+    #         self.grantExpireTime = time
+    #         self.update_cbsd_database_value('grantExpireTime',time)
 
-        if timeType == 'transmit':
-            self.transmitExpireTime = time
-            self.update_cbsd_database_value('transmitExpireTime',time)
+    #     if timeType == 'transmit':
+    #         self.transmitExpireTime = time
+    #         self.update_cbsd_database_value('transmitExpireTime',time)
 
 
     def toggleAdminState(self,adminState: int):
@@ -279,6 +258,14 @@ class CbsdInfo(ABC):
         #TODO update new value to database to relect changes on cbrsStatus page
         self.update_cbsd_database_value("sasStage",sasStage)
         self.sasStage = sasStage
+
+    def setGrantExpireTime(self,grantExpireTime):
+        self.update_cbsd_database_value("grantExpireTime",grantExpireTime)
+        self.grantExpireTime = grantExpireTime
+
+    def setTransmitExpireTime(self,transmitExpireTime):
+        self.update_cbsd_database_value("transmitExpireTime",transmitExpireTime)
+        self.transmitExpireTime = transmitExpireTime
 
 
     #deregister method(clear all values associtaed with SAS)
