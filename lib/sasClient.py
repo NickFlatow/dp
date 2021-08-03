@@ -274,6 +274,15 @@ class sasClient():
         else:
             print(f"conenction error {sasReponse.status_code}")
 
+    def cbsdInList(self,cbsdSN: str) -> bool:
+        '''
+        return True if cbsd is already in self.cbsdList
+        '''
+        for cbsd in self.cbsdList:
+            if cbsd.SN == cbsdSN:
+                return True
+
+
 if __name__ == '__main__':
 
     s = sasClient()
@@ -296,16 +305,15 @@ if __name__ == '__main__':
         grant_list = s.filter_sas_stage(consts.GRANT)
         s.makeSASRequest(grant_list,consts.GRANT)
 
-
-
         for cbsd in s.cbsdList:
             print(cbsd.sasStage)
-
 
         while True:
             heartbeat_list = s.filter_sas_stage(consts.HEART)
             s.makeSASRequest(heartbeat_list,consts.HEART)
             time.sleep(10)
+
+
         # for f in registration_list:
     #     print(f.SN)
 

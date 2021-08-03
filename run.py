@@ -2,11 +2,14 @@ from numpy.core.fromnumeric import shape
 from numpy.core.numeric import _array_equiv_dispatcher
 from lib.dbConn import dbConn
 from lib.thread import lockedThread
-from lib import sasHandler
+from lib import cbsd, sasHandler
 from config.default import SAS
 from lib.log import logger
 from test import app, runFlaskSever
 from numpy.ctypeslib import ndpointer
+from flask_cors import CORS, cross_origin
+from flask import request
+import json
 
 import time
 import threading 
@@ -15,15 +18,43 @@ import ctypes
 
 from lib.sasClient import sasClient
 
-
+s = sasClient()
 #needed here to make routes work
-from lib import routes
+# from lib import routes
 
 #init log class
 logger = logger()
 hbtimer = 0
 #create threadLock
 threadLock = threading.Lock()
+
+
+@app.route('/', methods=['GET'])
+def home():
+    return"<h1>Domain Proxy</h1><p>test version</p>"
+
+@app.route('/dp/v1/register', methods=['POST'])
+@cross_origin()
+def dp_register():
+
+
+    #Get cbsd SNs from FeMS    
+    SNlist = request.form['json']
+
+    #convert to json
+    SNlist = json.loads(SNlist)
+
+    #collect all values from databse
+    conn = dbConn("ACS_V1_1")
+    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist['snDict'])))
+    cbsd_list = conn.select(sql,SNlist['snDict'])
+    conn.dbClose()
+
+    s.create_cbsd(cbsd_list)
+
+    return "success"
+
+
 
 def registration():
     meth = [consts.REG,consts.SPECTRUM,consts.GRANT]
@@ -59,7 +90,7 @@ def start():
         print(f"Registration thread failed: {e}")
     # try:
     #     #if using args a comma for tuple is needed 
-    #     hbthread = threading.Thread(target=heartbeat, args=())
+    #     hbthread = threading.Thread(target=insert, args=())
     #     hbthread.name = 'heartbeat-thread'
     #     hbthread.start()
 
@@ -69,10 +100,9 @@ def start():
     runFlaskSever() 
 
 
-
 def test():
     # runFlaskSever() 
-    s = sasClient()
+    
     #takes cbsd add it to list of cbsds to be registered
     s.create_cbsd('900F0C732A02')
     # s.create_cbsd('DCE99461317E')
@@ -91,7 +121,6 @@ def test():
 
         grant_list = s.filter_sas_stage(consts.GRANT)
         s.makeSASRequest(grant_list,consts.GRANT)
-
 
 
         for cbsd in s.cbsdList:
