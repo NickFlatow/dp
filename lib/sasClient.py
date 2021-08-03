@@ -1,8 +1,10 @@
 from dbConn import dbConn
 from cbsd import CbsdModelExporter
-from abc import ABC, abstractmethod
+from sasMethods import SASRegistrationMethod
 import consts
 import requests
+
+import threading
 
 
 import json
@@ -58,7 +60,7 @@ class sasClient():
         # a.userID
         self.cbsdList.append(CbsdModelExporter.getCbsd(sqlCbsd[0]))
 
-    def buildJsonRequest(self,typeOfCalling: str) -> dict:
+    def buildJsonRequest(self,cbsds: list,typeOfCalling: str) -> dict:
         '''
         Builds and logs all json requests to SAS
         '''
@@ -67,7 +69,7 @@ class sasClient():
         
         req = {requestMessageType:[]}
 
-        for cbsd in self.cbsdList:
+        for cbsd in cbsds:
 
             if typeOfCalling == consts.REG:
                 req[requestMessageType].append(
@@ -118,9 +120,6 @@ class sasClient():
         print(json.dumps(req, indent=4))
         return req
 
-
-        
-    
     def getNextCalling(typeOfCalling):
         if typeOfCalling == consts.REG:
             return consts.SPECTRUM
@@ -150,15 +149,39 @@ class sasClient():
         print(response)
         
         # return sasResponse
-    
-    def SAS_response(self, cbsds: list, typeOfCalling: str) -> None:
-        #check for errors
-        #call individuial reponse methods
 
-        for cbsd in self.cbsdList:
+    def registrationResposne(self,cbsd,sasResponse):
+        
+        cbsd.setCbsdID(sasResponse['cbsdId'])
+        cbsd.setSasStage(consts.SPECTRUM)
+
+    def spectrumResposne(self,cbsd,channels):
+        pass
+
+    
+    def processSasResposne(self, sasResponse: dict, cbsds: list, typeOfCalling: str) -> None:
+
+        responseMessageType = typeOfCalling + "Response"
+        err = []
+
+        print(json.dumps(sasResponse,indent=4))
+
+        #iterate through the reposne for errors
+        for i in range(len(cbsds)):
+            if sasResponse[responseMessageType][i]['response']['responseCode'] != 0:
+                #TODO what to do about sasStage for cbsd
+                err.append(cbsds[i])
+                continue
             
-            cbsd.sasStage = self.getNextCalling(typeOfCalling)
-            #update cbsd to next sasStage
+            elif typeOfCalling == consts.REG:
+                self.registrationResposne(cbsds[i],sasResponse[responseMessageType][i])
+            
+            elif typeOfCalling == consts.SPECTRUM:
+                self.spectrumResposne(cbsds[i],sasResponse[responseMessageType][i]['availableChannel'])
+
+                
+        if err:
+            print("errror")
 
     def registration_response(self):
         pass
@@ -179,7 +202,6 @@ class sasClient():
         #else:
             #print to log/FeMS already registered or heartbeating
 
-
         typeOfCallings = [consts.REG,consts.SPECTRUM,consts.GRANT,consts.HEART]
         
         for typeOfCalling in typeOfCallings:
@@ -195,97 +217,18 @@ class sasClient():
         for cbsd in self.cbsdList:
             if cbsd.sasStage == sasStage:
                 filtered.append(cbsd)
+        
         return filtered
 
-    def reg(self):
-       reg = SASRegistrationMethod(self.cbsdList)
-       reg.buildJsonRequest()
-       reg.contactSAS()
-       reg.handleReply()
+    def makeSASRequest(self,cbsds:list,typeOfCalling:str):
+        req = self.buildJsonRequest(cbsds,typeOfCalling)
+        sasReponse = self.contactSAS(req,typeOfCalling)
+        self.processSasResposne(sasReponse.json(),cbsds,typeOfCalling)
+    #    reg = SASRegistrationMethod(self.cbsdList)
+    #    reg.buildJsonRequest()
+    #    reg.contactSAS()
+    #    reg.handleReply()
 
-class SASMethod(ABC):
-    
-    @abstractmethod
-    def buildJsonRequest():
-        pass
-    
-    @abstractmethod
-    def handleReply():
-        pass
-
-    def handleError():
-        pass
-
-
-    def contactSAS(self,method):
-        ''''
-        send json dict to sas
-        '''
-        try:
-            self.sasResponse = requests.post("https://192.168.4.222:5001/v1.2/"+method, 
-            # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
-            # verify=('googleCerts/ca.cert'),
-            # json=request)
-            # timeout=5
-            cert=('certs/client.cert','certs/client.key'),
-            verify=('certs/ca.cert'),
-            json=self.req,
-            timeout=5)
-        
-        except Exception as e:
-            print(f"your connection has failed: {e}")
-            return False
-
-
-class SASRegistrationMethod(SASMethod):
-
-
-    def __init__(self,cbsds: list):
-            self.method = str(consts.REG + "Request")
-            self.resposneMethod = str(consts.REG + "Response")
-            self.cbsds = cbsds
-
-    def buildJsonRequest(self):
-        """
-        produces json dict to send to SAS
-        """
-        self.req = {self.method:[]}
-        
-        for cbsd in self.cbsds:
-            self.req[self.method].append(
-                    {
-                        "cbsdSerialNumber": cbsd.SN,
-                        "fccId": cbsd.fccID,
-                        "cbsdCategory": cbsd.cbsdCat,
-                        "userId": cbsd.userID
-                    }
-                )
-        print(json.dumps(self.req, indent = 4))
-
-
-    def contactSAS(self):
-        return super().contactSAS("registration")
-
-
-    def handleReply(self):
-        #TODO dump the log to the log file
-        print(json.dumps(self.sasResponse.json(),indent=4))
-        
-        response = self.sasResponse.json()
-
-        #iterate through the reposne for errors
-        for i in range(len(self.cbsds)):
-            if response['registrationResponse'][i]['response']['responseCode'] != 0:
-                pass
-                #add to errorList
-            else:
-                self.cbsds[i].setCbsdID(response['registrationResponse'][i]['cbsdId'])
-                self.cbsds[i].setSasStage(consts.SPECTRUM)
-        
-        #if errorList
-            #send to error class
-
-    
 
 if __name__ == '__main__':
     
@@ -296,15 +239,18 @@ if __name__ == '__main__':
 
     # s.cbsdList[1].sasStage = consts.SPECTRUM
     registration_list = s.filter_sas_stage(consts.REG)
-    s.reg()
+    s.makeSASRequest(registration_list,consts.REG)
     spectrum_list = s.filter_sas_stage(consts.SPECTRUM)
-    # s.spec()
+    s.makeSASRequest(spectrum_list,consts.SPECTRUM)
 
 
 
     for cbsd in s.cbsdList:
         print(cbsd.sasStage)
 
+
+    # while True:
+        heartbeat_list = s.filter_sas_stage(consts.HEART)
     # for f in registration_list:
     #     print(f.SN)
 
