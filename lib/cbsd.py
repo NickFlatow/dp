@@ -45,7 +45,7 @@ class CbsdInfo(ABC):
         #set Low and high Frequcy
         self.set_low_and_high_frequncy(self.earfcn)
         #populate earfcnList
-        self.getEarfcnList()
+        # self.getEarfcnList()
 
 
         

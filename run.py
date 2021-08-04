@@ -1,12 +1,12 @@
-from numpy.core.fromnumeric import shape
-from numpy.core.numeric import _array_equiv_dispatcher
+# from numpy.core.fromnumeric import shape
+# from numpy.core.numeric import _array_equiv_dispatcher
 from lib.dbConn import dbConn
 from lib.thread import lockedThread
 from lib import cbsd, sasHandler
 from config.default import SAS
 from lib.log import logger
 from test import app, runFlaskSever
-from numpy.ctypeslib import ndpointer
+# from numpy.ctypeslib import ndpointer
 from flask_cors import CORS, cross_origin
 from flask import request
 import json
@@ -47,10 +47,10 @@ def dp_register():
     #collect all values from databse
     conn = dbConn("ACS_V1_1")
     sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist['snDict'])))
-    cbsd_list = conn.select(sql,SNlist['snDict'])
+    cbsds = conn.select(sql,SNlist['snDict'])
     conn.dbClose()
 
-    s.create_cbsd(cbsd_list)
+    s.registerCbsds(cbsds)
 
     return "success"
 
@@ -104,11 +104,10 @@ def test():
     # runFlaskSever() 
     
     #takes cbsd add it to list of cbsds to be registered
-    s.create_cbsd('900F0C732A02')
+    # s.addCbsd('900F0C732A02')
     # s.create_cbsd('DCE99461317E')
 
     # s.cbsdList[1].sasStage = consts.SPECTRUM
-
 
     registration_list = s.filter_sas_stage(consts.REG)
     if registration_list:

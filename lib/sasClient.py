@@ -1,3 +1,12 @@
+# import consts as consts
+# import requests
+# import time
+# from dbConn import dbConn
+# from cbsd import CbsdModelExporter
+# # from sasMethods import SASRegistrationMethod
+# from datetime import datetime,timedelta
+
+
 import lib.consts as consts
 import requests
 import time
@@ -10,7 +19,7 @@ from datetime import datetime,timedelta
 # from flaksconf import app, runFlaskSever
 
 
-import json
+import json 
 
 
 class sasClient():
@@ -28,6 +37,57 @@ class sasClient():
         self.err = []
 
 
+
+        
+        # except Exception as e:
+        #     raise e
+
+    def filter_sas_stage(self,sasStage):
+
+        filtered = []
+
+        for cbsd in self.cbsdList:
+            if cbsd.sasStage == sasStage:
+                filtered.append(cbsd)
+        
+        return filtered
+
+    def expired(self,SASexpireTime: str, isGrantTime = False) -> bool:
+        '''
+        Move to SAS client
+        expireTime: str representing UTC expire time\n
+        Time expired returns true
+        else false
+        '''
+        if SASexpireTime == None:
+            return False
+
+        expireTime = datetime.strptime(SASexpireTime,"%Y-%m-%dT%H:%M:%SZ")
+
+        #Renew grant five minues before it expires
+        if isGrantTime:
+            expireTime = expireTime - timedelta(seconds=300)
+    
+        if datetime.utcnow() <= expireTime:
+            return True
+        else: 
+            return False
+
+
+    def get_cbsd_database_row(self,SN: str) -> dict:
+        '''Given a cbsd Serial Number the fucntion will return a dict with cbsd attributes'''
+        conn = dbConn(consts.DB)
+        cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SN)
+        conn.dbClose()
+
+        return cbsd
+
+    def addCbsd(self,sqlCbsd: dict) -> None:
+
+        # sqlCbsd = self.get_cbsd_database_row(SN)
+        # a = CbsdModelExporter.getCbsd(sqlCbsd)
+        self.cbsdList.append(CbsdModelExporter.getCbsd(sqlCbsd))
+    
     def contactSAS(self,request:dict,method:str):
         '''
         request: json request to pass to SAS server
@@ -44,26 +104,7 @@ class sasClient():
         verify=('certs/ca.cert'),
         json=request,
         timeout=5)
-        
-        # except Exception as e:
-        #     raise e
-
-    def get_cbsd_database_row(self,SN: str) -> dict:
-        '''Given a cbsd Serial Number the fucntion will return a dict with cbsd attributes'''
-        conn = dbConn(consts.DB)
-        cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SN)
-        conn.dbClose()
-
-        return cbsd
-
-    def create_cbsd(self,SN):
-
-        sqlCbsd = self.get_cbsd_database_row(SN)
-        a = CbsdModelExporter.getCbsd(sqlCbsd[0])
-        
-        # a.userID
-        self.cbsdList.append(CbsdModelExporter.getCbsd(sqlCbsd[0]))
-
+    
     def buildJsonRequest(self,cbsds: list,typeOfCalling: str) -> dict:
         '''
         Builds and logs all json requests to SAS
@@ -134,29 +175,6 @@ class sasClient():
         else:
             return False
 
-
-    def expired(self,SASexpireTime: str, isGrantTime = False) -> bool:
-        '''
-        Move to SAS client
-        expireTime: str representing UTC expire time\n
-        Time expired returns true
-        else false
-        '''
-        if SASexpireTime == None:
-            return False
-
-        expireTime = datetime.strptime(SASexpireTime,"%Y-%m-%dT%H:%M:%SZ")
-
-        #Renew grant five minues before it expires
-        if isGrantTime:
-            expireTime = expireTime - timedelta(seconds=300)
-    
-        if datetime.utcnow() <= expireTime:
-            print("Expired")
-            return True
-        else: 
-            print("Not Expired")
-            return False
 
 
     def SAS_request(self,typeOfCalling: str) -> dict:
@@ -253,15 +271,6 @@ class sasClient():
         if self.err:
             print("errror")
 
-    def filter_sas_stage(self,sasStage):
-
-        filtered = []
-
-        for cbsd in self.cbsdList:
-            if cbsd.sasStage == sasStage:
-                filtered.append(cbsd)
-        
-        return filtered
 
     def makeSASRequest(self,cbsds:list,typeOfCalling:str):
         
@@ -281,13 +290,45 @@ class sasClient():
         for cbsd in self.cbsdList:
             if cbsd.SN == cbsdSN:
                 return True
+    
+    def registerCbsds(self, cbsds: dict) -> None:
+        '''
+        cbsds are a dict of database rows
+        '''
+        
+        for cbsd in cbsds:
+            if cbsd not in self.cbsdList:
+                self.addCbsd(cbsd)
+
+        registration_list = self.filter_sas_stage(consts.REG)
+        if registration_list:
+            self.makeSASRequest(registration_list,consts.REG)
+
+        spectrum_list = self.filter_sas_stage(consts.SPECTRUM)
+        if spectrum_list:
+            self.makeSASRequest(spectrum_list,consts.SPECTRUM)
+
+        grant_list = self.filter_sas_stage(consts.GRANT)
+        if grant_list:
+            self.makeSASRequest(grant_list,consts.GRANT)
+
+        heartbeat_list = self.filter_sas_stage(consts.HEART)
+        if heartbeat_list:
+            self.makeSASRequest(heartbeat_list,consts.HEART)
+            
+                
 
 
 if __name__ == '__main__':
 
     s = sasClient()
     #takes cbsd add it to list of cbsds to be registered
-    s.create_cbsd('900F0C732A02')
+
+    conn = dbConn(consts.DB)
+    cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE994613163')
+    conn.dbClose()
+
+    s.addCbsd(cbsd[0])
     # s.create_cbsd('DCE99461317E')
 
     # s.cbsdList[1].sasStage = consts.SPECTRUM
@@ -297,21 +338,17 @@ if __name__ == '__main__':
     if registration_list:
         s.makeSASRequest(registration_list,consts.REG)
 
-    
     spectrum_list = s.filter_sas_stage(consts.SPECTRUM)
     if spectrum_list:
         s.makeSASRequest(spectrum_list,consts.SPECTRUM)
 
-        grant_list = s.filter_sas_stage(consts.GRANT)
+    grant_list = s.filter_sas_stage(consts.GRANT)
+    if grant_list:
         s.makeSASRequest(grant_list,consts.GRANT)
 
-        for cbsd in s.cbsdList:
-            print(cbsd.sasStage)
-
-        while True:
-            heartbeat_list = s.filter_sas_stage(consts.HEART)
-            s.makeSASRequest(heartbeat_list,consts.HEART)
-            time.sleep(10)
+    heartbeat_list = s.filter_sas_stage(consts.HEART)
+    if heartbeat_list:
+        s.makeSASRequest(heartbeat_list,consts.HEART)
 
 
         # for f in registration_list:
