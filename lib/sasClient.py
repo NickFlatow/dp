@@ -1,26 +1,17 @@
-# import consts as consts
+# import json
+# import consts
 # import requests
-# import time
 # from dbConn import dbConn
 # from cbsd import CbsdModelExporter
-# # from sasMethods import SASRegistrationMethod
 # from datetime import datetime,timedelta
 
 
-import lib.consts as consts
-import requests
-import time
-from lib.dbConn import dbConn
-from lib.cbsd import CbsdModelExporter
-# from sasMethods import SASRegistrationMethod
-from datetime import datetime,timedelta
-
-
-# from flaksconf import app, runFlaskSever
-
-
 import json 
-
+import requests
+import lib.consts as consts
+from lib.dbConn import dbConn
+from lib.cbsd import CbsdModelExporter, OneCA
+from datetime import datetime,timedelta
 
 class sasClientClass():
     '''
@@ -36,9 +27,6 @@ class sasClientClass():
         #keep list of cell that have errors
         self.err = []
 
-
-
-        
         # except Exception as e:
         #     raise e
 
@@ -50,6 +38,17 @@ class sasClientClass():
             if cbsd.sasStage == sasStage:
                 filtered.append(cbsd)
         
+        return filtered
+
+
+    def filter_subsequent_heartbeat(self):
+
+        filtered = []
+
+        for cbsd in self.cbsdList:
+            if cbsd.sasStage == consts.HEART and cbsd.subHeart == True:
+                filtered.append(cbsd)
+
         return filtered
 
     def expired(self,SASexpireTime: str, isGrantTime = False) -> bool:
@@ -68,7 +67,7 @@ class sasClientClass():
         if isGrantTime:
             expireTime = expireTime - timedelta(seconds=300)
     
-        if datetime.utcnow() <= expireTime:
+        if datetime.utcnow() >= expireTime:
             return True
         else: 
             return False
@@ -82,11 +81,23 @@ class sasClientClass():
 
         return cbsd
 
+    def addOneCA(self, cbsd: OneCA):
+        self.cbsdList.append(cbsd)
+        
     def addCbsd(self,sqlCbsd: dict) -> None:
 
-        # sqlCbsd = self.get_cbsd_database_row(SN)
-        # a = CbsdModelExporter.getCbsd(sqlCbsd)
         self.cbsdList.append(CbsdModelExporter.getCbsd(sqlCbsd))
+
+    def getCbsds(self,SNs: dict) -> list:
+
+        cbsds = []
+
+        for cbsd in self.cbsdList:
+            if cbsd.SN in SNs['snDict']:
+                cbsds.append(cbsd)
+
+        return cbsds
+            
     
     def contactSAS(self,request:dict,method:str):
         '''
@@ -99,7 +110,6 @@ class sasClientClass():
         # verify=('googleCerts/ca.cert'),
         # json=request)
         # timeout=5
-
         cert=('certs/client.cert','certs/client.key'),
         verify=('certs/ca.cert'),
         json=request,
@@ -162,6 +172,21 @@ class sasClientClass():
                         "grantRenew":False
                     }
                 )
+            elif typeOfCalling == consts.DEREG:
+                req[requestMessageType].append(
+                    {
+                        "cbsdId":cbsd.cbsdID,
+                    }
+                )
+            elif typeOfCalling == consts.REL:
+                req[requestMessageType].append(
+                    {
+                        "cbsdId":cbsd.cbsdID,
+                        "grantId":cbsd.grantID
+                    }
+                )
+
+
         print(json.dumps(req, indent=4))
         return req
 
@@ -174,7 +199,6 @@ class sasClientClass():
             return consts.HEART
         else:
             return False
-
 
 
     def SAS_request(self,typeOfCalling: str) -> dict:
@@ -228,13 +252,13 @@ class sasClientClass():
 
         if self.expired(sasResponse['transmitExpireTime']) and cbsd.adminState == 1:
             cbsd.operationalState = 'GRANTED'
-            print("!!!!Power Off!!!!!!")
             cbsd.powerOff()
         
         elif not self.expired(sasResponse['transmitExpireTime']) and cbsd.adminState == 0:
-            cbsd.operationalState = 'AUTHORIZED'
-            print("!!!!Power On!!!!!!")
             cbsd.powerOn()
+            cbsd.operationalState = 'AUTHORIZED'
+            cbsd.subHeart = True
+
 
     def test(self):
         for cbsd in self.cbsdList:
@@ -292,9 +316,6 @@ class sasClientClass():
                 return True
     
     def registerCbsds(self, cbsds: dict) -> None:
-        '''
-        cbsds are a dict of database rows
-        '''
         
         for cbsd in cbsds:
             if cbsd not in self.cbsdList:
@@ -315,8 +336,33 @@ class sasClientClass():
         heartbeat_list = self.filter_sas_stage(consts.HEART)
         if heartbeat_list:
             self.makeSASRequest(heartbeat_list,consts.HEART)
+
+    def deregisterCbsd(self,SNs: dict) -> None:
+        '''
+        
+        '''
+        cbsds = self.getCbsds(SNs)
+        relinquish = []
+
+        for cbsd in cbsds:
+            if cbsd.grantID != None:
+                cbsd.relinquish()
+                relinquish.append(cbsd)
+            cbsd.deregister()
+
+        if relinquish:
+            self.makeSASRequest(relinquish,consts.REL)
+        self.makeSASRequest(cbsds,consts.DEREG)
             
-                
+    def heartbeat(self) -> None:
+
+        #filter for authorized heartbeats
+        heartbeat_list = self.filter_subsequent_heartbeat()
+        if heartbeat_list:
+            self.makeSASRequest(heartbeat_list,consts.HEART)
+
+
+        
 
 
 if __name__ == '__main__':
@@ -325,10 +371,11 @@ if __name__ == '__main__':
     #takes cbsd add it to list of cbsds to be registered
 
     conn = dbConn(consts.DB)
-    cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE994613163')
+    cbsd = conn.select("SELECT * FROM dp_device_info WHERE fccID = %s",'2AQ68T99B226')
     conn.dbClose()
 
-    s.addCbsd(cbsd[0])
+    # s.addCbsd(cbsd[0])
+    s.registerCbsds(cbsd)
     # s.create_cbsd('DCE99461317E')
 
     # s.cbsdList[1].sasStage = consts.SPECTRUM
