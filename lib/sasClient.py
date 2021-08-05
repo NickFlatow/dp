@@ -22,7 +22,7 @@ from datetime import datetime,timedelta
 import json 
 
 
-class sasClient():
+class sasClientClass():
     '''
     One stop shop for all your SAS communication needs.\n
     You got cbsds needing specturm?\n
@@ -321,7 +321,7 @@ class sasClient():
 
 if __name__ == '__main__':
 
-    s = sasClient()
+    s = sasClientClass()
     #takes cbsd add it to list of cbsds to be registered
 
     conn = dbConn(consts.DB)
