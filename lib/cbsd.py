@@ -1,3 +1,16 @@
+# from abc import ABC, abstractmethod
+# from datetime import datetime
+# from requests.auth import HTTPDigestAuth
+# from dbConn import dbConn
+# import consts as consts
+# import requests
+# import time
+# import math
+# import json
+
+
+
+
 from abc import ABC, abstractmethod
 from datetime import datetime
 from requests.auth import HTTPDigestAuth
@@ -37,6 +50,9 @@ class CbsdInfo(ABC):
         self.connreqURL =         sqlCbsd['connreqURL']
         self.hclass =             sqlCbsd['hclass']
 
+        #is cbsd in the initial or subsequent heartbeat
+        self.subHeart =           False
+
         self.maxEirp = 0
         #set sasStage
         self.setSasStage(consts.REG)
@@ -58,12 +74,16 @@ class CbsdInfo(ABC):
         pass
 
     def powerOn(self):
+        print(f"Turning power on for {self.SN}")
         parameterValueList = [consts.ADMIN_POWER_ON]
         self.setParamterValue(parameterValueList)
+        print(f"power successfully turned off")
 
     def powerOff(self):
+        print(f"Turning power off for {self.SN}")
         parameterValueList = [consts.ADMIN_POWER_OFF]
         self.setParamterValue(parameterValueList)
+        print(f"power successfully turned off")
 
     def getEarfcnList(self):
         '''
@@ -238,7 +258,29 @@ class CbsdInfo(ABC):
                 #and then retry
 
 
-            #if successful update class values
+    def relinquish(self):
+
+        #set sasStage
+        self.setSasStage(consts.REL)
+        
+        #powerOff CBSD
+        if self.adminState == 1:
+            self.powerOff()
+        #set operationalState
+        self.operationalState = None
+        #set grantTime
+        self.setGrantExpireTime(None)
+        #set transmitTime
+        self.setTransmitExpireTime(None)
+
+
+    def deregister(self):
+
+        self.setSasStage(consts.DEREG)
+
+        if self.adminState == 1:
+            self.powerOff()
+
 
     def cbsdAction(self,cbsdSN,action,time):
         #check note field for EXEC
@@ -277,9 +319,13 @@ class OneCA(CbsdInfo):
         super(OneCA,self).__init__(sqlCbsd)  
     
     def set_low_and_high_frequncy(self,earfcn):
-        MHz = self.EARFCNtoMHZ(earfcn)
-        self.lowFrequency  = MHz - 10
-        self.highFrequency = MHz + 10
+        if int(earfcn) >= 55240 and int(earfcn) <= 56739:
+            MHz = self.EARFCNtoMHZ(earfcn)
+            self.lowFrequency  = MHz - 10
+            self.highFrequency = MHz + 10
+        else:
+            raise ValueError
+            
     
     def select_frequency(self,channels: dict) -> bool:
         '''

@@ -1,55 +1,37 @@
-# from flask_cors import CORS, cross_origin
-# from flask import request
-# from lib.dbConn import dbConn
-# from lib import sasHandler
-# from lib.thread import lockedThread
-# import time
+from flask_cors import CORS, cross_origin
+from flask import request
+from lib.dbConn import dbConn
+from test import app
+from run import sasClient
+import json
 
-# from test import app
-# from run import insert
 
-# import lib.consts as consts
-# import json
 
-# import threading
+# threadLock = threading.Lock()
+@app.route('/', methods=['GET'])
+def home():
+    return"<h1>Domain Proxy</h1><p>test version</p>"
 
-# from lib.sasClient import sasClient
-# # import threading 
+@app.route('/dp/v1/register', methods=['POST'])
+@cross_origin()
+def dp_register():
 
-# # threadLock = threading.Lock()
-# @app.route('/', methods=['GET'])
-# def home():
-#     return"<h1>Domain Proxy</h1><p>test version</p>"
 
-# @app.route('/dp/v1/register', methods=['POST'])
-# @cross_origin()
-# def dp_register():
+    #Get cbsd SNs from FeMS    
+    SNlist = request.form['json']
 
-#     insert()
-#     #Get cbsd SNs from FeMS    
-#     SNlist = request.form['json']
+    #convert to json
+    SNlist = json.loads(SNlist)
 
-#     #convert to json
-#     SNlist = json.loads(SNlist)
+    #collect all values from databse
+    conn = dbConn("ACS_V1_1")
+    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist['snDict'])))
+    cbsds = conn.select(sql,SNlist['snDict'])
+    conn.dbClose()
 
-#     #collect all values from databse
-#     conn = dbConn("ACS_V1_1")
-#     sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist['snDict'])))
-#     cbsd_list = conn.select(sql,SNlist['snDict'])
+    sasClient.registerCbsds(cbsds)
 
-#     for cbsd in cbsd_list:
-#         if cbsd['sasStage'] != consts.REG:
-#             cbsd['sasStage'] = consts.REG
-#             conn.update("UPDATE dp_device_info SET sasStage = %s WHERE SN = %s",(consts.REG,cbsd['SN']))
-
-#     conn.dbClose()
-
-#     #create thread with threadLock so we do not get interference from heartbeat thread.
-#     # registrationThread = lockedThread("FeMS_reg_thread")
-    
-#     sasHandler.Handle_Request(cbsd_list,consts.REG)
-
-#     return "success"
+    return "success"
  
 # @app.route('/dp/v1/deregister', methods=['POST'])
 # @cross_origin()
