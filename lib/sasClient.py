@@ -17,7 +17,7 @@ class sasClientClass():
     '''
     One stop shop for all your SAS communication needs.\n
     You got cbsds needing specturm?\n
-    We got connections :|
+    We got connections :/
     '''
     def __init__(self):
         #list of cbsd objects
@@ -190,16 +190,6 @@ class sasClientClass():
         print(json.dumps(req, indent=4))
         return req
 
-    def getNextCalling(typeOfCalling):
-        if typeOfCalling == consts.REG:
-            return consts.SPECTRUM
-        if typeOfCalling == consts.SPECTRUM:
-            return consts.GRANT
-        if typeOfCalling == consts.GRANT:
-            return consts.HEART
-        else:
-            return False
-
 
     def SAS_request(self,typeOfCalling: str) -> dict:
         '''
@@ -258,12 +248,6 @@ class sasClientClass():
             cbsd.powerOn()
             cbsd.operationalState = 'AUTHORIZED'
             cbsd.subHeart = True
-
-
-    def test(self):
-        for cbsd in self.cbsdList:
-            print(cbsd.SN)
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!TEST_TEST_TEST_TEST_TEST_TEST_TEST_TEST_TEST!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
 
     def processSasResposne(self, sasResponse: dict, cbsds: list, typeOfCalling: str) -> None:
 
@@ -360,9 +344,6 @@ class sasClientClass():
         heartbeat_list = self.filter_subsequent_heartbeat()
         if heartbeat_list:
             self.makeSASRequest(heartbeat_list,consts.HEART)
-
-
-        
 
 
 if __name__ == '__main__':
