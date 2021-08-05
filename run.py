@@ -16,9 +16,9 @@ import threading
 import lib.consts as consts
 import ctypes
 
-from lib.sasClient import sasClient
+from lib.sasClient import sasClientClass
 
-s = sasClient()
+sasClient = sasClientClass()
 #needed here to make routes work
 # from lib import routes
 
@@ -50,7 +50,7 @@ def dp_register():
     cbsds = conn.select(sql,SNlist['snDict'])
     conn.dbClose()
 
-    s.registerCbsds(cbsds)
+    sasClient.registerCbsds(cbsds)
 
     return "success"
 
@@ -109,26 +109,26 @@ def test():
 
     # s.cbsdList[1].sasStage = consts.SPECTRUM
 
-    registration_list = s.filter_sas_stage(consts.REG)
+    registration_list = sasClient.filter_sas_stage(consts.REG)
     if registration_list:
-        s.makeSASRequest(registration_list,consts.REG)
+        sasClient.makeSASRequest(registration_list,consts.REG)
 
     
-    spectrum_list = s.filter_sas_stage(consts.SPECTRUM)
+    spectrum_list = sasClient.filter_sas_stage(consts.SPECTRUM)
     if spectrum_list:
-        s.makeSASRequest(spectrum_list,consts.SPECTRUM)
+        sasClient.makeSASRequest(spectrum_list,consts.SPECTRUM)
 
-        grant_list = s.filter_sas_stage(consts.GRANT)
-        s.makeSASRequest(grant_list,consts.GRANT)
+        grant_list = sasClient.filter_sas_stage(consts.GRANT)
+        sasClient.makeSASRequest(grant_list,consts.GRANT)
 
 
-        for cbsd in s.cbsdList:
+        for cbsd in sasClient.cbsdList:
             print(cbsd.sasStage)
 
 
         while True:
-            heartbeat_list = s.filter_sas_stage(consts.HEART)
-            s.makeSASRequest(heartbeat_list,consts.HEART)
+            heartbeat_list = sasClient.filter_sas_stage(consts.HEART)
+            sasClient.makeSASRequest(heartbeat_list,consts.HEART)
             time.sleep(10)
 
 
