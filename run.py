@@ -33,7 +33,7 @@ def dp_register():
     cbsds = conn.select(sql,SNlist['snDict'])
     conn.dbClose()
 
-    sasClient.registerCbsds(cbsds)
+    sasClient.userRegisterCbsds(cbsds)
 
     return "success"
 
@@ -48,7 +48,7 @@ def dp_deregister():
     SNlist = json.loads(SNlist)
 
     #send to sasClient to be deregistered
-    sasClient.deregisterCbsd(SNlist)
+    sasClient.userDeregisterCbsd(SNlist)
 
     return "success"
 

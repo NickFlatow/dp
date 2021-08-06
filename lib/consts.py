@@ -10,6 +10,7 @@ SUB_HEART = 'authorized_heartbeat'
 DEREG = 'deregistration'
 REL = 'relinquishment'
 REPROV = 'provisioning'
+ERROR = 'error'
 
 
 #LICENSE FILE CONSTS

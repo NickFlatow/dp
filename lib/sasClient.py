@@ -6,11 +6,14 @@
 # from datetime import datetime,timedelta
 
 
-import json 
+import json
+import time
 import requests
+from lib import alarm
+from lib.alarm import Alarm 
 import lib.consts as consts
 from lib.dbConn import dbConn
-from lib.cbsd import CbsdModelExporter, OneCA
+from lib.cbsd import CbsdInfo, CbsdModelExporter, OneCA
 from datetime import datetime,timedelta
 
 class sasClientClass():
@@ -24,11 +27,8 @@ class sasClientClass():
         self.cbsdList = []
         #list of cbsd objects currently heartbeating
         self.heartbeatList = []
-        #keep list of cell that have errors
-        self.err = []
 
-        # except Exception as e:
-        #     raise e
+        self.alarm = Alarm
 
     def filter_sas_stage(self,sasStage):
 
@@ -92,6 +92,7 @@ class sasClientClass():
 
         cbsds = []
 
+        cbsd: CbsdInfo
         for cbsd in self.cbsdList:
             if cbsd.SN in SNs['snDict']:
                 cbsds.append(cbsd)
@@ -124,6 +125,7 @@ class sasClientClass():
         
         req = {requestMessageType:[]}
 
+        cbsd:CbsdInfo
         for cbsd in cbsds:
 
             if typeOfCalling == consts.REG:
@@ -209,12 +211,12 @@ class sasClientClass():
         
         # return sasResponse
 
-    def registrationResposne(self,cbsd,sasResponse):
+    def registrationResposne(self,cbsd: CbsdInfo,sasResponse):
         
         cbsd.setCbsdID(sasResponse['cbsdId'])
         cbsd.setSasStage(consts.SPECTRUM)
 
-    def spectrumResposne(self,cbsd,channels):
+    def spectrumResposne(self,cbsd: CbsdInfo,channels):
 
         # channelSelected = cbsd.select_frequency(channels)
         channelSelected = True
@@ -225,7 +227,7 @@ class sasClientClass():
             self.err = [cbsd]
             # cbsd.setSasStage("error")
 
-    def grantResposne(self,cbsd,sasResponse):
+    def grantResposne(self,cbsd: CbsdInfo,sasResponse):
         #set grant expire time
         cbsd.setGrantExpireTime(sasResponse['grantExpireTime'])
 
@@ -236,7 +238,7 @@ class sasClientClass():
         #set sasStage to heartbeat
         cbsd.setSasStage(consts.HEART)
 
-    def heartbeatResposne(self,cbsd,sasResponse):
+    def heartbeatResposne(self, cbsd: CbsdInfo, sasResponse):
         print(f"utcnow: {datetime.utcnow()}")
         cbsd.setTransmitExpireTime(sasResponse['transmitExpireTime'])
 
@@ -249,18 +251,108 @@ class sasClientClass():
             cbsd.operationalState = 'AUTHORIZED'
             cbsd.subHeart = True
 
+    def relinquishmentResponse(self, cbsd: CbsdInfo):
+        #TODO move everything from self.deregister?
+
+        cbsd.grantID = None
+
+    def deregistrationResposne(self, cbsd: CbsdInfo):
+
+        cbsd.setCbsdID(None)
+
+    def processError(self, err: dict) -> None:
+        for errorCode in err.keys():
+
+            #100: Unsupported SAS protocol version
+            #101: Blacklist CBSD
+            #103: Invalid Parameters
+            if errorCode == 100 or errorCode == 101 or errorCode == 103:
+
+                #check if deregistertion or relinquishment is needed
+                self.deregisterCbsd(err[errorCode])
+                
+                cbsd: CbsdInfo
+                for cbsd in err[errorCode]:
+                    #log error to FeMS page for further user debugging
+                    self.alarm.log_error_to_FeMS_alarm("CRITICAL",cbsd,errorCode)
+
+            #105: Deregister
+            elif errorCode == 105:
+                
+                #the cbsd is in a badly desychronized state. reliquish any grants and deregister.
+                self.deregisterCbsd(err[errorCode])
+                
+                #Start fresh and reregister with the SAS
+                self.autoRegisterCbsds(err[errorCode])
+
+            #200: Pending registration
+            if errorCode == 200:
+                cbsd: CbsdInfo
+                #log error to FeMS
+                for cbsd in err[errorCode]:
+                    self.alarm.log_error_to_FeMS_alarm('WARNING',cbsd,200)
+                
+                #retry again
+                time.sleep(30)
+                self.autoRegisterCbsds(err[errorCode])
+
+            #if no action is required just display error to user.
+            else:
+                #102: Missing required parameter
+                #104: Certification error 
+                #201: Group Error
+                for cbsd in err[errorCode]:
+                    alarm.Alarm.log_error_to_FeMS_alarm("WARNING",cbsd,errorCode)
+
+
+        
+        #at the end of the day remember to clear your errors
+        # self.err.clear()
+
+    def cbsdError(self,cbsd: CbsdInfo, sasResponse: dict,err: dict) -> bool:
+
+        #makes things more a bit more clear
+        responseCode = sasResponse['response']['responseCode']
+            
+        #if there is an error
+        if responseCode != 0:
+
+            #if the transmit time has expired be sure to power off the cbsd ASAP
+            if 'transmitExpireTime' in sasResponse and cbsd.adminState == 1:
+                if self.expired(sasResponse['transmitExpireTime']):
+                    cbsd.powerOff()
+
+            #change the sas stage to stop unwanted request being sent to the SAS
+            cbsd.setSasStage(consts.ERROR)
+
+            #if the response code already exists in dict
+            if responseCode in err.keys():
+                #append the list
+                err[responseCode].append(cbsd)
+            else:
+                #if the key does not exist in list create the key and create the list
+                err[responseCode] = [cbsd]
+
+            #there was an error
+            return True
+        else:
+            #there was no error
+            return False
+
     def processSasResposne(self, sasResponse: dict, cbsds: list, typeOfCalling: str) -> None:
+        #create error dictionry
+        err = {}
 
         responseMessageType = typeOfCalling + "Response"
 
         print(json.dumps(sasResponse,indent=4))
 
-        #iterate through the response for errors
+        #match cbsd with response from SAS
         for i in range(len(cbsds)):
-            if sasResponse[responseMessageType][i]['response']['responseCode'] != 0:
-                
-                #TODO what to do about sasStage for cbsd
-                self.err.append(cbsds[i])
+            
+            #if there is an error
+            if self.cbsdError(cbsds[i],sasResponse[responseMessageType][i],err):
+                #skip to the next cbsd in the list
                 continue
             
             elif typeOfCalling == consts.REG:
@@ -273,12 +365,17 @@ class sasClientClass():
                 self.grantResposne(cbsds[i],sasResponse[responseMessageType][i])
 
             elif typeOfCalling == consts.HEART:
-                self.heartbeatResposne(cbsds[i],sasResponse[responseMessageType][i])                
+                self.heartbeatResposne(cbsds[i],sasResponse[responseMessageType][i])
 
-                
-        if self.err:
-            print("errror")
+            elif typeOfCalling == consts.REL:
+                self.relinquishmentResponse(cbsds[i])
 
+            elif typeOfCalling == consts.DEREG:
+                self.deregistrationResposne(cbsds[i])
+      
+        if err:
+            print("error")
+            self.processError(err)
 
     def makeSASRequest(self,cbsds:list,typeOfCalling:str):
         
@@ -295,16 +392,46 @@ class sasClientClass():
         '''
         return True if cbsd is already in self.cbsdList
         '''
+        cbsd: CbsdInfo
         for cbsd in self.cbsdList:
             if cbsd.SN == cbsdSN:
                 return True
-    
-    def registerCbsds(self, cbsds: dict) -> None:
+
+
+    def updateSasStageBySN(self, SN: str,typeOfCalling):
+        cbsd:CbsdInfo
+        for cbsd in self.cbsdList:
+            if cbsd.SN == SN:
+                cbsd.setSasStage(typeOfCalling)
+
+    def userRegisterCbsds(self, cbsds: dict) -> None:
+        '''
+        Method used to handle registration requested by user
+        '''
         
         for cbsd in cbsds:
-            if cbsd not in self.cbsdList:
+            #if the cbsd has never been registered
+            if not self.cbsdInList(cbsd['SN']):
+                #create cbsd class
                 self.addCbsd(cbsd)
+            else:
+                #otherwise just update the stage to registration
+                self.updateSasStageBySN(cbsd['SN'],consts.REG)
 
+        self.registrationFlow()
+
+    def autoRegisterCbsds(self, cbsds: list) -> None:
+        '''
+        Method used by domain proxy to handle registering cbsds
+        '''
+        cbsd: CbsdInfo
+        for cbsd in cbsds:
+            cbsd.setSasStage(consts.REG)
+
+        self.registrationFlow()
+    
+    def registrationFlow(self) -> None:
+        
         registration_list = self.filter_sas_stage(consts.REG)
         if registration_list:
             self.makeSASRequest(registration_list,consts.REG)
@@ -321,30 +448,48 @@ class sasClientClass():
         if heartbeat_list:
             self.makeSASRequest(heartbeat_list,consts.HEART)
 
-    def deregisterCbsd(self,SNs: dict) -> None:
-        '''
-        
-        '''
-        cbsds = self.getCbsds(SNs)
-        relinquish = []
 
+    def deregisterCbsd(self,cbsds:list) -> None:
+        
+
+        relinquish = []
+        deregister = []
+        
+        cbsd: CbsdInfo
         for cbsd in cbsds:
             if cbsd.grantID != None:
+                #set internal settings for cbsd reqlinquish e.g(powerOff, set times to null, set sas stage)
                 cbsd.relinquish()
                 relinquish.append(cbsd)
-            cbsd.deregister()
+            if cbsd.cbsdID != None:
+                #set interal settings for cbsd deregister e.g(ensure power is off, set sas stage)
+                cbsd.deregister()
+                deregister.append(cbsd)
+                
 
+        #send requests to SAS for cbsd actions
         if relinquish:
             self.makeSASRequest(relinquish,consts.REL)
-        self.makeSASRequest(cbsds,consts.DEREG)
+        if deregister:
+            self.makeSASRequest(cbsds,consts.DEREG)
+
+
+    def userDeregisterCbsd(self,SNs: dict) -> None:
+
+        cbsds = self.getCbsds(SNs)
+
+        cbsd: CbsdInfo
+
+        for cbsd in cbsds:
+            cbsd.setSasStage(consts.DEREG)
+
+        self.deregisterCbsd(cbsds)
             
     def heartbeat(self) -> None:
-
         #filter for authorized heartbeats
         heartbeat_list = self.filter_subsequent_heartbeat()
         if heartbeat_list:
             self.makeSASRequest(heartbeat_list,consts.HEART)
-
 
 if __name__ == '__main__':
 
@@ -379,7 +524,7 @@ if __name__ == '__main__':
         s.makeSASRequest(heartbeat_list,consts.HEART)
 
 
-        # for f in registration_list:
+    # for f in registration_list:
     #     print(f.SN)
 
     #while True:

@@ -32,8 +32,8 @@ class CbsdInfo(ABC):
         self.userID =             sqlCbsd['userID']
         self.fccID =              sqlCbsd['fccID']
         self.SN =                 sqlCbsd['SN']
+        self.cbsdID =             None
         self.cbsdCat =            sqlCbsd['cbsdCategory']
-        # self.sasStage =           sqlCbsd['sasStage']
         self.sasStage =           consts.REG
         self.txPower =            sqlCbsd['TxPower']
         self.earfcn =             sqlCbsd['EARFCN']
@@ -52,6 +52,9 @@ class CbsdInfo(ABC):
 
         #is cbsd in the initial or subsequent heartbeat
         self.subHeart =           False
+
+        #in the case of an error from the SAS attach the error to the cell
+        self.errResponse =        None
 
         self.maxEirp = 0
         #set sasStage
@@ -77,7 +80,7 @@ class CbsdInfo(ABC):
         print(f"Turning power on for {self.SN}")
         parameterValueList = [consts.ADMIN_POWER_ON]
         self.setParamterValue(parameterValueList)
-        print(f"power successfully turned off")
+        print(f"power successfully turned on")
 
     def powerOff(self):
         print(f"Turning power off for {self.SN}")

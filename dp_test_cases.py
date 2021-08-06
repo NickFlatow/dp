@@ -208,7 +208,7 @@ class sasClientTest(unittest.TestCase):
         cbsd1.subHeart = True
         cbsd2.subHeart = True
 
-        sasClient.deregisterCbsd(deregDict)
+        sasClient.userDeregisterCbsd(deregDict)
 
 
 

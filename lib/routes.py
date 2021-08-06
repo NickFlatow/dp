@@ -7,31 +7,31 @@ import json
 
 
 
-# threadLock = threading.Lock()
-@app.route('/', methods=['GET'])
-def home():
-    return"<h1>Domain Proxy</h1><p>test version</p>"
+# # threadLock = threading.Lock()
+# @app.route('/', methods=['GET'])
+# def home():
+#     return"<h1>Domain Proxy</h1><p>test version</p>"
 
-@app.route('/dp/v1/register', methods=['POST'])
-@cross_origin()
-def dp_register():
+# @app.route('/dp/v1/register', methods=['POST'])
+# @cross_origin()
+# def dp_register():
 
 
-    #Get cbsd SNs from FeMS    
-    SNlist = request.form['json']
+#     #Get cbsd SNs from FeMS    
+#     SNlist = request.form['json']
 
-    #convert to json
-    SNlist = json.loads(SNlist)
+#     #convert to json
+#     SNlist = json.loads(SNlist)
 
-    #collect all values from databse
-    conn = dbConn("ACS_V1_1")
-    sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist['snDict'])))
-    cbsds = conn.select(sql,SNlist['snDict'])
-    conn.dbClose()
+#     #collect all values from databse
+#     conn = dbConn("ACS_V1_1")
+#     sql = "SELECT * FROM dp_device_info WHERE SN IN ({})".format(','.join(['%s'] * len(SNlist['snDict'])))
+#     cbsds = conn.select(sql,SNlist['snDict'])
+#     conn.dbClose()
 
-    sasClient.registerCbsds(cbsds)
+#     sasClient.registerCbsds(cbsds)
 
-    return "success"
+#     return "success"
  
 # @app.route('/dp/v1/deregister', methods=['POST'])
 # @cross_origin()
