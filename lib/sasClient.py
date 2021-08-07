@@ -7,6 +7,7 @@
 
 
 import json
+from logging import error
 import time
 import requests
 from lib import alarm
@@ -260,6 +261,21 @@ class sasClientClass():
 
         cbsd.setCbsdID(None)
 
+
+    def resendRequest(self, err: dict, errorCode: int, typeOfCalling: str,sleepTime) -> None:
+
+        cbsd: CbsdInfo
+        for cbsd in err[errorCode]:
+            #log error to FeMS alarm for each cbsd
+            self.alarm.log_error_to_FeMS_alarm('WARNING',cbsd,errorCode)
+            #change sas Stage to register
+            cbsd.setSasStage(typeOfCalling)
+        
+        #wait and retry again
+        time.sleep(sleepTime)
+        self.registrationFlow()
+
+
     def processError(self, err: dict) -> None:
         for errorCode in err.keys():
 
@@ -269,7 +285,7 @@ class sasClientClass():
             if errorCode == 100 or errorCode == 101 or errorCode == 103:
 
                 #check if deregistertion or relinquishment is needed
-                self.deregisterCbsd(err[errorCode])
+                self.deregisterCbsds(err[errorCode])
                 
                 cbsd: CbsdInfo
                 for cbsd in err[errorCode]:
@@ -280,27 +296,46 @@ class sasClientClass():
             elif errorCode == 105:
                 
                 #the cbsd is in a badly desychronized state. reliquish any grants and deregister.
-                self.deregisterCbsd(err[errorCode])
+                self.deregisterCbsds(err[errorCode])
                 
                 #Start fresh and reregister with the SAS
                 self.autoRegisterCbsds(err[errorCode])
 
-            #200: Pending registration
-            if errorCode == 200:
-                cbsd: CbsdInfo
-                #log error to FeMS
-                for cbsd in err[errorCode]:
-                    self.alarm.log_error_to_FeMS_alarm('WARNING',cbsd,200)
-                
-                #retry again
-                time.sleep(30)
-                self.autoRegisterCbsds(err[errorCode])
+            #106: Resend The SAS was temporarily unable to fulfill the request
+            elif errorCode == 106:
 
-            #if no action is required just display error to user.
+                self.resendRequest(err,errorCode,consts.GRANT,30)
+
+            #200: Pending registration
+            elif errorCode == 200:
+
+                self.resendRequest(err,errorCode,consts.REG,30)
+
+            #400 incumbent activity has entered the area between spectrum and grant request(retry spectrum request)
+            elif errorCode == 400:
+
+                self.resendRequest(err,errorCode,consts.SPECTRUM,30)
+
+            #401 Grant Conflict
+            elif errorCode == 401:
+
+                #relinquish grants
+                self.relinquishGrant(err[errorCode])
+                #apply for new grant
+                self.resendRequest(err,errorCode,consts.GRANT,0)
+
+            #500 Terminate Grant
+            elif errorCode == 500:
+                print("Need to test with google SAS")
+
+
+
+
+            #102: Missing required parameter
+            #104: Certification error 
+            #201: Group Error
             else:
-                #102: Missing required parameter
-                #104: Certification error 
-                #201: Group Error
+                #no action is required from the domain proxy. Log error to FeMS
                 for cbsd in err[errorCode]:
                     alarm.Alarm.log_error_to_FeMS_alarm("WARNING",cbsd,errorCode)
 
@@ -321,6 +356,10 @@ class sasClientClass():
             if 'transmitExpireTime' in sasResponse and cbsd.adminState == 1:
                 if self.expired(sasResponse['transmitExpireTime']):
                     cbsd.powerOff()
+            
+            #if the sas suggestes new operational paramaters 
+            if 'operationParam' in sasResponse:
+                cbsd.sasOperationalParams = sasResponse['operationParam']
 
             #change the sas stage to stop unwanted request being sent to the SAS
             cbsd.setSasStage(consts.ERROR)
@@ -449,9 +488,31 @@ class sasClientClass():
             self.makeSASRequest(heartbeat_list,consts.HEART)
 
 
-    def deregisterCbsd(self,cbsds:list) -> None:
-        
+    def relinquishGrant(self,cbsds: list) -> None:
+        '''
+        based on if cbsd has grantID
+        this method will set the internal settings for cbsd reqlinquish e.g(powerOff, set times to null, set sas stage)  \n
+        then send the reqlinquishment request
+        '''
+        relinquish = [] 
 
+        cbsd: CbsdInfo
+        for cbsd in cbsds:
+            if cbsd.grantID != None:
+                #set internal settings for cbsd reqlinquish e.g(powerOff, set times to null, set sas stage)
+                cbsd.relinquish()
+                relinquish.append(cbsd)
+
+        if relinquish:
+            self.makeSASRequest(relinquish,consts.REL)
+
+    def deregisterCbsds(self,cbsds:list) -> None:
+        '''
+        if needed sets the internal settings for cbsd reqlinquish e.g(powerOff, set times to null, set sas stage)  \n
+        if needed sets interal settings for cbsd deregister e.g(ensure power is off, set sas stage) \n
+        sends the appropriate requests to SAS
+        '''
+    
         relinquish = []
         deregister = []
         
@@ -483,7 +544,7 @@ class sasClientClass():
         for cbsd in cbsds:
             cbsd.setSasStage(consts.DEREG)
 
-        self.deregisterCbsd(cbsds)
+        self.deregisterCbsds(cbsds)
             
     def heartbeat(self) -> None:
         #filter for authorized heartbeats

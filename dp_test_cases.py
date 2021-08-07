@@ -9,10 +9,29 @@ from lib.cbsd import OneCA as ONECA
 
 
 
-# class CbsdTest(unittest.TestCase):
-#     '''
-#     Test Cases for generic cbsd class
-#     '''
+class CbsdTest(unittest.TestCase):
+    '''
+    Test Cases for generic cbsd class
+    '''
+
+    def test_updateOperationalParams(self):
+        conn = dbConn("ACS_V1_1")
+        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
+        cbsd1 = ONECA(sqlCbsd[0])
+
+        cbsd1.sasOperationalParams = {
+                "maxEirp": 10,
+                "operationFrequencyRange": {
+                    "highFrequency": 3655000000,
+                    "lowFrequency": 3635000000
+                }
+            }
+
+        self.assertEqual(cbsd1.txPower,3)
+        self.assertEquals(cbsd1.earfcn,'56390')
+
+        
+
     
 #     def test_setParameterValues_adminState_off(self):
 
@@ -131,88 +150,127 @@ from lib.cbsd import OneCA as ONECA
 
 class sasClientTest(unittest.TestCase):
     
-    def test_subHeart_function(self):
-        conn = dbConn("ACS_V1_1")
-        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
-        cbsd1 = ONECA(sqlCbsd[0])
+    # def test_subHeart_function(self):
+    #     conn = dbConn("ACS_V1_1")
+    #     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
+    #     cbsd1 = ONECA(sqlCbsd[0])
 
-        conn = dbConn("ACS_V1_1")
-        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE99461317E')
-        cbsd2 = ONECA(sqlCbsd[0])
+    #     conn = dbConn("ACS_V1_1")
+    #     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE99461317E')
+    #     cbsd2 = ONECA(sqlCbsd[0])
 
-        sasClient = sasClientClass()
+    #     sasClient = sasClientClass()
 
-        sasClient.addOneCA(cbsd1)
-        sasClient.addOneCA(cbsd2)
+    #     sasClient.addOneCA(cbsd1)
+    #     sasClient.addOneCA(cbsd2)
 
-        cbsd1.subHeart = True
-        cbsd1.setSasStage(consts.HEART)
+    #     cbsd1.subHeart = True
+    #     cbsd1.setSasStage(consts.HEART)
 
-        subheatList = sasClient.filter_subsequent_heartbeat()
+    #     subheatList = sasClient.filter_subsequent_heartbeat()
 
-        self.assertEqual([cbsd1],subheatList)
-        # print(subheatList)
+    #     self.assertEqual([cbsd1],subheatList)
+    #     # print(subheatList)
 
 
-    def test_getCbsds_function(self):
-        conn = dbConn("ACS_V1_1")
-        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
-        cbsd1 = ONECA(sqlCbsd[0])
+    # def test_getCbsds_function(self):
+    #     conn = dbConn("ACS_V1_1")
+    #     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
+    #     cbsd1 = ONECA(sqlCbsd[0])
 
-        sasClient = sasClientClass()
-        myDict = {'snDict':['900F0C732A02','DCE99461317E']}
+    #     sasClient = sasClientClass()
+    #     myDict = {'snDict':['900F0C732A02','DCE99461317E']}
     
-        sasClient.addOneCA(cbsd1)
+    #     sasClient.addOneCA(cbsd1)
 
-        cbsds = sasClient.getCbsds(myDict)
+    #     cbsds = sasClient.getCbsds(myDict)
 
-        self.assertEqual([cbsd1],cbsds)
+    #     self.assertEqual([cbsd1],cbsds)
 
 
-    def test_reqlinquish_function(self):
+    # def test_reqlinquish_function(self):
         
-        #create two cbsds
+    #     #create two cbsds
+    #     conn = dbConn("ACS_V1_1")
+    #     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
+    #     cbsd1 = ONECA(sqlCbsd[0])
+
+    #     conn = dbConn("ACS_V1_1")
+    #     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE99461317E')
+    #     cbsd2 = ONECA(sqlCbsd[0])
+
+    #     #get sas client
+    #     sasClient = sasClientClass()
+    #     #create dereg dic
+    #     deregDict = {'snDict':['900F0C732A02','DCE99461317E']}
+
+    #     #make cbsds 1CA
+    #     sasClient.addOneCA(cbsd1)
+    #     sasClient.addOneCA(cbsd2)
+
+
+    #     #turn power on
+    #     cbsd1.adminState = 1
+    #     cbsd2.adminState = 1
+
+    #     #set grantID
+    #     cbsd1.grantID = 1
+    #     cbsd2.grantID = 2
+
+    #     #set cbsdID
+    #     cbsd1.cbsdID = 1
+    #     cbsd2.cbsdID = 2
+
+    #     #make cbsds heartbeating
+    #     cbsd1.setSasStage(consts.HEART)
+    #     cbsd2.setSasStage(consts.HEART)
+    #     cbsd1.subHeart = True
+    #     cbsd2.subHeart = True
+
+    #     sasClient.userDeregisterCbsd(deregDict)
+
+
+    def test_opParams(self):
+
+        #create cbsd 
         conn = dbConn("ACS_V1_1")
         sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
         cbsd1 = ONECA(sqlCbsd[0])
 
-        conn = dbConn("ACS_V1_1")
-        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE99461317E')
-        cbsd2 = ONECA(sqlCbsd[0])
 
-        #get sas client
+        #get SAS client
         sasClient = sasClientClass()
-        #create dereg dic
-        deregDict = {'snDict':['900F0C732A02','DCE99461317E']}
 
         #make cbsds 1CA
         sasClient.addOneCA(cbsd1)
-        sasClient.addOneCA(cbsd2)
 
 
         #turn power on
         cbsd1.adminState = 1
-        cbsd2.adminState = 1
-
-        #set grantID
-        cbsd1.grantID = 1
-        cbsd2.grantID = 2
 
         #set cbsdID
-        cbsd1.cbsdID = 1
-        cbsd2.cbsdID = 2
+        cbsd1.setCbsdID('2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982')
+
+
+        #set grantID
+        cbsd1.grantID = '2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982/14299188259055949944'
+
 
         #make cbsds heartbeating
         cbsd1.setSasStage(consts.HEART)
-        cbsd2.setSasStage(consts.HEART)
-        cbsd1.subHeart = True
-        cbsd2.subHeart = True
-
-        sasClient.userDeregisterCbsd(deregDict)
 
 
+        #simulate terminate grant error
+        sasClient.processSasResposne(consts.HB500,[cbsd1],consts.HEART)
 
 
+        self.assertEqual(cbsd1.sasOperationalParams,{
+                "maxEirp": 19,
+                "operationFrequencyRange": {
+                    "highFrequency": 3655000000,
+                    "lowFrequency": 3635000000
+                }
+            })
 
 
 

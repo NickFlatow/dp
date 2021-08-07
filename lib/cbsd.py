@@ -53,14 +53,14 @@ class CbsdInfo(ABC):
         #is cbsd in the initial or subsequent heartbeat
         self.subHeart =           False
 
-        #in the case of an error from the SAS attach the error to the cell
-        self.errResponse =        None
+        #in the case where sas suggests new operational parameters
+        self.sasOperationalParams=None
 
         self.maxEirp = 0
         #set sasStage
         self.setSasStage(consts.REG)
         #set maxEirp
-        self.compute_maxEirp()
+        self.calcMaxEirp()
         #set Low and high Frequcy
         self.set_low_and_high_frequncy(self.earfcn)
         #populate earfcnList
@@ -181,14 +181,55 @@ class CbsdInfo(ABC):
     def adjustPower(self,power):
         # logging.info("adjust to power to %s dBm",power)
         self.txPower = power 
-        self.compute_maxEirp()
+        self.calcMaxEirp()
 
-    def compute_maxEirp(self):
+    def calcMaxEirp(self):
         self.maxEirp = self.txPower + self.antennaGain
         # logging.info("adjust to maxEirp to %s dBm",maxEirp)
 
     def wait_for_execution():
         pass
+
+    def powerOn(self):
+        print(f"Turning power on for {self.SN}")
+        parameterValueList = [consts.ADMIN_POWER_ON]
+        self.setParamterValue(parameterValueList)
+        print(f"power successfully turned on")
+
+    def powerOff(self):
+        print(f"Turning power off for {self.SN}")
+        parameterValueList = [consts.ADMIN_POWER_OFF]
+        self.setParamterValue(parameterValueList)
+        print(f"power successfully turned off")
+
+    def updateOperationalParams(self):
+        print(f"updating operational parameters for {self.SN}")
+        parameterValueList = []
+
+        #set new power level
+        if 'maxEirp' in self.sasOperationalParams:
+            # if self.calcMaxEirp > self.sasOperationalParams['maxEirp']:
+            #configure datapath and value for txPower
+            parameterValueList.append[{'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value': self.sasOperationalParams['maxEirp']}]
+            
+        if 'operationFrequencyRange' in self.sasOperationalParams:
+            #convert frequency range to MHz
+            MHz = self.sasOperationalParams['operationalFrequenyRange']['lowFrequncy']/consts.Hz
+            #convert MHz to earfcn
+            earfcn = self.MHZtoEARFCN(MHz)
+            #configure datapath and value for earfcn
+            parameterValueList.append[{'data_path':consts.EARFCN_LIST,'data_type':'string','data_value': earfcn}]
+
+        if parameterValueList:
+            self.setParamterValue(parameterValueList)
+            return True
+        else:
+            return False
+            
+
+        #set new frequency
+
+
 
     def setParamterValue(self,parameterValueList)-> None:
         '''
@@ -327,7 +368,7 @@ class OneCA(CbsdInfo):
             self.lowFrequency  = MHz - 10
             self.highFrequency = MHz + 10
         else:
-            raise ValueError
+            raise ValueError(f"earfcn should never be: {earfcn}")
             
     
     def select_frequency(self,channels: dict) -> bool:

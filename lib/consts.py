@@ -1,3 +1,4 @@
+from datetime import datetime
 #program constants
 
 #CBSD SAS states
@@ -40,15 +41,12 @@ TEN_MHz = 10000000
 
 DB = 'ACS_V1_1'
 
-#TEST CONSTS
+#TESTING CONSTS
+
 TEST_CBSD_SN = '900F0C732A02'
 # TEST_CBSD_SN = 'DCE994613163'
 
 
-
-
-
-#SAS HANDLER CONSTS
 FS = {
   "spectrumInquiryResponse": [
     {
