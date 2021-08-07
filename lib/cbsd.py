@@ -210,11 +210,11 @@ class CbsdInfo(ABC):
         if 'maxEirp' in self.sasOperationalParams:
             # if self.calcMaxEirp > self.sasOperationalParams['maxEirp']:
             #configure datapath and value for txPower
-            parameterValueList.append[{'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value': self.sasOperationalParams['maxEirp']}]
+            parameterValueList.append[{'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value': self.sasOperationalParams['maxEirp'] }]
             
         if 'operationFrequencyRange' in self.sasOperationalParams:
             #convert frequency range to MHz
-            MHz = self.sasOperationalParams['operationalFrequenyRange']['lowFrequncy']/consts.Hz
+            MHz = self.sasOperationalParams['operationFrequencyRange']['lowFrequency']/consts.Hz
             #convert MHz to earfcn
             earfcn = self.MHZtoEARFCN(MHz)
             #configure datapath and value for earfcn

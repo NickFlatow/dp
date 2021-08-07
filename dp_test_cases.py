@@ -27,6 +27,10 @@ class CbsdTest(unittest.TestCase):
                 }
             }
 
+        # print(f"op params: {cbsd1.sasOperationalParams['maxEirp']}")
+
+        # print(f"op params1: {cbsd1.sasOperationalParams['operationFrequencyRange']['lowFrequency']}")
+        cbsd1.updateOperationalParams()
         self.assertEqual(cbsd1.txPower,3)
         self.assertEquals(cbsd1.earfcn,'56390')
 
