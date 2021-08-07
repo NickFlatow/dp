@@ -187,6 +187,9 @@ class CbsdInfo(ABC):
         self.maxEirp = self.txPower + self.antennaGain
         # logging.info("adjust to maxEirp to %s dBm",maxEirp)
 
+    def calcTxPower(self,maxEirp):
+        return maxEirp - self.antennaGain
+
     def wait_for_execution():
         pass
 
@@ -210,7 +213,11 @@ class CbsdInfo(ABC):
         if 'maxEirp' in self.sasOperationalParams:
             # if self.calcMaxEirp > self.sasOperationalParams['maxEirp']:
             #configure datapath and value for txPower
-            parameterValueList.append[{'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value': self.sasOperationalParams['maxEirp'] }]
+            # print(self.sasOperationalParams['maxEirp'])
+
+            #calc TxPower not maxEirp
+
+            parameterValueList.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value': self.calcTxPower(self.sasOperationalParams['maxEirp']) })
             
         if 'operationFrequencyRange' in self.sasOperationalParams:
             #convert frequency range to MHz
@@ -218,7 +225,7 @@ class CbsdInfo(ABC):
             #convert MHz to earfcn
             earfcn = self.MHZtoEARFCN(MHz)
             #configure datapath and value for earfcn
-            parameterValueList.append[{'data_path':consts.EARFCN_LIST,'data_type':'string','data_value': earfcn}]
+            parameterValueList.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value': earfcn})
 
         if parameterValueList:
             self.setParamterValue(parameterValueList)
