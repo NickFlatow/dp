@@ -8,4 +8,4 @@ cors = CORS(app)
 app.config['CORS_HEADER'] = 'Content-Type'
 
 def runFlaskSever():
-   app.run(port = app.config["PORT"], use_reloader=False, host='0.0.0.0') 
+   app.run(port = app.config["PORT"], use_reloader=False, host='0.0.0.0')  

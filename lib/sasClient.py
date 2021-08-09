@@ -108,22 +108,8 @@ class sasClientClass():
         return cbsds
             
     
-    def contactSAS(self,request:dict,method:str):
-        '''
-        request: json request to pass to SAS server
-        method:  method to pass json request to: registration,spectrum,grant,heartbeat
-        '''
-        # try:
-        return requests.post("https://192.168.4.222:5001/v1.2/"+method, 
-        # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
-        # verify=('googleCerts/ca.cert'),
-        # json=request)
-        # timeout=5
-        cert=('certs/client.cert','certs/client.key'),
-        verify=('certs/ca.cert'),
-        json=request,
-        timeout=5)
-    
+
+        
     def buildJsonRequest(self,cbsds: list,typeOfCalling: str) -> dict:
         '''
         Builds and logs all json requests to SAS
@@ -201,23 +187,23 @@ class sasClientClass():
         return req
 
 
-    def SAS_request(self,typeOfCalling: str) -> dict:
-        '''
-        passses json to SAS with typeOfCalling method 
-        returns the resposne from SAS
-        '''
-        #filter cbsdList where cbsd.sasStage
+    # def SAS_request(self,typeOfCalling: str) -> dict:
+    #     '''
+    #     passses json to SAS with typeOfCalling method 
+    #     returns the resposne from SAS
+    #     '''
+    #     #filter cbsdList where cbsd.sasStage
          
-        #build json
-        sasRequest = self.buildJsonRequest(typeOfCalling)
-        #contactSAS
-        response = self.contactSAS(sasRequest,typeOfCalling)
+    #     #build json
+    #     sasRequest = self.buildJsonRequest(typeOfCalling)
+    #     #contactSAS
+    #     response = self.contactSAS(sasRequest,typeOfCalling)
 
-        if response.status_code == 200:
-            return 
-        print(response)
+    #     if response.status_code == 200:
+    #         return 
+    #     print(response)
         
-        # return sasResponse
+    #     # return sasResponse
 
     def registrationResposne(self,cbsd: CbsdInfo,sasResponse):
         
@@ -467,6 +453,47 @@ class sasClientClass():
             self.createErrorThread(self.processError,err)
 
             # self.processError(err)
+
+
+    #timout decorator for network drops when contacting SAS
+    def sleep(self,timeout,cbsds,typeOfCalling, retry=20):
+        def the_real_decorator(function):
+            def wrapper(*args, **kwargs):
+                retries = 0
+                while retries < retry:
+                    value = function(*args, **kwargs)
+                    if value == 'sasTimeOut':
+                        print(f'Retry SAS in {timeout} seconds')
+                              
+                        #add line for put cbsds in granted state and powerOff if transmit time is expired
+                        time.sleep(timeout)
+                        retries += 1
+                    else:
+                        return value
+            return wrapper
+        return the_real_decorator
+    
+    @sleep(3)
+    def contactSAS(self,request:dict,method:str):
+        '''
+        request: json request to pass to SAS server
+        method:  method to pass json request to: registration,spectrum,grant,heartbeat
+        '''
+
+        try:
+            return requests.post("https://192.168.4.222:5001/v1.2/"+method, 
+            # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+            # verify=('googleCerts/ca.cert'),
+            # json=request)
+            # timeout=5
+            cert=('certs/client.cert','certs/client.key'),
+            verify=('certs/ca.cert'),
+            json=request,
+            timeout=5)
+        except requests.exceptions.ReadTimeout as e: 
+            print(f"connection error {e}")
+            return 'sasTimeOut'
+
 
     def makeSASRequest(self,cbsds:list,typeOfCalling:str):
         
