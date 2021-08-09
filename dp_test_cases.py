@@ -32,7 +32,19 @@ class CbsdTest(unittest.TestCase):
         # print(f"op params1: {cbsd1.sasOperationalParams['operationFrequencyRange']['lowFrequency']}")
         cbsd1.updateOperationalParams()
         self.assertEqual(cbsd1.txPower,3)
-        self.assertEquals(cbsd1.earfcn,'56390')
+        self.assertEqual(cbsd1.earfcn,56190)
+
+
+    def test_NO_OperationalParams(self):
+        conn = dbConn("ACS_V1_1")
+        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
+        cbsd1 = ONECA(sqlCbsd[0])
+
+        # print(f"op params: {cbsd1.sasOperationalParams['maxEirp']}")
+
+        # print(f"op params1: {cbsd1.sasOperationalParams['operationFrequencyRange']['lowFrequency']}")
+        self.assertEqual(cbsd1.updateOperationalParams(),False)
+
 
         
 
@@ -234,47 +246,47 @@ class sasClientTest(unittest.TestCase):
     #     sasClient.userDeregisterCbsd(deregDict)
 
 
-    def test_opParams(self):
+    # def test_opParams(self):
 
-        #create cbsd 
-        conn = dbConn("ACS_V1_1")
-        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
-        cbsd1 = ONECA(sqlCbsd[0])
-
-
-        #get SAS client
-        sasClient = sasClientClass()
-
-        #make cbsds 1CA
-        sasClient.addOneCA(cbsd1)
+    #     #create cbsd 
+    #     conn = dbConn("ACS_V1_1")
+    #     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
+    #     cbsd1 = ONECA(sqlCbsd[0])
 
 
-        #turn power on
-        cbsd1.adminState = 1
+    #     #get SAS client
+    #     sasClient = sasClientClass()
 
-        #set cbsdID
-        cbsd1.setCbsdID('2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982')
-
-
-        #set grantID
-        cbsd1.grantID = '2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982/14299188259055949944'
+    #     #make cbsds 1CA
+    #     sasClient.addOneCA(cbsd1)
 
 
-        #make cbsds heartbeating
-        cbsd1.setSasStage(consts.HEART)
+    #     #turn power on
+    #     cbsd1.adminState = 1
+
+    #     #set cbsdID
+    #     cbsd1.setCbsdID('2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982')
 
 
-        #simulate terminate grant error
-        sasClient.processSasResposne(consts.HB500,[cbsd1],consts.HEART)
+    #     #set grantID
+    #     cbsd1.grantID = '2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982/14299188259055949944'
 
 
-        self.assertEqual(cbsd1.sasOperationalParams,{
-                "maxEirp": 19,
-                "operationFrequencyRange": {
-                    "highFrequency": 3655000000,
-                    "lowFrequency": 3635000000
-                }
-            })
+    #     #make cbsds heartbeating
+    #     cbsd1.setSasStage(consts.HEART)
+
+
+    #     #simulate terminate grant error
+    #     sasClient.processSasResposne(consts.HB500,[cbsd1],consts.HEART)
+
+
+    #     self.assertEqual(cbsd1.sasOperationalParams,{
+    #             "maxEirp": 19,
+    #             "operationFrequencyRange": {
+    #                 "highFrequency": 3655000000,
+    #                 "lowFrequency": 3635000000
+    #             }
+    #         })
 
 
 

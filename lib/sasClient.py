@@ -8,14 +8,19 @@
 
 import json
 from logging import error
+from math import e
 import time
 import requests
+import threading
 from lib import alarm
 from lib.alarm import Alarm 
 import lib.consts as consts
 from lib.dbConn import dbConn
 from lib.cbsd import CbsdInfo, CbsdModelExporter, OneCA
 from datetime import datetime,timedelta
+
+# event = threading.Event()
+
 
 class sasClientClass():
     '''
@@ -30,6 +35,8 @@ class sasClientClass():
         self.heartbeatList = []
 
         self.alarm = Alarm
+
+        self.event = threading.Event()
 
     def filter_sas_stage(self,sasStage):
 
@@ -268,11 +275,12 @@ class sasClientClass():
         for cbsd in err[errorCode]:
             #log error to FeMS alarm for each cbsd
             self.alarm.log_error_to_FeMS_alarm('WARNING',cbsd,errorCode)
-            #change sas Stage to register
+
             cbsd.setSasStage(typeOfCalling)
         
         #wait and retry again
         time.sleep(sleepTime)
+        # self.event.wait(sleepTime)
         self.registrationFlow()
 
 
@@ -326,23 +334,65 @@ class sasClientClass():
 
             #500 Terminate Grant
             elif errorCode == 500:
-                print("Need to test with google SAS")
+                
+                cbsd: CbsdInfo
+                for cbsd in err[errorCode]:
+                    #update cbsd with new operational parameters from SAS
+                    if not cbsd.updateOperationalParams():
+                        #if there are no operational parameters provided
+                        
+                        #reqlinqusih grant
+                        self.relinquishGrant(err[errorCode])
+                        #get new spectrum
+                        self.makeSASRequest(err[errorCode],consts.SPECTRUM)
+                        #apply for new grant
+                        self.makeSASRequest(err[errorCode],consts.GRANT)
 
+            #501 Suspend Grant
+            elif errorCode == 501:
+                
+                cbsd: CbsdInfo
+                #change heartbeat to granted
+                for cbsd in err[errorCode]:
+                    cbsd.operationalState = 'GRANTED'
+                    cbsd.subHeart = True
+                    cbsd.setSasStage(consts.HEART)
+                    self.alarm.log_error_to_FeMS_alarm('WARNING',cbsd,errorCode)
 
+            elif errorCode == 502:
+                
+                cbsd: CbsdInfo
+                for cbsd in err[errorCode]:
+                    self.alarm.log_error_to_FeMS_alarm('WARNING',cbsd,errorCode)
 
+                self.relinquishGrant(err[errorCode])
+                self.makeSASRequest(err[errorCode],consts.GRANT)
+            
 
             #102: Missing required parameter
-            #104: Certification error 
+            #104: Certification error  
             #201: Group Error
             else:
                 #no action is required from the domain proxy. Log error to FeMS
                 for cbsd in err[errorCode]:
                     alarm.Alarm.log_error_to_FeMS_alarm("WARNING",cbsd,errorCode)
-
-
         
-        #at the end of the day remember to clear your errors
-        # self.err.clear()
+        
+        # self.errorThread.join()
+        print("!!!!!!!! Threading !!!!!!!!!!")
+        print(threading.enumerate())
+        print("!!!!!!!! Threading !!!!!!!!!!")
+        # err.clear()
+
+    def createErrorThread(self,fn,arg):
+        try:
+            #if using args a comma for tuple is needed 
+            self.errorThread = threading.Thread(target=fn, args=(arg,))
+            self.errorThread.name = 'error-thread'
+            self.errorThread.start()
+        except Exception as e:
+            print(f"error thread failed: {e}")
+
 
     def cbsdError(self,cbsd: CbsdInfo, sasResponse: dict,err: dict) -> bool:
 
@@ -414,7 +464,9 @@ class sasClientClass():
       
         if err:
             print("error")
-            self.processError(err)
+            self.createErrorThread(self.processError,err)
+
+            # self.processError(err)
 
     def makeSASRequest(self,cbsds:list,typeOfCalling:str):
         
@@ -425,8 +477,8 @@ class sasClientClass():
         if sasReponse.status_code == 200:
             self.processSasResposne(sasReponse.json(),cbsds,typeOfCalling)
         else:
-            print(f"conenction error {sasReponse.status_code}")
-
+            print(f"connection error {sasReponse.status_code}")
+ 
     def cbsdInList(self,cbsdSN: str) -> bool:
         '''
         return True if cbsd is already in self.cbsdList
@@ -550,6 +602,7 @@ class sasClientClass():
         #filter for authorized heartbeats
         heartbeat_list = self.filter_subsequent_heartbeat()
         if heartbeat_list:
+            # self.event.set()
             self.makeSASRequest(heartbeat_list,consts.HEART)
 
 if __name__ == '__main__':

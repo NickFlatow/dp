@@ -71,6 +71,7 @@ def start():
 def heartbeat():
 
     while True:
+
         sasClient.heartbeat()
         time.sleep(5)
 

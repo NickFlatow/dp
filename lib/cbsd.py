@@ -54,7 +54,7 @@ class CbsdInfo(ABC):
         self.subHeart =           False
 
         #in the case where sas suggests new operational parameters
-        self.sasOperationalParams=None
+        self.sasOperationalParams={}
 
         self.maxEirp = 0
         #set sasStage
@@ -222,20 +222,22 @@ class CbsdInfo(ABC):
         if 'operationFrequencyRange' in self.sasOperationalParams:
             #convert frequency range to MHz
             MHz = self.sasOperationalParams['operationFrequencyRange']['lowFrequency']/consts.Hz
-            #convert MHz to earfcn
-            earfcn = self.MHZtoEARFCN(MHz)
+            
+            #convert MHz to earfcn 
+            #add 10 to get to middle frequency
+            earfcn = self.MHZtoEARFCN((MHz + 10))
             #configure datapath and value for earfcn
             parameterValueList.append({'data_path':consts.EARFCN_LIST,'data_type':'string','data_value': earfcn})
 
         if parameterValueList:
             self.setParamterValue(parameterValueList)
+            #do not store old opParams
+            self.sasOperationalParams.clear()
             return True
         else:
+            #do not store old opParams
+            self.sasOperationalParams.clear()
             return False
-            
-
-        #set new frequency
-
 
 
     def setParamterValue(self,parameterValueList)-> None:
@@ -280,27 +282,27 @@ class CbsdInfo(ABC):
             #place action in apt_action_queue
             self.cbsdAction(self.SN,'Set Parameter Value',str(datetime.now()))
             
-            #Make connection request
-            response = requests.get(self.connreqURL, auth= HTTPDigestAuth(self.connreqUname,self.connreqPass))
+        #Make connection request
+        response = requests.get(self.connreqURL, auth= HTTPDigestAuth(self.connreqUname,self.connreqPass))
 
-            #if connection request returns 200
-            if response.status_code == 200:
-                #Wait for conenction request to complete
-                settingParameters = True
-                while settingParameters:
-                    # logging.info(f"Setting Parameters for {cbsd['SN']}")
-                    database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",self.SN)
-                    
-                    if database == (): 
-                        # logging.info(f"Paramters set successfully for {cbsd['SN']}")
-                        settingParameters = False
-                    else:
-                        time.sleep(1)
-                        # endTime = datetime.now()
-                        # logging.info(f"end time in loop: {endTime}")
-            else:
-                # remove action from action queue
-                conn.update("DELETE FROM apt_action_queue WHERE SN = %s",self.SN)
+        #if connection request returns 200
+        if response.status_code == 200:
+            #Wait for conenction request to complete
+            settingParameters = True
+            while settingParameters:
+                # logging.info(f"Setting Parameters for {cbsd['SN']}")
+                database = conn.select("SELECT * FROM apt_action_queue WHERE SN = %s",self.SN)
+                
+                if database == (): 
+                    # logging.info(f"Paramters set successfully for {cbsd['SN']}")
+                    settingParameters = False
+                else:
+                    time.sleep(1)
+                    # endTime = datetime.now()
+                    # logging.info(f"end time in loop: {endTime}")
+        else:
+            # remove action from action queue
+            conn.update("DELETE FROM apt_action_queue WHERE SN = %s",self.SN)
 
 
             
@@ -319,6 +321,8 @@ class CbsdInfo(ABC):
             self.powerOff()
         #set operationalState
         self.operationalState = None
+        #set subHeart to False
+        self.subHeart = False
         #set grantTime
         self.setGrantExpireTime(None)
         #set transmitTime
@@ -398,8 +402,8 @@ class OneCA(CbsdInfo):
             #step one is the frequency already selected for the cell avialble?
             for channel in channels:
 
-                low = channel['frequencyRange']['lowFrequency']
-                high = channel['frequencyRange']['highFrequency']
+                # low = channel['frequencyRange']['lowFrequency']
+                # high = channel['frequencyRange']['highFrequency']
                 if lowFreqHz >= channel['frequencyRange']['lowFrequency'] and lowFreqHz <= channel['frequencyRange']['highFrequency']:
                     low_frequeny_channel_found = True
 
