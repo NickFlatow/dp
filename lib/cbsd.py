@@ -64,7 +64,7 @@ class CbsdInfo(ABC):
         #set Low and high Frequcy
         self.set_low_and_high_frequncy(self.earfcn)
         #populate earfcnList
-        # self.getEarfcnList()
+        self.getEarfcnList()
 
 
         
@@ -76,17 +76,26 @@ class CbsdInfo(ABC):
     def select_frequency(self,channels):
         pass
 
+    def isTransmitTimeExpired(self):
+        
+        expireTime = datetime.strptime(self.transmitExpireTime,"%Y-%m-%dT%H:%M:%SZ")
+        if expireTime <= datetime.utcnow():
+            self.powerOff()
+            self.operationalState = 'GRANTED'
+
     def powerOn(self):
-        print(f"Turning power on for {self.SN}")
-        parameterValueList = [consts.ADMIN_POWER_ON]
-        self.setParamterValue(parameterValueList)
-        print(f"power successfully turned on")
+        if self.adminState == 0:
+            print(f"Turning power on for {self.SN}")
+            parameterValueList = [consts.ADMIN_POWER_ON]
+            self.setParamterValue(parameterValueList)
+            print(f"power successfully turned on")
 
     def powerOff(self):
-        print(f"Turning power off for {self.SN}")
-        parameterValueList = [consts.ADMIN_POWER_OFF]
-        self.setParamterValue(parameterValueList)
-        print(f"power successfully turned off")
+        if self.adminState == 1:
+            print(f"Turning power off for {self.SN}")
+            parameterValueList = [consts.ADMIN_POWER_OFF]
+            self.setParamterValue(parameterValueList)
+            print(f"power successfully turned off")
 
     def getEarfcnList(self):
         '''
@@ -193,17 +202,17 @@ class CbsdInfo(ABC):
     def wait_for_execution():
         pass
 
-    def powerOn(self):
-        print(f"Turning power on for {self.SN}")
-        parameterValueList = [consts.ADMIN_POWER_ON]
-        self.setParamterValue(parameterValueList)
-        print(f"power successfully turned on")
+    # def powerOn(self):
+    #     print(f"Turning power on for {self.SN}")
+    #     parameterValueList = [consts.ADMIN_POWER_ON]
+    #     self.setParamterValue(parameterValueList)
+    #     print(f"power successfully turned on")
 
-    def powerOff(self):
-        print(f"Turning power off for {self.SN}")
-        parameterValueList = [consts.ADMIN_POWER_OFF]
-        self.setParamterValue(parameterValueList)
-        print(f"power successfully turned off")
+    # def powerOff(self):
+    #     print(f"Turning power off for {self.SN}")
+    #     parameterValueList = [consts.ADMIN_POWER_OFF]
+    #     self.setParamterValue(parameterValueList)
+    #     print(f"power successfully turned off")
 
     def updateOperationalParams(self):
         print(f"updating operational parameters for {self.SN}")
@@ -303,13 +312,10 @@ class CbsdInfo(ABC):
         else:
             # remove action from action queue
             conn.update("DELETE FROM apt_action_queue WHERE SN = %s",self.SN)
-
-
-            
+ 
         conn.dbClose()
 
                 #and then retry
-
 
     def relinquish(self):
 
@@ -438,10 +444,12 @@ class OneCA(CbsdInfo):
                         self.setParamterValue(paramterValueList)
 
                     #we have found spectrum
+                    print(f"found spectrum {earfcn}")
                     return True
         if not low_frequeny_channel_found or not high_frequency_channel_found:
             #TODO log no specrum error to FeMS
             #we have not found spectrum
+            print(f"did not find spectrum!")
             return False
 
 

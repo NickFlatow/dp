@@ -12,6 +12,8 @@ from math import e
 import time
 import requests
 import threading
+
+from requests.exceptions import ConnectTimeout, ReadTimeout, SSLError
 from lib import alarm
 from lib.alarm import Alarm 
 import lib.consts as consts
@@ -454,45 +456,38 @@ class sasClientClass():
 
             # self.processError(err)
 
+    def checkCbsdsTransmitExpireTime(self):
+        
+        cbsd:CbsdInfo
+        hblist = self.filter_sas_stage(consts.HEART)
+        if hblist:
+            for cbsd in hblist:
+                cbsd.isTransmitTimeExpired()
 
-    #timout decorator for network drops when contacting SAS
-    def sleep(self,timeout,cbsds,typeOfCalling, retry=20):
-        def the_real_decorator(function):
-            def wrapper(*args, **kwargs):
-                retries = 0
-                while retries < retry:
-                    value = function(*args, **kwargs)
-                    if value == 'sasTimeOut':
-                        print(f'Retry SAS in {timeout} seconds')
-                              
-                        #add line for put cbsds in granted state and powerOff if transmit time is expired
-                        time.sleep(timeout)
-                        retries += 1
-                    else:
-                        return value
-            return wrapper
-        return the_real_decorator
-    
-    @sleep(3)
-    def contactSAS(self,request:dict,method:str):
+    def contactSAS(self,request:dict,method:str,retry=100):
         '''
         request: json request to pass to SAS server
         method:  method to pass json request to: registration,spectrum,grant,heartbeat
         '''
-
-        try:
-            return requests.post("https://192.168.4.222:5001/v1.2/"+method, 
-            # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
-            # verify=('googleCerts/ca.cert'),
-            # json=request)
-            # timeout=5
-            cert=('certs/client.cert','certs/client.key'),
-            verify=('certs/ca.cert'),
-            json=request,
-            timeout=5)
-        except requests.exceptions.ReadTimeout as e: 
-            print(f"connection error {e}")
-            return 'sasTimeOut'
+        timeout = 3
+        retries = 0
+        while retries < retry:
+            try:
+                return requests.post("https://192.168.4.222:5001/v1.2/"+method, 
+                # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+                # verify=('googleCerts/ca.cert'),
+                # json=request)
+                # timeout=5
+                cert=('certs/client.cert','certs/client.key'),
+                verify=('certs/ca.cert'),
+                json=request,
+                timeout=5)
+            except(ConnectTimeout,ConnectionError,SSLError,ReadTimeout,ConnectionRefusedError):
+                retries = retries + 1
+                self.checkCbsdsTransmitExpireTime()
+                print('connection to SAS failed')
+                print(f'Retry SAS in {timeout} seconds')
+                time.sleep(timeout)
 
 
     def makeSASRequest(self,cbsds:list,typeOfCalling:str):
