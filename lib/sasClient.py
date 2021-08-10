@@ -214,8 +214,8 @@ class sasClientClass():
 
     def spectrumResposne(self,cbsd: CbsdInfo,channels):
 
-        # channelSelected = cbsd.select_frequency(channels)
-        channelSelected = True
+        channelSelected = cbsd.select_frequency(channels)
+        # channelSelected = True
 
         if channelSelected:
             cbsd.setSasStage(consts.GRANT)
@@ -473,15 +473,15 @@ class sasClientClass():
         retries = 0
         while retries < retry:
             try:
-                return requests.post("https://192.168.4.222:5001/v1.2/"+method, 
-                # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
-                # verify=('googleCerts/ca.cert'),
-                # json=request)
+                return requests.post("https://test.sas.goog/v1.2/"+method, 
+                cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+                verify=('googleCerts/ca.cert'),
+                json=request)
                 # timeout=5
-                cert=('certs/client.cert','certs/client.key'),
-                verify=('certs/ca.cert'),
-                json=request,
-                timeout=5)
+                # cert=('certs/client.cert','certs/client.key'),
+                # verify=('certs/ca.cert'),
+                # json=request,
+                # timeout=5)
             except(ConnectTimeout,ConnectionError,SSLError,ReadTimeout,ConnectionRefusedError):
                 retries = retries + 1
                 self.checkCbsdsTransmitExpireTime()

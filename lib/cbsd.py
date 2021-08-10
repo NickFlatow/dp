@@ -377,7 +377,9 @@ class CbsdInfo(ABC):
 class OneCA(CbsdInfo):
 
     def __init__(self,sqlCbsd):
-        super(OneCA,self).__init__(sqlCbsd)  
+        self.lowFrequency = 0
+        self.highFrequency = 0
+        super(OneCA,self).__init__(sqlCbsd)   
     
     def set_low_and_high_frequncy(self,earfcn):
         if int(earfcn) >= 55240 and int(earfcn) <= 56739:

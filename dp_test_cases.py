@@ -46,6 +46,8 @@ class CbsdTest(unittest.TestCase):
         self.assertEqual(cbsd1.updateOperationalParams(),False)
 
 
+    def spectrum_select(self):
+        pass
         
 
     

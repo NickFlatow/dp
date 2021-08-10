@@ -47,6 +47,297 @@ TEST_CBSD_SN = '900F0C732A02'
 # TEST_CBSD_SN = 'DCE994613163'
 
 
+FS_TWO_CELLS = {
+    "spectrumInquiryResponse": [
+        {
+            "cbsdId": "2AQ68T99B226/1c7d581a7d75020846aa7c5869be9f22991b44ad",
+            "availableChannel": [
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3550000000,
+                        "highFrequency": 3560000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3560000000,
+                        "highFrequency": 3570000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3570000000,
+                        "highFrequency": 3580000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3580000000,
+                        "highFrequency": 3590000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3590000000,
+                        "highFrequency": 3600000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3600000000,
+                        "highFrequency": 3610000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3610000000,
+                        "highFrequency": 3620000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3620000000,
+                        "highFrequency": 3630000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3630000000,
+                        "highFrequency": 3640000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3640000000,
+                        "highFrequency": 3650000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3650000000,
+                        "highFrequency": 3660000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3660000000,
+                        "highFrequency": 3670000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3670000000,
+                        "highFrequency": 3680000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3680000000,
+                        "highFrequency": 3690000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3690000000,
+                        "highFrequency": 3700000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                }
+            ],
+            "response": {
+                "responseCode": 0
+            }
+        },
+        {
+            "cbsdId": "2AQ68T99B226/87b4920114c1b81d92a3342a68fa0d86d2c71f37",
+            "availableChannel": [
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3550000000,
+                        "highFrequency": 3560000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3600000000,
+                        "highFrequency": 3610000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3640000000,
+                        "highFrequency": 3650000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3650000000,
+                        "highFrequency": 3660000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3660000000,
+                        "highFrequency": 3670000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3670000000,
+                        "highFrequency": 3680000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3680000000,
+                        "highFrequency": 3690000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3690000000,
+                        "highFrequency": 3700000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3630000000,
+                        "highFrequency": 3640000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3610000000,
+                        "highFrequency": 3620000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3620000000,
+                        "highFrequency": 3630000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3560000000,
+                        "highFrequency": 3570000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3570000000,
+                        "highFrequency": 3580000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3580000000,
+                        "highFrequency": 3590000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                },
+                {
+                    "frequencyRange": {
+                        "lowFrequency": 3590000000,
+                        "highFrequency": 3600000000
+                    },
+                    "channelType": "GAA",
+                    "ruleApplied": "FCC_PART_96",
+                    "maxEirp": 23
+                }
+            ],
+            "response": {
+                "responseCode": 0
+            }
+        }
+    ]
+}
+
 FS = {
   "spectrumInquiryResponse": [
     {
