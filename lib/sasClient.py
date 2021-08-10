@@ -20,6 +20,7 @@ import lib.consts as consts
 from lib.dbConn import dbConn
 from lib.cbsd import CbsdInfo, CbsdModelExporter, OneCA
 from datetime import datetime,timedelta
+from lib.authLicense import License
 
 # event = threading.Event()
 
@@ -37,6 +38,8 @@ class sasClientClass():
         self.heartbeatList = []
 
         self.alarm = Alarm
+
+        self.license = License()
 
         self.event = threading.Event()
 
@@ -96,7 +99,11 @@ class sasClientClass():
         
     def addCbsd(self,sqlCbsd: dict) -> None:
 
-        self.cbsdList.append(CbsdModelExporter.getCbsd(sqlCbsd))
+        self.license:License
+        if len(self.cbsdList) >= self.license.numEnB:
+            print("Maximum number of ENB exceeded")
+        else:
+            self.cbsdList.append(CbsdModelExporter.getCbsd(sqlCbsd))
 
     def getCbsds(self,SNs: dict) -> list:
 
@@ -220,6 +227,7 @@ class sasClientClass():
         if channelSelected:
             cbsd.setSasStage(consts.GRANT)
         else: 
+
             self.err = [cbsd]
             # cbsd.setSasStage("error")
 
@@ -323,18 +331,29 @@ class sasClientClass():
             #500 Terminate Grant
             elif errorCode == 500:
                 
+                opParam = []
+                noOpParam = []
                 cbsd: CbsdInfo
                 for cbsd in err[errorCode]:
                     #update cbsd with new operational parameters from SAS
-                    if not cbsd.updateOperationalParams():
-                        #if there are no operational parameters provided
+                    if cbsd.updateOperationalParams(): #apply the new op Params
                         
-                        #reqlinqusih grant
-                        self.relinquishGrant(err[errorCode])
-                        #get new spectrum
-                        self.makeSASRequest(err[errorCode],consts.SPECTRUM)
-                        #apply for new grant
-                        self.makeSASRequest(err[errorCode],consts.GRANT)
+                        #update grant status
+                        cbsd.setSasStage(consts.GRANT)
+
+                        opParam.append(cbsd)
+                    #if there are no operational parameters provided    
+                    else:
+                        noOpParam.append(cbsd)
+
+                if opParam:
+                    self.makeSASRequest(opParam,consts.GRANT)
+                if noOpParam:
+                    self.relinquishGrant(noOpParam)
+                    #get new spectrum
+                    self.makeSASRequest(noOpParam,consts.SPECTRUM)
+                    #apply for new grant
+                    self.makeSASRequest(noOpParam,consts.GRANT)
 
             #501 Suspend Grant
             elif errorCode == 501:

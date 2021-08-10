@@ -947,6 +947,23 @@ HB500 = {
                 "responseMessage": "TERMINATED_GRANT"
             },
             # "transmitExpireTime": "2021-07-07T20:15:00Z"
+        },
+        {
+            "cbsdId": "2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982",
+            "grantId": "2AQ68T99B226/4943375cc665c2bc8f72536524cbb2ff3b4e7982/14299188259055949944",
+            "heartbeatInterval": 60,
+            "operationParam": {
+                "maxEirp": 5,
+                "operationFrequencyRange": {
+                    "highFrequency": 3655000000,
+                    "lowFrequency": 3635000000
+                }
+            },
+            "response": {
+                "responseCode": 500,
+                "responseMessage": "TERMINATED_GRANT"
+            },
+            # "transmitExpireTime": "2021-07-07T20:15:00Z"
         }
     ]
 }

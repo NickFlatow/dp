@@ -5,6 +5,8 @@ from lib.dbConn import dbConn
 from config.default import SAS
 from test import app, runFlaskSever
 from lib.sasClient import sasClientClass
+from lib.authLicense import License
+
 
 from flask_cors import cross_origin
 from flask import request
@@ -12,7 +14,7 @@ import json
 
 sasClient = sasClientClass()
 #needed here to make routes work
-from lib.routes import *
+# from lib.routes import *
 
 
 #create route for cbsd registration
@@ -52,20 +54,21 @@ def dp_deregister():
 
     return "success"
 
-def start():
+def start(l: License):
 
-
-    #start heartbeat thread
-    try:
-        #if using args a comma for tuple is needed 
-        thread = threading.Thread(target=heartbeat, args=())
-        thread.name = 'heartbeat-thread'
-        thread.start()
-    except Exception as e:
-        print(f"Heartbeat thread failed: {e}")
-        
-    #run flask server
-    runFlaskSever() 
+    if l.authType == consts.FUNC_MODE_ALL or l.authType == consts.FUNC_MODE_DOMAIN_PROXY and l.remainingtime > 0:
+    
+        #start heartbeat thread
+        try:
+            #if using args a comma for tuple is needed 
+            thread = threading.Thread(target=heartbeat, args=())
+            thread.name = 'heartbeat-thread'
+            thread.start()
+        except Exception as e:
+            print(f"Heartbeat thread failed: {e}")
+            
+        #run flask server
+        runFlaskSever() 
 
 
 def heartbeat():
@@ -73,9 +76,10 @@ def heartbeat():
     while True:
 
         sasClient.heartbeat()
-        time.sleep(5)
+        time.sleep(30)
 
-start()
+
+start(License())
 
 
 

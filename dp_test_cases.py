@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from lib import sasClient
 from lib.sasClient import sasClientClass
 from lib.dbConn import dbConn
 import unittest
@@ -14,41 +15,66 @@ class CbsdTest(unittest.TestCase):
     Test Cases for generic cbsd class
     '''
 
-    def test_updateOperationalParams(self):
-        conn = dbConn("ACS_V1_1")
-        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
-        cbsd1 = ONECA(sqlCbsd[0])
+    # def test_updateOperationalParams(self):
+    #     conn = dbConn("ACS_V1_1")
+    #     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
+    #     cbsd1 = ONECA(sqlCbsd[0])
 
-        cbsd1.sasOperationalParams = {
-                "maxEirp": 10,
-                "operationFrequencyRange": {
-                    "highFrequency": 3655000000,
-                    "lowFrequency": 3635000000
-                }
-            }
+    #     cbsd1.sasOperationalParams = {
+    #             "maxEirp": 10,
+    #             "operationFrequencyRange": {
+    #                 "highFrequency": 3655000000,
+    #                 "lowFrequency": 3635000000
+    #             }
+    #         }
 
-        # print(f"op params: {cbsd1.sasOperationalParams['maxEirp']}")
+    #     # print(f"op params: {cbsd1.sasOperationalParams['maxEirp']}")
 
-        # print(f"op params1: {cbsd1.sasOperationalParams['operationFrequencyRange']['lowFrequency']}")
-        cbsd1.updateOperationalParams()
-        self.assertEqual(cbsd1.txPower,3)
-        self.assertEqual(cbsd1.earfcn,56190)
-
-
-    def test_NO_OperationalParams(self):
-        conn = dbConn("ACS_V1_1")
-        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
-        cbsd1 = ONECA(sqlCbsd[0])
-
-        # print(f"op params: {cbsd1.sasOperationalParams['maxEirp']}")
-
-        # print(f"op params1: {cbsd1.sasOperationalParams['operationFrequencyRange']['lowFrequency']}")
-        self.assertEqual(cbsd1.updateOperationalParams(),False)
+    #     # print(f"op params1: {cbsd1.sasOperationalParams['operationFrequencyRange']['lowFrequency']}")
+    #     cbsd1.updateOperationalParams()
+    #     self.assertEqual(cbsd1.txPower,3)
+    #     self.assertEqual(cbsd1.earfcn,56190)
 
 
-    def spectrum_select(self):
-        pass
+    # def test_NO_OperationalParams(self):
+    #     conn = dbConn("ACS_V1_1")
+    #     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
+    #     cbsd1 = ONECA(sqlCbsd[0])
+
+    #     # print(f"op params: {cbsd1.sasOperationalParams['maxEirp']}")
+
+    #     # print(f"op params1: {cbsd1.sasOperationalParams['operationFrequencyRange']['lowFrequency']}")
+    #     self.assertEqual(cbsd1.updateOperationalParams(),False)
+
+
+
+
+
+    # def test_spectrum_select(self):
+    #     conn = dbConn("ACS_V1_1")
+    #     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
+    #     cbsd1 = ONECA(sqlCbsd[0])
+
+
+    #     conn = dbConn("ACS_V1_1")
+    #     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE99461317E')
+    #     cbsd2 = ONECA(sqlCbsd[0])
+
+    #     # sasResponse[responseMessageType][i]['availableChannel']
+    #     print(f"cbsd1 lowFrequency: {cbsd1.lowFrequency} highFrequency: {cbsd1.highFrequency}")
+    #     print(f"cbsd2 lowFrequency: {cbsd2.lowFrequency} highFrequency: {cbsd2.highFrequency}")
+
+
+
+    #     cbsd1.select_frequency(consts.FS_TWO_CELLS['spectrumInquiryResponse'][0]['availableChannel'])
+    #     cbsd2.select_frequency(consts.FS_TWO_CELLS['spectrumInquiryResponse'][1]['availableChannel'])
         
+    #     self.assertEqual(cbsd1.highFrequency,3655)
+    #     self.assertEqual(cbsd1.lowFrequency,3635)
+
+    #     self.assertEqual(cbsd2.highFrequency,3570)
+    #     self.assertEqual(cbsd2.lowFrequency,3550)
+
 
     
 #     def test_setParameterValues_adminState_off(self):
@@ -167,6 +193,31 @@ class CbsdTest(unittest.TestCase):
 
 
 class sasClientTest(unittest.TestCase):
+
+
+    def test_apply_operationalParams(self):
+        conn = dbConn("ACS_V1_1")
+        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
+        cbsd1 = ONECA(sqlCbsd[0])
+
+
+        conn = dbConn("ACS_V1_1")
+        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE99461317E')
+        cbsd2 = ONECA(sqlCbsd[0])
+
+        sasClient = sasClientClass()
+        
+        sasClient.addOneCA(cbsd1)
+        sasClient.addOneCA(cbsd2)
+
+
+        sasClient.processSasResposne(consts.HB500,[cbsd1,cbsd2],consts.HEART)
+
+        self.assertLessEqual(cbsd1.maxEirp,19)
+        self.assertEqual(cbsd1.earfcn,'56190')
+        self.assertLessEqual(cbsd2.maxEirp,5)
+        self.assertEqual(cbsd2.earfcn,'56190')
+
     
     # def test_subHeart_function(self):
     #     conn = dbConn("ACS_V1_1")

@@ -446,12 +446,12 @@ class OneCA(CbsdInfo):
                         self.setParamterValue(paramterValueList)
 
                     #we have found spectrum
-                    print(f"found spectrum {earfcn}")
+                    print(f"found spectrum {earfcn} for {self.SN}")
                     return True
         if not low_frequeny_channel_found or not high_frequency_channel_found:
             #TODO log no specrum error to FeMS
             #we have not found spectrum
-            print(f"did not find spectrum!")
+            print(f"did not find spectrum for {self.SN}")
             return False
 
 
