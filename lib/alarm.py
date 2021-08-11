@@ -5,7 +5,7 @@ from datetime import datetime
 
 class Alarm:
 
-    def log_error_to_FeMS_alarm(severity: str,cbsd: CbsdInfo,errorCode: int):
+    def log_error_to_FeMS_alarm(self,severity: str,cbsd: CbsdInfo,errorCode: int):
 
         # resposneMessageType = str(typeOfCalling +"Response")
         errorCode = "SAS error code: " + str(errorCode)
@@ -13,7 +13,7 @@ class Alarm:
         #alarmIdentity is SN, response code and the hour it was reported
         alarmIdentifier = cbsd.SN +"_"+ str(errorCode) +"_"+ str(datetime.now().hour)
 
-        if(hasAlarmIdentifier(alarmIdentifier)):
+        if(self.hasAlarmIdentifier(alarmIdentifier)):
             conn = dbConn("ACS_V1_1")
             conn.update("UPDATE apt_alarm_latest SET updateTime = %s,EventTime = %s WHERE AlarmIdentifier = %s" ,(str(datetime.now()),str(datetime.now()),alarmIdentifier ))
             conn.dbClose()
@@ -23,15 +23,15 @@ class Alarm:
             conn.dbClose()
 
 
-def hasAlarmIdentifier(ai):
-    '''
-    checks if alarm already exisits in apt_alarm_latest
-    '''
-    conn = dbConn("ACS_V1_1")
-    alarmIdentifier = conn.select('SELECT alarmIdentifier FROM apt_alarm_latest WHERE alarmIdentifier = %s',ai)
-    conn.dbClose()
+    def hasAlarmIdentifier(self,ai):
+        '''
+        checks if alarm already exisits in apt_alarm_latest
+        '''
+        conn = dbConn("ACS_V1_1")
+        alarmIdentifier = conn.select('SELECT alarmIdentifier FROM apt_alarm_latest WHERE alarmIdentifier = %s',ai)
+        conn.dbClose()
 
-    if alarmIdentifier == ():
-        return False
-    else:
-        return True
+        if alarmIdentifier == ():
+            return False
+        else:
+            return True
