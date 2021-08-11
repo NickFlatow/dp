@@ -202,17 +202,36 @@ class CbsdInfo(ABC):
     def wait_for_execution():
         pass
 
-    # def powerOn(self):
-    #     print(f"Turning power on for {self.SN}")
-    #     parameterValueList = [consts.ADMIN_POWER_ON]
-    #     self.setParamterValue(parameterValueList)
-    #     print(f"power successfully turned on")
 
-    # def powerOff(self):
-    #     print(f"Turning power off for {self.SN}")
-    #     parameterValueList = [consts.ADMIN_POWER_OFF]
-    #     self.setParamterValue(parameterValueList)
-    #     print(f"power successfully turned off")
+    def updateFromDatabase(self,sqlInfo: dict):
+        '''
+        updates any changes made from FeMS to the domain Proxy
+        '''
+        #get txpower and earfcn from database
+        txpower = sqlInfo['TxPower']
+        earfcn  = sqlInfo['EARFCN']
+        #cellIdentity
+        #ipaddress
+        #connreqUname
+        #connreqPass
+        #connreqURL
+        #hclass
+        updatedCell = False
+
+        #if values are txpower or earfcn than on the cell
+        if self.txPower != txpower:
+            self.txPower = txpower
+            self.calcMaxEirp() 
+            updatedCell = True
+            print(f"!!!!! UPDATED: txPower {self.txPower}")
+        if self.earfcn != earfcn and earfcn != '0':
+            self.earfcn = earfcn
+            self.set_low_and_high_frequncy(earfcn)
+            updatedCell = True
+            print(f"!!!!! UPDATED: earfcn {self.earfcn}")
+
+
+        return updatedCell
 
     def updateOperationalParams(self):
         print(f"updating operational parameters for {self.SN}")
@@ -387,7 +406,8 @@ class OneCA(CbsdInfo):
             self.lowFrequency  = MHz - 10
             self.highFrequency = MHz + 10
         else:
-            raise ValueError(f"earfcn should never be: {earfcn}")
+            print(f"earfcn should not be 0 {earfcn}")
+            # raise ValueError(f"earfcn should never be: {earfcn}")
             
     
     def select_frequency(self,channels: dict) -> bool:

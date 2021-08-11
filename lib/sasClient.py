@@ -22,9 +22,6 @@ from lib.cbsd import CbsdInfo, CbsdModelExporter, OneCA
 from datetime import datetime,timedelta
 from lib.authLicense import License
 
-# event = threading.Event()
-
-
 class sasClientClass():
     '''
     One stop shop for all your SAS communication needs.\n
@@ -34,14 +31,14 @@ class sasClientClass():
     def __init__(self):
         #list of cbsd objects
         self.cbsdList = []
-        #list of cbsd objects currently heartbeating
-        self.heartbeatList = []
+
+        # self.heartbeatList = []
 
         self.alarm = Alarm
 
         self.license = License()
 
-        self.event = threading.Event()
+        # self.event = threading.Event()
 
     def filter_sas_stage(self,sasStage):
 
@@ -58,6 +55,7 @@ class sasClientClass():
 
         filtered = []
 
+        cbsd:CbsdInfo
         for cbsd in self.cbsdList:
             if cbsd.sasStage == consts.HEART and cbsd.subHeart == True:
                 filtered.append(cbsd)
@@ -65,8 +63,8 @@ class sasClientClass():
         return filtered
 
     def expired(self,SASexpireTime: str, isGrantTime = False) -> bool:
+        
         '''
-        Move to SAS client
         expireTime: str representing UTC expire time\n
         Time expired returns true
         else false
@@ -95,6 +93,9 @@ class sasClientClass():
         return cbsd
 
     def addOneCA(self, cbsd: OneCA):
+        '''
+        Method used for testing 
+        '''
         self.cbsdList.append(cbsd)
         
     def addCbsd(self,sqlCbsd: dict) -> None:
@@ -195,25 +196,6 @@ class sasClientClass():
         print(json.dumps(req, indent=4))
         return req
 
-
-    # def SAS_request(self,typeOfCalling: str) -> dict:
-    #     '''
-    #     passses json to SAS with typeOfCalling method 
-    #     returns the resposne from SAS
-    #     '''
-    #     #filter cbsdList where cbsd.sasStage
-         
-    #     #build json
-    #     sasRequest = self.buildJsonRequest(typeOfCalling)
-    #     #contactSAS
-    #     response = self.contactSAS(sasRequest,typeOfCalling)
-
-    #     if response.status_code == 200:
-    #         return 
-    #     print(response)
-        
-    #     # return sasResponse
-
     def registrationResposne(self,cbsd: CbsdInfo,sasResponse):
         
         cbsd.setCbsdID(sasResponse['cbsdId'])
@@ -221,8 +203,8 @@ class sasClientClass():
 
     def spectrumResposne(self,cbsd: CbsdInfo,channels):
 
-        channelSelected = cbsd.select_frequency(channels)
-        # channelSelected = True
+        # channelSelected = cbsd.select_frequency(channels)
+        channelSelected = True
 
         if channelSelected:
             cbsd.setSasStage(consts.GRANT)
@@ -256,8 +238,7 @@ class sasClientClass():
             cbsd.subHeart = True
 
     def relinquishmentResponse(self, cbsd: CbsdInfo):
-        #TODO move everything from self.deregister?
-
+     
         cbsd.grantID = None
 
     def deregistrationResposne(self, cbsd: CbsdInfo):
@@ -270,7 +251,7 @@ class sasClientClass():
         cbsd: CbsdInfo
         for cbsd in err[errorCode]:
             #log error to FeMS alarm for each cbsd
-            self.alarm.log_error_to_FeMS_alarm('WARNING',cbsd,errorCode)
+            self.alarm.log_error_to_FeMS_alarm(self,'WARNING',cbsd,errorCode)
 
             cbsd.setSasStage(typeOfCalling)
         
@@ -496,11 +477,12 @@ class sasClientClass():
                 cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
                 verify=('googleCerts/ca.cert'),
                 json=request)
-                # timeout=5
+                # return requests.post("https://192.168.4.222:5001/v1.2/"+method, 
                 # cert=('certs/client.cert','certs/client.key'),
                 # verify=('certs/ca.cert'),
                 # json=request,
                 # timeout=5)
+
             except(ConnectTimeout,ConnectionError,SSLError,ReadTimeout,ConnectionRefusedError):
                 retries = retries + 1
                 self.checkCbsdsTransmitExpireTime()
@@ -563,6 +545,10 @@ class sasClientClass():
         self.registrationFlow()
     
     def registrationFlow(self) -> None:
+
+        #TODO check database for updates
+        #TODO make cbsd method to updatea make changes based on database
+        #TODO if grant or heartbeat reqliuish and apply for new grant
         
         registration_list = self.filter_sas_stage(consts.REG)
         if registration_list:
@@ -638,10 +624,39 @@ class sasClientClass():
             cbsd.setSasStage(consts.DEREG)
 
         self.deregisterCbsds(cbsds)
+
+
+    def getUpdateFromDatabase(self):
+        #TODO check database for updates for heatbeat_list
+        #TODO make cbsd method to updatea make changes based on database
+        #TODO if grant or heartbeat reqliuish and apply for new grant
+
+        relinquish = []
+
+        conn = dbConn("ACS_V1_1")
+        cbsdUpdate = conn.select("SELECT * FROM dp_device_info")
+        conn.dbClose()
+
+        i = 0
+        cbsd:CbsdInfo
+        for cbsd in self.cbsdList:
+            if cbsd.updateFromDatabase(cbsdUpdate[i]):
+                relinquish.append(cbsd)
+            i = i + 1
+
+        if relinquish:
+            self.relinquishGrant(relinquish)
+            self.makeSASRequest(relinquish,consts.GRANT)
+            self.makeSASRequest(relinquish,consts.HEART)
+
             
     def heartbeat(self) -> None:
         #filter for authorized heartbeats
+
+        self.getUpdateFromDatabase()
+
         heartbeat_list = self.filter_subsequent_heartbeat()
+
         if heartbeat_list:
             # self.event.set()
             self.makeSASRequest(heartbeat_list,consts.HEART)
@@ -656,7 +671,6 @@ if __name__ == '__main__':
     conn.dbClose()
 
     # s.addCbsd(cbsd[0])
-    s.registerCbsds(cbsd)
     # s.create_cbsd('DCE99461317E')
 
     # s.cbsdList[1].sasStage = consts.SPECTRUM

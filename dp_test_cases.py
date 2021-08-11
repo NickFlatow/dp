@@ -15,6 +15,14 @@ class CbsdTest(unittest.TestCase):
     Test Cases for generic cbsd class
     '''
 
+    def test_updateFromDatabase(self):
+        conn = dbConn("ACS_V1_1")
+        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
+        cbsd1 = ONECA(sqlCbsd[0])
+
+        cbsd1.updateFromDatabase({'TxPower':15,'EARFCN':'0' })
+
+
     # def test_updateOperationalParams(self):
     #     conn = dbConn("ACS_V1_1")
     #     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
@@ -194,29 +202,31 @@ class CbsdTest(unittest.TestCase):
 
 class sasClientTest(unittest.TestCase):
 
+    def test(self):
+        pass
 
-    def test_apply_operationalParams(self):
-        conn = dbConn("ACS_V1_1")
-        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
-        cbsd1 = ONECA(sqlCbsd[0])
+    # def test_apply_operationalParams(self):
+    #     conn = dbConn("ACS_V1_1")
+    #     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
+    #     cbsd1 = ONECA(sqlCbsd[0])
 
 
-        conn = dbConn("ACS_V1_1")
-        sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE99461317E')
-        cbsd2 = ONECA(sqlCbsd[0])
+    #     conn = dbConn("ACS_V1_1")
+    #     sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE99461317E')
+    #     cbsd2 = ONECA(sqlCbsd[0])
 
-        sasClient = sasClientClass()
+    #     sasClient = sasClientClass()
         
-        sasClient.addOneCA(cbsd1)
-        sasClient.addOneCA(cbsd2)
+    #     sasClient.addOneCA(cbsd1)
+    #     sasClient.addOneCA(cbsd2)
 
 
-        sasClient.processSasResposne(consts.HB500,[cbsd1,cbsd2],consts.HEART)
+    #     sasClient.processSasResposne(consts.HB500,[cbsd1,cbsd2],consts.HEART)
 
-        self.assertLessEqual(cbsd1.maxEirp,19)
-        self.assertEqual(cbsd1.earfcn,'56190')
-        self.assertLessEqual(cbsd2.maxEirp,5)
-        self.assertEqual(cbsd2.earfcn,'56190')
+    #     self.assertLessEqual(cbsd1.maxEirp,19)
+    #     self.assertEqual(cbsd1.earfcn,'56190')
+    #     self.assertLessEqual(cbsd2.maxEirp,5)
+    #     self.assertEqual(cbsd2.earfcn,'56190')
 
     
     # def test_subHeart_function(self):
