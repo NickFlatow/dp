@@ -186,16 +186,19 @@ class CbsdInfo(ABC):
     def updateFromDatabase(self,sqlInfo: dict):
         '''
         updates any changes made from FeMS to the domain Proxy
+        returns True is there was a change
+        returns False is there was none
         '''
         #get txpower and earfcn from database
-        txpower = sqlInfo['TxPower']
-        earfcn  = sqlInfo['EARFCN']
+        txpower          = sqlInfo['TxPower']
+        earfcn           = sqlInfo['EARFCN']
+
+        self.cellIdenity = sqlInfo['CellIdentity']
+        self.ipAddress   = sqlInfo['IPAddress']
+        self.connreqURL  = sqlInfo['connreqURL']
         #TODO cellIdentity
         #TODO ipaddress
-        #TODO connreqUname
-        #TODO connreqPass
         #TODO connreqURL
-        #TODO hclass
         updatedCell = False
 
         #if values are txpower or earfcn than on the cell
@@ -209,7 +212,6 @@ class CbsdInfo(ABC):
             self.set_low_and_high_frequncy(earfcn)
             updatedCell = True
             print(f"!!!!! UPDATED: earfcn {self.earfcn}")
-
 
         return updatedCell
 
@@ -242,6 +244,18 @@ class CbsdInfo(ABC):
             #do not store old opParams
             self.sasOperationalParams.clear()
             return False
+
+    def smallCellRequest(self,retry=10):
+        timeout = 3
+        retries = 0
+        while retries < retry:
+            try:
+                 return requests.get(self.connreqURL, auth= HTTPDigestAuth(self.connreqUname,self.connreqPass))
+            except(ConnectionError,ConnectionRefusedError):
+                    retries = retries + 1
+                    self.logger.info('connection to Small Cell failed')
+                    self.logger.info(f'Retry SC in {timeout} seconds')
+                    time.sleep(timeout)
 
 
     def setParamterValue(self,parameterValueList)-> None:
@@ -283,7 +297,7 @@ class CbsdInfo(ABC):
             self.cbsdAction(self.SN,'Set Parameter Value',str(datetime.now()))
             
         #Make connection request
-        response = requests.get(self.connreqURL, auth= HTTPDigestAuth(self.connreqUname,self.connreqPass))
+        response = self.smallCellRequest()
 
         #if connection request returns 200
         if response.status_code == 200:

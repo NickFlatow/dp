@@ -6,7 +6,6 @@
 # from datetime import datetime,timedelta
 
 from lib.log import logger
-from math import e
 import time
 import requests
 import threading
@@ -187,7 +186,6 @@ class sasClientClass():
                     }
                 )
 
-
         self.logger.log_json(req,len(cbsds))
 
         return req
@@ -237,7 +235,6 @@ class sasClientClass():
     def deregistrationResposne(self, cbsd: CbsdInfo):
 
         cbsd.setCbsdID(None)
-
 
     def resendRequest(self, err: dict, errorCode: int, typeOfCalling: str,sleepTime) -> None:
 
@@ -509,7 +506,7 @@ class sasClientClass():
         '''
         Method used to handle registration requested by user
         '''
-        
+
         for cbsd in cbsds:
             #if the cbsd has never been registered
             if not self.cbsdInList(cbsd['SN']):
@@ -600,7 +597,6 @@ class sasClientClass():
         if deregister:
             self.makeSASRequest(cbsds,consts.DEREG)
 
-
     def userDeregisterCbsd(self,SNs: dict) -> None:
 
         cbsds = self.getCbsds(SNs)
@@ -612,11 +608,7 @@ class sasClientClass():
 
         self.deregisterCbsds(cbsds)
 
-
     def getUpdateFromDatabase(self):
-        #TODO check database for updates for heatbeat_list
-        #TODO make cbsd method to updatea make changes based on database
-        #TODO if grant or heartbeat reqliuish and apply for new grant
 
         relinquish = []
 
@@ -635,8 +627,7 @@ class sasClientClass():
             self.relinquishGrant(relinquish)
             self.makeSASRequest(relinquish,consts.GRANT)
             self.makeSASRequest(relinquish,consts.HEART)
-
-            
+ 
     def heartbeat(self) -> None:
         
         #keep cbsd data consistant with any changes in FeMS
@@ -646,7 +637,6 @@ class sasClientClass():
         heartbeat_list = self.filter_subsequent_heartbeat()
 
         if heartbeat_list:
-            # self.event.set()
             self.makeSASRequest(heartbeat_list,consts.HEART)
 
 

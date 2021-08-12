@@ -6,8 +6,6 @@ from config.default import SAS
 from flaskConfig import app, runFlaskSever
 from lib.sasClient import sasClientClass
 from lib.authLicense import License
-
-
 from flask_cors import cross_origin
 from flask import request
 import json
@@ -16,7 +14,6 @@ sasClient = sasClientClass()
 
 #needed here to make routes work
 # from lib.routes import *
-
 
 #route for cbsd registration
 @app.route('/dp/v1/register', methods=['POST'])
