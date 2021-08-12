@@ -100,7 +100,7 @@ class CbsdInfo(ABC):
     def getEarfcnList(self):
         '''
         earfcnInUse will always be at the first element in the list\n
-        Collects user defined earfcn network plan for SAS spectrum inquery channel scan
+        Collects user defined earfcn network plan from FeMS subscription tabel for SAS spectrum inquery channel scan
         '''
         conn = dbConn(consts.DB)
         
@@ -118,9 +118,6 @@ class CbsdInfo(ABC):
         if eutra != '':
             #convert to list
             earfcnList = list(eutra.split(","))
-
-            # #convert all values to ints
-            # earfcnList = [int(i) for i in earfcnList]
                 
             #add to the front of the list
             if self.earfcn not in earfcnList:
@@ -154,29 +151,11 @@ class CbsdInfo(ABC):
 
     def update_cbsd_database_value(self,column: str ,value) -> None:
 
-        '''
-        UPDATE TO JUST PASS A SQL STRING TO UPDATE 
-        '''
+        #TODO UPDATE TO JUST PASS A SQL STRING TO UPDATE 
+        
         conn = dbConn(consts.DB)
         conn.update("UPDATE dp_device_info SET " + column + " = %s WHERE SN = %s",(value,self.SN))
         conn.dbClose()
-
-    # def updateExpireTime(self, time:str, timeType: str):
-    #     '''
-    #     updates time locally and in the database(to display on FeMS cbrs status page) for grant and tranmit time specified by type
-    #     timeTypes = 'grant' or 'transmit'
-    #     '''
-    #     timeTypes = ['grant','transmit']
-    #     if timeType not in timeTypes:
-    #         raise ValueError("Invalid timeType must be grant or transmit")
-
-    #     if timeType == 'grant':
-    #         self.grantExpireTime = time
-    #         self.update_cbsd_database_value('grantExpireTime',time)
-
-    #     if timeType == 'transmit':
-    #         self.transmitExpireTime = time
-    #         self.update_cbsd_database_value('transmitExpireTime',time)
 
 
     def toggleAdminState(self,adminState: int):
@@ -210,12 +189,12 @@ class CbsdInfo(ABC):
         #get txpower and earfcn from database
         txpower = sqlInfo['TxPower']
         earfcn  = sqlInfo['EARFCN']
-        #cellIdentity
-        #ipaddress
-        #connreqUname
-        #connreqPass
-        #connreqURL
-        #hclass
+        #TODO cellIdentity
+        #TODO ipaddress
+        #TODO connreqUname
+        #TODO connreqPass
+        #TODO connreqURL
+        #TODO hclass
         updatedCell = False
 
         #if values are txpower or earfcn than on the cell
@@ -239,12 +218,8 @@ class CbsdInfo(ABC):
 
         #set new power level
         if 'maxEirp' in self.sasOperationalParams:
-            # if self.calcMaxEirp > self.sasOperationalParams['maxEirp']:
-            #configure datapath and value for txPower
-            # print(self.sasOperationalParams['maxEirp'])
 
-            #calc TxPower not maxEirp
-
+            #from the maxEirp value given in sas convert to dbm txpower and set on the new txpower on the cell
             parameterValueList.append({'data_path':consts.TXPOWER_PATH,'data_type':'int','data_value': self.calcTxPower(self.sasOperationalParams['maxEirp']) })
             
         if 'operationFrequencyRange' in self.sasOperationalParams:
@@ -276,11 +251,8 @@ class CbsdInfo(ABC):
         #connect to database
         conn = dbConn("ACS_V1_1")
 
-
         #remove previous values in spv table where SN = self.SN
         conn.update("DELETE FROM fems_spv WHERE SN = %s",self.SN)
-
-
 
         #add perodicInform to parameterValueList(sets new database values immediately after setting)
         parameterValueList.append(consts.PERIODIC_ONE)
@@ -299,7 +271,6 @@ class CbsdInfo(ABC):
 
             #change cell frequency
             if parameterValueList[i]['data_path'] == consts.EARFCN_LIST:
-                #TODO can we make database script to do this for us on each periodic inform?
                 self.earfcn = parameterValueList[i]['data_value']
                 self.set_low_and_high_frequncy(parameterValueList[i]['data_value'])
 
@@ -364,7 +335,6 @@ class CbsdInfo(ABC):
 
     def cbsdAction(self,cbsdSN,action,time):
         #check note field for EXEC
-        # logging.critical("Triggering CBSD action")
         conn = dbConn("ACS_V1_1")
         sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+cbsdSN+"\',\'"+action+"\',\'"+time+"\')"
         # logging.critical(cbsdSN + " : SQL cmd " + sql_action)
@@ -372,12 +342,10 @@ class CbsdInfo(ABC):
         conn.dbClose()
 
     def setCbsdID(self,cbsdID):
-        #TODO update new value to database to relect changes on cbrsStatus page
         self.update_cbsd_database_value("cbsdID",cbsdID)
         self.cbsdID = cbsdID
 
     def setSasStage(self,sasStage):
-        #TODO update new value to database to relect changes on cbrsStatus page
         self.update_cbsd_database_value("sasStage",sasStage)
         self.sasStage = sasStage
 
@@ -419,7 +387,10 @@ class OneCA(CbsdInfo):
         high_frequency_channel_found = False   
 
         #list of values to change on the cell if needed
-        paramterValueList = []      
+        paramterValueList = []
+
+        #make sure domain proxy list matches FeMS list
+        self.getEarfcnList()      
 
         for earfcn in self.earfcnList:
 
@@ -469,7 +440,6 @@ class OneCA(CbsdInfo):
                     print(f"found spectrum {earfcn} for {self.SN}")
                     return True
         if not low_frequeny_channel_found or not high_frequency_channel_found:
-            #TODO log no specrum error to FeMS
             #we have not found spectrum
             print(f"did not find spectrum for {self.SN}")
             return False
@@ -502,22 +472,6 @@ class CbsdModelExporter():
         elif dbObj['hclass'] == 'FAP_FC4064Q2CA':
             return TwoCA(dbObj) 
 
-if __name__ == '__main__':
-    conn = dbConn("ACS_V1_1")
-    # sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'DCE994613163')
-    sqlCbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",'900F0C732A02')
-    conn.dbClose()
 
-    # sql = "UPDATE `dp_device_info` SET ({}) WHERE SN IN %s".format(','.join(['%s'] * len(parameter)))
-
-    # print(f"sql: {sql}")    
-
-    a = OneCA(sqlCbsd[0])
-    a.powerOff()
-    # a.powerOff()
-    # b = TwoCA(sqlCbsd[0])
-
-    # print(f"1CA lowFreq: {a.lowFrequency}")
-    # print(f"2CA lowFreq: {b.lowFrequency}") 
 
 
