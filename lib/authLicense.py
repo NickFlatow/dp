@@ -14,7 +14,3 @@ class License:
         conn.dbClose()
         return license[0]
 
-
-l = License()
-
-print(l.authType)

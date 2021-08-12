@@ -7,7 +7,7 @@
 
 
 import json
-from logging import error
+from lib.log import logger
 from math import e
 import time
 import requests
@@ -34,16 +34,18 @@ class sasClientClass():
 
         # self.heartbeatList = []
 
-        self.alarm = Alarm
+        self.alarm = Alarm()
 
         self.license = License()
+
+        self.logger = logger()
 
         # self.event = threading.Event()
 
     def filter_sas_stage(self,sasStage):
-
         filtered = []
 
+        cbsd:CbsdInfo
         for cbsd in self.cbsdList:
             if cbsd.sasStage == sasStage:
                 filtered.append(cbsd)
@@ -102,6 +104,7 @@ class sasClientClass():
 
         self.license:License
         if len(self.cbsdList) >= self.license.numEnB:
+            #TODO log error to FeMS
             print("Maximum number of ENB exceeded")
         else:
             self.cbsdList.append(CbsdModelExporter.getCbsd(sqlCbsd))
@@ -193,7 +196,8 @@ class sasClientClass():
                 )
 
 
-        print(json.dumps(req, indent=4))
+        self.logger.log_json(req,len(cbsds))
+
         return req
 
     def registrationResposne(self,cbsd: CbsdInfo,sasResponse):
@@ -203,15 +207,13 @@ class sasClientClass():
 
     def spectrumResposne(self,cbsd: CbsdInfo,channels):
 
-        # channelSelected = cbsd.select_frequency(channels)
-        channelSelected = True
+        channelSelected = cbsd.select_frequency(channels)
+        # channelSelected = True
 
         if channelSelected:
             cbsd.setSasStage(consts.GRANT)
         else: 
-
-            self.err = [cbsd]
-            # cbsd.setSasStage("error")
+            self.alarm.log_error_to_FeMS_alarm('CRITICAL',cbsd,123)
 
     def grantResposne(self,cbsd: CbsdInfo,sasResponse):
         #set grant expire time
@@ -225,7 +227,6 @@ class sasClientClass():
         cbsd.setSasStage(consts.HEART)
 
     def heartbeatResposne(self, cbsd: CbsdInfo, sasResponse):
-        print(f"utcnow: {datetime.utcnow()}")
         cbsd.setTransmitExpireTime(sasResponse['transmitExpireTime'])
 
         if self.expired(sasResponse['transmitExpireTime']) and cbsd.adminState == 1:
@@ -365,12 +366,6 @@ class sasClientClass():
                 for cbsd in err[errorCode]:
                     alarm.Alarm.log_error_to_FeMS_alarm("WARNING",cbsd,errorCode)
         
-        
-        # self.errorThread.join()
-        print("!!!!!!!! Threading !!!!!!!!!!")
-        print(threading.enumerate())
-        print("!!!!!!!! Threading !!!!!!!!!!")
-        # err.clear()
 
     def createErrorThread(self,fn,arg):
         try:
@@ -422,7 +417,7 @@ class sasClientClass():
 
         responseMessageType = typeOfCalling + "Response"
 
-        print(json.dumps(sasResponse,indent=4))
+        self.logger.log_json(sasResponse,len(cbsds))
 
         #match cbsd with response from SAS
         for i in range(len(cbsds)):
@@ -486,8 +481,8 @@ class sasClientClass():
             except(ConnectTimeout,ConnectionError,SSLError,ReadTimeout,ConnectionRefusedError):
                 retries = retries + 1
                 self.checkCbsdsTransmitExpireTime()
-                print('connection to SAS failed')
-                print(f'Retry SAS in {timeout} seconds')
+                self.logger.info('connection to SAS failed')
+                self.logger.info(f'Retry SAS in {timeout} seconds')
                 time.sleep(timeout)
 
 
@@ -661,44 +656,7 @@ class sasClientClass():
             # self.event.set()
             self.makeSASRequest(heartbeat_list,consts.HEART)
 
-if __name__ == '__main__':
 
-    s = sasClientClass()
-    #takes cbsd add it to list of cbsds to be registered
-
-    conn = dbConn(consts.DB)
-    cbsd = conn.select("SELECT * FROM dp_device_info WHERE fccID = %s",'2AQ68T99B226')
-    conn.dbClose()
-
-    # s.addCbsd(cbsd[0])
-    # s.create_cbsd('DCE99461317E')
-
-    # s.cbsdList[1].sasStage = consts.SPECTRUM
-
-
-    registration_list = s.filter_sas_stage(consts.REG)
-    if registration_list:
-        s.makeSASRequest(registration_list,consts.REG)
-
-    spectrum_list = s.filter_sas_stage(consts.SPECTRUM)
-    if spectrum_list:
-        s.makeSASRequest(spectrum_list,consts.SPECTRUM)
-
-    grant_list = s.filter_sas_stage(consts.GRANT)
-    if grant_list:
-        s.makeSASRequest(grant_list,consts.GRANT)
-
-    heartbeat_list = s.filter_sas_stage(consts.HEART)
-    if heartbeat_list:
-        s.makeSASRequest(heartbeat_list,consts.HEART)
-
-
-    # for f in registration_list:
-    #     print(f.SN)
-
-    #while True:
-        #keep heartbeating all cbsds in hb stage
-    # s.buildJsonRequest(s.cbsdList,consts.REG)
 
 
 
