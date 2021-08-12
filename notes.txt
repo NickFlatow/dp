@@ -6,8 +6,4 @@
 3.) remove do nothing var
 
 
-Add to FeMS subscription
-1.) antenna gain
-
-
 

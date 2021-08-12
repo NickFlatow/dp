@@ -10,7 +10,7 @@
 
 
 
-
+from lib.log import logger
 from abc import ABC, abstractmethod
 from datetime import datetime
 from requests.auth import HTTPDigestAuth
@@ -66,6 +66,7 @@ class CbsdInfo(ABC):
         #populate earfcnList
         self.getEarfcnList()
 
+        self.logger = logger()
 
         
     @abstractmethod
@@ -85,17 +86,17 @@ class CbsdInfo(ABC):
 
     def powerOn(self):
         if self.adminState == 0:
-            print(f"Turning power on for {self.SN}")
+            self.logger.info(f"Turning power on for {self.SN}")
             parameterValueList = [consts.ADMIN_POWER_ON]
             self.setParamterValue(parameterValueList)
-            print(f"power successfully turned on")
+            self.logger.info(f"power successfully turned on")
 
     def powerOff(self):
         if self.adminState == 1:
-            print(f"Turning power off for {self.SN}")
+            self.logger.info (f"Turning power off for {self.SN}")
             parameterValueList = [consts.ADMIN_POWER_OFF]
             self.setParamterValue(parameterValueList)
-            print(f"power successfully turned off")
+            self.logger.info (f"power successfully turned off")
 
     def getEarfcnList(self):
         '''
@@ -213,7 +214,7 @@ class CbsdInfo(ABC):
         return updatedCell
 
     def updateOperationalParams(self):
-        print(f"updating operational parameters for {self.SN}")
+        self.logger.info (f"updating operational parameters for {self.SN}")
         parameterValueList = []
 
         #set new power level
@@ -257,7 +258,7 @@ class CbsdInfo(ABC):
         #add perodicInform to parameterValueList(sets new database values immediately after setting)
         parameterValueList.append(consts.PERIODIC_ONE)
         
-        print(f"connected to IP: {self.ipAddress}")
+        self.logger.info (f"connected to IP: {self.ipAddress}")
 
         for i in range(len(parameterValueList)):
             
@@ -337,7 +338,6 @@ class CbsdInfo(ABC):
         #check note field for EXEC
         conn = dbConn("ACS_V1_1")
         sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+cbsdSN+"\',\'"+action+"\',\'"+time+"\')"
-        # logging.critical(cbsdSN + " : SQL cmd " + sql_action)
         conn.update(sql_action)
         conn.dbClose()
 
@@ -356,9 +356,6 @@ class CbsdInfo(ABC):
     def setTransmitExpireTime(self,transmitExpireTime):
         self.update_cbsd_database_value("transmitExpireTime",transmitExpireTime)
         self.transmitExpireTime = transmitExpireTime
-
-
-    #deregister method(clear all values associtaed with SAS)
 
 
 class OneCA(CbsdInfo):
@@ -437,11 +434,11 @@ class OneCA(CbsdInfo):
                         self.setParamterValue(paramterValueList)
 
                     #we have found spectrum
-                    print(f"found spectrum {earfcn} for {self.SN}")
+                    self.logger.info (f"found spectrum {earfcn} for {self.SN}")
                     return True
         if not low_frequeny_channel_found or not high_frequency_channel_found:
             #we have not found spectrum
-            print(f"did not find spectrum for {self.SN}")
+            self.logger.info (f"did not find spectrum for {self.SN}")
             return False
 
 

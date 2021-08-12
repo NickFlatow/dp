@@ -5,14 +5,13 @@
 # from cbsd import CbsdModelExporter
 # from datetime import datetime,timedelta
 
-
-import json
 from lib.log import logger
 from math import e
 import time
 import requests
 import threading
 
+from flaskConfig import app
 from requests.exceptions import ConnectTimeout, ReadTimeout, SSLError
 from lib import alarm
 from lib.alarm import Alarm 
@@ -32,15 +31,11 @@ class sasClientClass():
         #list of cbsd objects
         self.cbsdList = []
 
-        # self.heartbeatList = []
-
         self.alarm = Alarm()
 
         self.license = License()
 
         self.logger = logger()
-
-        # self.event = threading.Event()
 
     def filter_sas_stage(self,sasStage):
         filtered = []
@@ -76,7 +71,7 @@ class sasClientClass():
 
         expireTime = datetime.strptime(SASexpireTime,"%Y-%m-%dT%H:%M:%SZ")
 
-        #Renew grant five minues before it expires
+        #Renew grant five minutes before it expires
         if isGrantTime:
             expireTime = expireTime - timedelta(seconds=300)
     
@@ -120,9 +115,6 @@ class sasClientClass():
 
         return cbsds
             
-    
-
-        
     def buildJsonRequest(self,cbsds: list,typeOfCalling: str) -> dict:
         '''
         Builds and logs all json requests to SAS
@@ -468,7 +460,7 @@ class sasClientClass():
         retries = 0
         while retries < retry:
             try:
-                return requests.post("https://test.sas.goog/v1.2/"+method, 
+                return requests.post(app.config['SAS']+method, 
                 cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
                 verify=('googleCerts/ca.cert'),
                 json=request)
@@ -646,10 +638,11 @@ class sasClientClass():
 
             
     def heartbeat(self) -> None:
-        #filter for authorized heartbeats
-
+        
+        #keep cbsd data consistant with any changes in FeMS
         self.getUpdateFromDatabase()
 
+        #filter for authorized heartbeats
         heartbeat_list = self.filter_subsequent_heartbeat()
 
         if heartbeat_list:

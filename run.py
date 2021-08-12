@@ -3,7 +3,7 @@ import threading
 import lib.consts as consts
 from lib.dbConn import dbConn
 from config.default import SAS
-from test import app, runFlaskSever
+from flaskConfig import app, runFlaskSever
 from lib.sasClient import sasClientClass
 from lib.authLicense import License
 
@@ -13,11 +13,12 @@ from flask import request
 import json
 
 sasClient = sasClientClass()
+
 #needed here to make routes work
 # from lib.routes import *
 
 
-#create route for cbsd registration
+#route for cbsd registration
 @app.route('/dp/v1/register', methods=['POST'])
 @cross_origin()
 def dp_register():
@@ -39,6 +40,8 @@ def dp_register():
 
     return "success"
 
+
+#route for cbsd deregistration
 @app.route('/dp/v1/deregister', methods=['POST'])
 @cross_origin()
 def dp_deregister():

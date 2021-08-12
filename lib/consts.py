@@ -44,8 +44,6 @@ DB = 'ACS_V1_1'
 #TESTING CONSTS
 
 TEST_CBSD_SN = '900F0C732A02'
-# TEST_CBSD_SN = 'DCE994613163'
-
 
 FS_TWO_CELLS = {
     "spectrumInquiryResponse": [
@@ -967,7 +965,6 @@ HB500 = {
         }
     ]
 }
-
 
 ERR106 = {
     "grantResponse": [
