@@ -21,11 +21,7 @@ from datetime import datetime,timedelta
 from lib.authLicense import License
 
 class sasClientClass():
-    '''
-    One stop shop for all your SAS communication needs.\n
-    You got cbsds needing specturm?\n
-    We got connections :/
-    '''
+    
     def __init__(self):
         #list of cbsd objects
         self.cbsdList = []
@@ -80,13 +76,13 @@ class sasClientClass():
             return False
 
 
-    def get_cbsd_database_row(self,SN: str) -> dict:
-        '''Given a cbsd Serial Number the fucntion will return a dict with cbsd attributes'''
-        conn = dbConn(consts.DB)
-        cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SN)
-        conn.dbClose()
+    # def get_cbsd_database_row(self,SN: str) -> dict:
+    #     '''Given a cbsd Serial Number the fucntion will return a dict with cbsd attributes'''
+    #     conn = dbConn(consts.DB)
+    #     cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SN)
+    #     conn.dbClose()
 
-        return cbsd
+    #     return cbsd
 
     def addOneCA(self, cbsd: OneCA):
         '''
@@ -235,6 +231,7 @@ class sasClientClass():
     def deregistrationResposne(self, cbsd: CbsdInfo):
 
         cbsd.setCbsdID(None)
+        self.cbsdList.remove(cbsd)
 
     def resendRequest(self, err: dict, errorCode: int, typeOfCalling: str,sleepTime) -> None:
 
@@ -332,6 +329,7 @@ class sasClientClass():
                 cbsd: CbsdInfo
                 #change heartbeat to granted
                 for cbsd in err[errorCode]:
+                    #TODO make into cbsd function
                     cbsd.operationalState = 'GRANTED'
                     cbsd.subHeart = True
                     cbsd.setSasStage(consts.HEART)
@@ -353,7 +351,7 @@ class sasClientClass():
             else:
                 #no action is required from the domain proxy. Log error to FeMS
                 for cbsd in err[errorCode]:
-                    alarm.Alarm.log_error_to_FeMS_alarm("WARNING",cbsd,errorCode)
+                    self.alarm.log_error_to_FeMS_alarm("WARNING",cbsd,errorCode)
         
 
     def createErrorThread(self,fn,arg):
@@ -435,10 +433,8 @@ class sasClientClass():
                 self.deregistrationResposne(cbsds[i])
       
         if err:
-            print("error")
+            print("Enter Error Module")
             self.createErrorThread(self.processError,err)
-
-            # self.processError(err)
 
     def checkCbsdsTransmitExpireTime(self):
         
@@ -609,7 +605,7 @@ class sasClientClass():
         self.deregisterCbsds(cbsds)
 
     def getUpdateFromDatabase(self):
-
+        #TODO add rabbitMQ work flow instead
         relinquish = []
 
         conn = dbConn("ACS_V1_1")
@@ -625,6 +621,7 @@ class sasClientClass():
 
         if relinquish:
             self.relinquishGrant(relinquish)
+            # self.registrationFlow()
             self.makeSASRequest(relinquish,consts.GRANT)
             self.makeSASRequest(relinquish,consts.HEART)
  
