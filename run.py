@@ -56,19 +56,19 @@ def dp_deregister():
 
 def start(l: License):
 
-    if l.authType == consts.FUNC_MODE_ALL or l.authType == consts.FUNC_MODE_DOMAIN_PROXY and l.remainingtime > 0:
+    # if l.authType == consts.FUNC_MODE_ALL or l.authType == consts.FUNC_MODE_DOMAIN_PROXY and l.remainingtime > 0:
     
-        #start heartbeat thread
-        try:
-            #if using args a comma for tuple is needed 
-            thread = threading.Thread(target=heartbeat, args=())
-            thread.name = 'heartbeat-thread'
-            thread.start()
-        except Exception as e:
-            print(f"Heartbeat thread failed: {e}")
-            
-        #run flask server
-        runFlaskSever() 
+    #start heartbeat thread
+    try:
+        #if using args a comma for tuple is needed 
+        thread = threading.Thread(target=heartbeat, args=())
+        thread.name = 'heartbeat-thread'
+        thread.start()
+    except Exception as e:
+        print(f"Heartbeat thread failed: {e}")
+        
+    #run flask server
+    runFlaskSever() 
 
 
 def heartbeat():

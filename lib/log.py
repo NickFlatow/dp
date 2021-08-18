@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 
 logging.basicConfig(filename='/tmp/dp.log', format='%(message)s', level=logging.INFO)
+# logging.basicConfig(filename='/home/gtadmin/dp.log', format='%(message)s', level=logging.INFO)
 
 # logger.debug("Harmless debug Message")
 # logger.info("Just an information")

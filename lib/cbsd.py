@@ -250,12 +250,15 @@ class CbsdInfo(ABC):
         retries = 0
         while retries < retry:
             try:
-                 return requests.get(self.connreqURL, auth= HTTPDigestAuth(self.connreqUname,self.connreqPass))
+                self.logger.info("trying")
+                print("trying try")
+                return requests.get(self.connreqURL, auth= HTTPDigestAuth(self.connreqUname,self.connreqPass))
             except(ConnectionError,ConnectionRefusedError):
-                    retries = retries + 1
-                    self.logger.info('connection to Small Cell failed')
-                    self.logger.info(f'Retry SC in {timeout} seconds')
-                    time.sleep(timeout)
+                print("trying except")
+                retries = retries + 1
+                self.logger.info('connection to Small Cell failed')
+                self.logger.info(f'Retry SC in {timeout} seconds')
+                time.sleep(timeout)
 
 
     def setParamterValue(self,parameterValueList)-> None:
@@ -263,6 +266,7 @@ class CbsdInfo(ABC):
         Given a list of dicts containing datamodel_path, data_type and data_value
         setParameterValues will use the ACS to set this value on the cell.
         '''
+        print("setting parameter values")
         #connect to database
         conn = dbConn("ACS_V1_1")
 
@@ -270,7 +274,7 @@ class CbsdInfo(ABC):
         conn.update("DELETE FROM fems_spv WHERE SN = %s",self.SN)
 
         #add perodicInform to parameterValueList(sets new database values immediately after setting)
-        parameterValueList.append(consts.PERIODIC_ONE)
+        # parameterValueList.append(consts.PERIODIC_ONE)
         
         self.logger.info (f"connected to IP: {self.ipAddress}")
 
@@ -298,6 +302,8 @@ class CbsdInfo(ABC):
             
         #Make connection request
         response = self.smallCellRequest()
+
+        print(response)
 
         #if connection request returns 200
         if response.status_code == 200:
