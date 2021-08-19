@@ -76,20 +76,31 @@ class sasClientClass():
             return False
 
 
-    # def get_cbsd_database_row(self,SN: str) -> dict:
-    #     '''Given a cbsd Serial Number the fucntion will return a dict with cbsd attributes'''
-    #     conn = dbConn(consts.DB)
-    #     cbsd = conn.select("SELECT * FROM dp_device_info WHERE SN = %s",SN)
-    #     conn.dbClose()
-
-    #     return cbsd
-
     def addOneCA(self, cbsd: OneCA):
         '''
         Method used for testing 
         '''
         self.cbsdList.append(cbsd)
-        
+
+    def populateList(self):
+        '''
+        Methoded for the case of reboot or domain proxy to pickup small cell where it has left off in process
+        '''
+
+
+        conn = dbConn("ACS_V1_1")
+        cbsds = conn.select("SELECT * FROM dp_device_info")
+        conn.dbClose()
+
+        for cbsd in cbsds:
+            #if the cbsd has never been registered
+            if not self.cbsdInList(cbsd['SN']) and cbsd['sasStage'] != consts.DEREG:
+                #create cbsd class
+                self.addCbsd(cbsd)
+
+        self.checkCbsdsTransmitExpireTime()
+        self.registrationFlow()
+
     def addCbsd(self,sqlCbsd: dict) -> None:
 
         self.license:License
@@ -205,9 +216,9 @@ class sasClientClass():
         #set grant expire time
         cbsd.setGrantExpireTime(sasResponse['grantExpireTime'])
 
-        cbsd.grantID = sasResponse['grantId']
+        cbsd.setGrantID(sasResponse['grantId'])
         #operationalState to granted
-        cbsd.operationalState = 'GRANTED'
+        cbsd.setOperationalState('GRANTED')
 
         #set sasStage to heartbeat
         cbsd.setSasStage(consts.HEART)
@@ -216,17 +227,18 @@ class sasClientClass():
         cbsd.setTransmitExpireTime(sasResponse['transmitExpireTime'])
 
         if self.expired(sasResponse['transmitExpireTime']) and cbsd.adminState == 1:
-            cbsd.operationalState = 'GRANTED'
+            cbsd.setOperationalState('GRANTED')
             cbsd.powerOff()
         
         elif not self.expired(sasResponse['transmitExpireTime']) and cbsd.adminState == 0:
             cbsd.powerOn()
-            cbsd.operationalState = 'AUTHORIZED'
-            cbsd.subHeart = True
+            cbsd.setOperationalState('AUTHORIZED')
+            cbsd.setSubHeart(True)
 
     def relinquishmentResponse(self, cbsd: CbsdInfo):
      
-        cbsd.grantID = None
+        cbsd.setSubHeart(False)
+        cbsd.setGrantID(None)
 
     def deregistrationResposne(self, cbsd: CbsdInfo):
 
@@ -238,7 +250,7 @@ class sasClientClass():
         cbsd: CbsdInfo
         for cbsd in err[errorCode]:
             #log error to FeMS alarm for each cbsd
-            self.alarm.log_error_to_FeMS_alarm(self,'WARNING',cbsd,errorCode)
+            self.alarm.log_error_to_FeMS_alarm('WARNING',cbsd,errorCode)
 
             cbsd.setSasStage(typeOfCalling)
         
@@ -330,8 +342,8 @@ class sasClientClass():
                 #change heartbeat to granted
                 for cbsd in err[errorCode]:
                     #TODO make into cbsd function
-                    cbsd.operationalState = 'GRANTED'
-                    cbsd.subHeart = True
+                    cbsd.setOperationalState('GRANTED')
+                    cbsd.setSubHeart(True)
                     cbsd.setSasStage(consts.HEART)
                     self.alarm.log_error_to_FeMS_alarm('WARNING',cbsd,errorCode)
 
@@ -626,13 +638,13 @@ class sasClientClass():
             self.makeSASRequest(relinquish,consts.HEART)
  
     def heartbeat(self) -> None:
-        
+
         #keep cbsd data consistant with any changes in FeMS
         self.getUpdateFromDatabase()
 
         #filter for authorized heartbeats
         heartbeat_list = self.filter_subsequent_heartbeat()
-
+        print(len(heartbeat_list))
         if heartbeat_list:
             self.makeSASRequest(heartbeat_list,consts.HEART)
 

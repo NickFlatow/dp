@@ -32,15 +32,15 @@ class CbsdInfo(ABC):
         self.userID =             sqlCbsd['userID']
         self.fccID =              sqlCbsd['fccID']
         self.SN =                 sqlCbsd['SN']
-        self.cbsdID =             None
+        self.cbsdID =             sqlCbsd['cbsdID']
         self.cbsdCat =            sqlCbsd['cbsdCategory']
-        self.sasStage =           consts.REG
+        self.sasStage =           sqlCbsd['sasStage']
         self.txPower =            sqlCbsd['TxPower']
         self.earfcn =             sqlCbsd['EARFCN']
         self.antennaGain =        sqlCbsd['antennaGain']
-        self.adminState =         0
-        self.grantID =            None
-        self.operationalState =   None
+        self.adminState =         sqlCbsd['AdminState']
+        self.grantID =            sqlCbsd['grantID']
+        self.operationalState =   sqlCbsd['operationalState']
         self.transmitExpireTime = sqlCbsd['transmitExpireTime']
         self.grantExpireTime =    sqlCbsd['grantExpireTime']
         self.cellIdenity =        sqlCbsd['CellIdentity']
@@ -51,14 +51,14 @@ class CbsdInfo(ABC):
         self.hclass =             sqlCbsd['hclass']
 
         #is cbsd in the initial or subsequent heartbeat
-        self.subHeart =           False
+        self.subHeart =          sqlCbsd['subHeart']
 
         #in the case where sas suggests new operational parameters
         self.sasOperationalParams={}
 
         self.maxEirp = 0
         #set sasStage
-        self.setSasStage(consts.REG)
+        # self.setSasStage(consts.REG)
         #set maxEirp
         self.calcMaxEirp()
         #set Low and high Frequcy
@@ -82,7 +82,7 @@ class CbsdInfo(ABC):
         expireTime = datetime.strptime(self.transmitExpireTime,"%Y-%m-%dT%H:%M:%SZ")
         if expireTime <= datetime.utcnow():
             self.powerOff()
-            self.operationalState = 'GRANTED'
+            self.setOperationalState('GRANTED')
 
     def powerOn(self):
         if self.adminState == 0:
@@ -159,13 +159,13 @@ class CbsdInfo(ABC):
         conn.dbClose()
 
 
-    def toggleAdminState(self,adminState: int):
+    def toggleAdminState(self,adminState: str):
         if adminState == 'false':
             # logging.info("Turn RF OFF for %s",cbsd['SN'])
-            self.adminState = 0
+            self.setAdminState(0)
         else:
             # logging.info("Turn on RF for %s",cbsd['SN'])
-            self.adminState = 1
+            self.setAdminState(1)
 
     def adjustPower(self,power):
         # logging.info("adjust to power to %s dBm",power)
@@ -331,9 +331,9 @@ class CbsdInfo(ABC):
         if self.adminState == 1:
             self.powerOff()
         #set operationalState
-        self.operationalState = None
+        self.setOperationalState(None)
         #set subHeart to False
-        self.subHeart = False
+        self.setSubHeart(False)
         #set grantTime
         self.setGrantExpireTime(None)
         #set transmitTime
@@ -354,6 +354,23 @@ class CbsdInfo(ABC):
         sql_action = "INSERT INTO apt_action_queue (SN,Action,ScheduleTime) values(\'"+cbsdSN+"\',\'"+action+"\',\'"+time+"\')"
         conn.update(sql_action)
         conn.dbClose()
+
+    
+    def setSubHeart(self,subHeart):
+        self.update_cbsd_database_value("subHeart",subHeart)
+        self.subHeart = subHeart
+
+    def setOperationalState(self,operationalState):
+        self.update_cbsd_database_value("operationalState",operationalState)
+        self.operationalState = operationalState
+
+    def setGrantID(self,grantID):
+        self.update_cbsd_database_value("grantID",grantID)
+        self.grantID = grantID
+
+    def setAdminState(self,adminState):
+        self.update_cbsd_database_value("AdminState",adminState)
+        self.adminState = adminState
 
     def setCbsdID(self,cbsdID):
         self.update_cbsd_database_value("cbsdID",cbsdID)

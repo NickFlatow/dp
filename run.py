@@ -57,7 +57,12 @@ def dp_deregister():
 def start(l: License):
 
     if l.authType == consts.FUNC_MODE_ALL or l.authType == consts.FUNC_MODE_DOMAIN_PROXY and l.remainingtime > 0:
-    
+
+
+        #in the case where domain proxy rebooted
+        sasClient.populateList()
+
+
         #start heartbeat thread
         try:
             #if using args a comma for tuple is needed 
@@ -66,9 +71,14 @@ def start(l: License):
             thread.start()
         except Exception as e:
             print(f"Heartbeat thread failed: {e}")
+
+
+
             
         #run flask server
-        runFlaskSever() 
+        runFlaskSever()
+
+
 
 
 def heartbeat():
