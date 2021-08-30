@@ -71,15 +71,9 @@ def start(l: License):
             thread.start()
         except Exception as e:
             print(f"Heartbeat thread failed: {e}")
-
-
-
             
         #run flask server
         runFlaskSever()
-
-
-
 
 def heartbeat():
 
