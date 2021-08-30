@@ -219,6 +219,8 @@ class CbsdInfo(ABC):
         self.logger.info (f"updating operational parameters for {self.SN}")
         parameterValueList = []
 
+        #some new change
+
         #set new power level
         if 'maxEirp' in self.sasOperationalParams:
 
