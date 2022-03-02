@@ -1,4 +1,5 @@
 import requests
+import time
 import json
 from lib import consts
 from lib.cbsd import CbsdInfo
@@ -27,12 +28,7 @@ class Registration():
         
         self.processResponse(cbsds,regResponse)
     
-
-
-        
-
-
-
+    
     def processResponse(self,cbsds:list,response:dict):
         
         #bind json response to cbsd
@@ -64,23 +60,22 @@ class Registration():
         method:  method to pass json request to: registration,spectrum,grant,heartbeat
         '''
 
-
-        return consts.REGPASS
-        # timeout = 3
-        # retries = 0
-        # while retries < retry:
-        #     try:
-        #         # return requests.post(consts.SAS+method, 
-        #         # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
-        #         # verify=('googleCerts/ca.cert'),
-        #         # json=request)
-        #         return requests.post("https://192.168.4.222:5001/v1.2/"+method, 
-        #         cert=('certs/client.cert','certs/client.key'),
-        #         verify=('certs/ca.cert'),
-        #         json=request,
-        #         timeout=5)
-        #     except Exception as e:
-        #         print({f"there has been some exception: {e}"})
+        timeout = 3
+        retries = 0
+        while retries < retry:
+            try:
+                # return requests.post(consts.SAS+method, 
+                # cert=('googleCerts/AFE01.cert','googleCerts/AFE01.key'),
+                # verify=('googleCerts/ca.cert'),
+                # json=request)
+                return requests.post("https://192.168.4.25:5000/v1.2/"+method, 
+                cert=('certs/client.cert','certs/client.key'),
+                verify=('certs/ca.cert'),
+                json=request,
+                timeout=5)
+            except Exception as e:
+                time.sleep(3)
+                print({f"there has been some exception: {e}"})
 
             # except(ConnectTimeout,ConnectionError,SSLError,ReadTimeout,ConnectionRefusedError):
             #     retries = retries + 1
