@@ -56,12 +56,19 @@ def dp_deregister():
 
 def start(l: License):
 
-    if l.authType == consts.FUNC_MODE_ALL or l.authType == consts.FUNC_MODE_DOMAIN_PROXY and l.remainingtime > 0:
+    # if l.authType == consts.FUNC_MODE_ALL or l.authType == consts.FUNC_MODE_DOMAIN_PROXY and l.remainingtime > 0:
 
+        #setup netconf server
 
+        #setup session manager
+
+        #setup config
+
+        #setup radio controller(session manager)
+
+        
         #in the case where domain proxy rebooted
         sasClient.populateList()
-
 
         #start heartbeat thread
         try:
@@ -75,8 +82,8 @@ def start(l: License):
 
 
             
-        #run flask server
-        runFlaskSever()
+        # #run flask server
+        # runFlaskSever()
 
 
 

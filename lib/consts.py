@@ -13,6 +13,9 @@ REL = 'relinquishment'
 REPROV = 'provisioning'
 ERROR = 'error'
 
+SAS = "https://192.168.4.222:5001/v1.2/"
+# SAS = "https://test.sas.goog/v1.2/"
+
 
 #LICENSE FILE CONSTS
 FUNC_MODE_ALL = 0
@@ -44,6 +47,28 @@ DB = 'ACS_V1_1'
 #TESTING CONSTS
 
 TEST_CBSD_SN = '900F0C732A02'
+
+
+REGPASS = {  
+   "registrationResponse":[  
+      {  
+         "cbsdId":"abcd1234",
+         "response":{  
+            "responseCode":0,
+            "responseMessage": "some test message",
+            "responseData": ["fccId"]
+         }
+      },
+      {  
+         "cbsdId":"efgh5678",
+         "response":{  
+            "responseCode":105
+         }
+      }
+   ]
+}
+
+
 
 FS_TWO_CELLS = {
     "spectrumInquiryResponse": [

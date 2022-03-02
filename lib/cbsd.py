@@ -8,8 +8,7 @@
 # import math
 # import json
 
-
-
+from lib.Response import Resposne
 from lib.log import logger
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -28,43 +27,48 @@ class CbsdInfo(ABC):
     CBSD class assumes adminState will start as off. As it is not allowed to be on without SAS permission
     '''
 
-    def __init__(self, sqlCbsd):
+    def __init__(self, sqlCbsd: dict):
+        self.cbsdState      =       consts.DEREG
+        self.bandwidth      =       20
         self.userID =             sqlCbsd['userID']
         self.fccID =              sqlCbsd['fccID']
         self.SN =                 sqlCbsd['SN']
-        self.cbsdID =             sqlCbsd['cbsdID']
+        # self.cbsdID =             sqlCbsd['cbsdID']
         self.cbsdCat =            sqlCbsd['cbsdCategory']
-        self.sasStage =           sqlCbsd['sasStage']
-        self.txPower =            sqlCbsd['TxPower']
-        self.earfcn =             sqlCbsd['EARFCN']
-        self.antennaGain =        sqlCbsd['antennaGain']
-        self.adminState =         sqlCbsd['AdminState']
-        self.grantID =            sqlCbsd['grantID']
-        self.operationalState =   sqlCbsd['operationalState']
-        self.transmitExpireTime = sqlCbsd['transmitExpireTime']
-        self.grantExpireTime =    sqlCbsd['grantExpireTime']
-        self.cellIdenity =        sqlCbsd['CellIdentity']
-        self.ipAddress =          sqlCbsd['IPAddress']
-        self.connreqUname =       sqlCbsd['connreqUname']
-        self.connreqPass =        sqlCbsd['connreqPass']
-        self.connreqURL =         sqlCbsd['connreqURL']
+        # self.sasStage =           sqlCbsd['sasStage']
+        # self.txPower =            sqlCbsd['TxPower']
+        # self.earfcn =             sqlCbsd['EARFCN']
+        # self.antennaGain =        sqlCbsd['antennaGain']
+        # self.adminState =         sqlCbsd['AdminState']
+        # self.grantID =            sqlCbsd['grantID']
+        # self.operationalState =   sqlCbsd['operationalState']
+        # self.transmitExpireTime = sqlCbsd['transmitExpireTime']
+        # self.grantExpireTime =    sqlCbsd['grantExpireTime']
+        # self.cellIdenity =        sqlCbsd['CellIdentity']
+        # self.ipAddress =          sqlCbsd['IPAddress']
+        # self.connreqUname =       sqlCbsd['connreqUname']
+        # self.connreqPass =        sqlCbsd['connreqPass']
+        # self.connreqURL =         sqlCbsd['connreqURL']
         self.hclass =             sqlCbsd['hclass']
+        self.reponseObj      =    Resposne()
 
+
+        
         #is cbsd in the initial or subsequent heartbeat
-        self.subHeart =          sqlCbsd['subHeart']
+        # self.subHeart =          sqlCbsd['subHeart']
 
         #in the case where sas suggests new operational parameters
-        self.sasOperationalParams={}
+        # self.sasOperationalParams={}
 
-        self.maxEirp = 0
-        #set sasStage
+        # self.maxEirp = 0
+        # #set sasStage
         # self.setSasStage(consts.REG)
-        #set maxEirp
-        self.calcMaxEirp()
-        #set Low and high Frequcy
-        self.set_low_and_high_frequncy(self.earfcn)
-        #populate earfcnList
-        self.getEarfcnList()
+        # #set maxEirp
+        # self.calcMaxEirp()
+        # #set Low and high Frequcy
+        # self.set_low_and_high_frequncy(self.earfcn)
+        # #populate earfcnList
+        # self.getEarfcnList()
 
         self.logger = logger()
 
@@ -375,7 +379,7 @@ class CbsdInfo(ABC):
         self.adminState = adminState
 
     def setCbsdID(self,cbsdID):
-        self.update_cbsd_database_value("cbsdID",cbsdID)
+        # self.update_cbsd_database_value("cbsdID",cbsdID)
         self.cbsdID = cbsdID
 
     def setSasStage(self,sasStage):
