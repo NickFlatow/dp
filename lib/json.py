@@ -97,7 +97,6 @@ class Json():
         i:int = 0
 
         for cbsd in cbsds:
-           
             if typeOfCalling == consts.REG:
                 
                 print(response[responseMessageType][i]['response']['responseCode'])
@@ -108,7 +107,7 @@ class Json():
                     cbsd.reponseObj.responseMessage = response[responseMessageType][i]['response']['responseMessage']
                 
                 if 'responseData' in response[responseMessageType][i]:
-                    cbsd.reponseObj.reponseData = response[responseMessageType][i]['response']['responseData']
+                    cbsd.reponseObj.responseData = response[responseMessageType][i]['response']['responseData']
                 
                 if 'cbsdId' in response[responseMessageType][i]:
                     cbsd.setCbsdID(response[responseMessageType][i]['cbsdId'])

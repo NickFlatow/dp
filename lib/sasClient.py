@@ -1,32 +1,46 @@
 from concurrent.futures import ThreadPoolExecutor
+from re import A
+from lib import cbsd
 from lib.cbsd import CbsdInfo, CbsdModelExporter
 from lib.Registration import Registration
+from lib.GrantManger import GrantManger
+from lib.types import cbsdAction
 
 
 class SasClient():
     def __init__(self):
         self.reg = Registration()
+        self.gm = GrantManger()
+        self.gm.start()
+        # self.StartGmPollingThread()
+        
 
-    def startRegistration(self, cbsdSerialNumbers: list):
+    def sasClientRequestStrategy(self, cbsdSerialNumbers: list):
         '''proccess post request to register node from user'''
 
-        cbsds = []
+        # cbsds = []
 
-        for sn in cbsdSerialNumbers:
-            cbsds.append(CbsdModelExporter.getCbsd( {"SN":sn,"fccID":"2QCAT299166","cbsdCategory":"B","userID":"Foxconn","hclass":"FAP_FC4064Q1CA"} ) )
+        # for sn in cbsdSerialNumbers:
+            # cbsds.append(CbsdModelExporter.getCbsd( {"SN":sn,"fccID":"2QCAT299166","cbsdCategory":"B","userID":"Foxconn","hclass":"FAP_FC4064Q1CA"} ) )
 
         # self.reg.registerCbsds(cbsds)
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            executor.submit(self.reg.registerCbsds,cbsds)
+        # with ThreadPoolExecutor(max_workers=1) as executor:
+            # executor.submit(self.reg.registerCbsds,cbsds)
+
+        #change to strategy.run()
+        
+        action = self.reg.Run(cbsdSerialNumbers)
+
+        if action == cbsdAction.STARTGRANT:
+            self.gm.actionQueue = action
 
 
-        print("test")
+        # self.gm.kill = True
+        
+        
 
 
         #verify cbsds are not alreday in registed or granted state
-
-        #if 5GC does not use database/ dp will use database to store persistant cbsd info
-        #will node have cbsdState stored in it's database?... how accessible is this?
 
         #dbCbds = Select * FROM database where SN = {cbsdSerialNumbers}
 
@@ -36,6 +50,7 @@ class SasClient():
                 #add to cbsdRegList
             #else: 
                 #nothing
+        
         
               
 

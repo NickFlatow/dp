@@ -26,7 +26,7 @@ def dp_register():
         cbsdSerialNumbers.append(request.args[a])
 
     if cbsdSerialNumbers:
-        sasClient.startRegistration(cbsdSerialNumbers)
+        sasClient.sasClientRequestStrategy(cbsdSerialNumbers)
 
     return "success"
 
