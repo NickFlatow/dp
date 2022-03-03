@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from lib.cbsd import CbsdInfo, CbsdModelExporter
 from lib.Registration import Registration
 
@@ -14,7 +15,13 @@ class SasClient():
         for sn in cbsdSerialNumbers:
             cbsds.append(CbsdModelExporter.getCbsd( {"SN":sn,"fccID":"2QCAT299166","cbsdCategory":"B","userID":"Foxconn","hclass":"FAP_FC4064Q1CA"} ) )
 
-        self.reg.registerCbsds(cbsds)
+        # self.reg.registerCbsds(cbsds)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            executor.submit(self.reg.registerCbsds,cbsds)
+
+
+        print("test")
+
 
         #verify cbsds are not alreday in registed or granted state
 

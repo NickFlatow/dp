@@ -16,6 +16,8 @@ ERROR = 'error'
 SAS = "https://192.168.4.222:5001/v1.2/"
 # SAS = "https://test.sas.goog/v1.2/"
 
+REQ_TIMEOUT = 30
+
 
 #LICENSE FILE CONSTS
 FUNC_MODE_ALL = 0

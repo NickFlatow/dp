@@ -19,8 +19,7 @@ class GrantManger():
 
     def printTest(self):
         while True:
-            for d in self.data:
-                print(d)
+            print("second thread")
             time.sleep(3)
 
 
