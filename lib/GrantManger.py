@@ -6,26 +6,28 @@ from lib.types import cbsdAction
 
 class GrantManger(Thread):
     def __init__(self):
-        Thread.__init__(self,None,None,"Grant Manager Main Thread")
+        # Thread.__init__(self,None,None,"Grant Manager Main Thread")
         self._kill:bool = False
-        # self._startGrant:bool = False
         self._actionQueue:list = []
-        # self.SIQ = Spectrum()
+        self.heartbeating = False
+        self.hbthread:Thread
         self.action_methods = {
             cbsdAction.STARTGRANT:self.startSpecturmInquiry,
-            cbsdAction.DEREGISTER:self.deregister,
-            cbsdAction.RELINQUISH:self.reqlinquish
+            # cbsdAction.DEREGISTER:self.deregister,
+            # cbsdAction.RELINQUISH:self.reqlinquish
         }
    
     def run(self):
+        print("starting SIQ")
         #poll to start grant
-        while (not self._kill):
-            if self._actionQueue:
-                self.handleAction(self._actionQueue[0])
+        # while (not self._kill):
+        #     if self._actionQueue:
+        #         self.handleAction(self._actionQueue[0])
+        #         self._actionQueue.pop(0)
 
-                #def SIQ.ChannelSelection
-            print("second thread")
-            time.sleep(3)
+        #         #def SIQ.ChannelSelection
+        #     print("polling thread")
+        #     time.sleep(3)
     
 
     @property
@@ -45,22 +47,26 @@ class GrantManger(Thread):
         print("added action")
         self._actionQueue.append(action)
 
-
-
     def handleAction(self,action:cbsdAction):
         print("handleAction")
         method = self.action_methods[action]
         method()
 
     def startSpecturmInquiry(self):
+        #start spectrum thread
         print("spectrum")
 
-    def reqlinquish(self):
-        print("relinquish")
+    def _heartbeat(self):
+        while not self._kill:
+            print("heartbeating")
+            time.sleep(30)
 
-    def deregister(self):
-        print("deregister")
-
+    def heartbeat(self):
+        if not self.heartbeating:
+            self.hbthread = Thread(target=self._heartbeat)
+            self.hbthread.name = "heartbeat-thread"
+            self.hbthread.start()
+            self.heartbeating = True
 
     # def __init__(self):
     #     self.test = "test"

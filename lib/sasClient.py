@@ -5,18 +5,16 @@ from lib.cbsd import CbsdInfo, CbsdModelExporter
 from lib.Registration import Registration
 from lib.GrantManger import GrantManger
 from lib.types import cbsdAction
+import threading
 
 
 class SasClient():
     def __init__(self):
         self.reg = Registration()
-        self.gm = GrantManger()
-        self.gm.start()
-        # self.StartGmPollingThread()
         
 
-    def sasClientRequestStrategy(self, cbsdSerialNumbers: list):
-        '''proccess post request to register node from user'''
+    def sasClientRequestStrategy(self, cbsdSerialNumbers: list,strategyClass):
+        '''proccess post request to register,relinquish or deregister node'''
 
         # cbsds = []
 
@@ -28,29 +26,19 @@ class SasClient():
             # executor.submit(self.reg.registerCbsds,cbsds)
 
         #change to strategy.run()
-        
-        action = self.reg.Run(cbsdSerialNumbers)
+        self.reg.Run(cbsdSerialNumbers)
+        # strategyClass.Run(cbsdSerialNumbers)
+        # action = self.reg.Run(cbsdSerialNumbers)
+        print('waiting for new request')
 
-        if action == cbsdAction.STARTGRANT:
-            self.gm.actionQueue = action
-
-
-        # self.gm.kill = True
-        
-        
+        for thread in threading.enumerate(): 
+            print(f"sasClient thread loop -- {thread.name}")
 
 
-        #verify cbsds are not alreday in registed or granted state
+        # self.gm.poll()
+        # print("continue")
+        # if action == cbsdAction.STARTGRANT:
+        #     self.gm.actionQueue = action
 
-        #dbCbds = Select * FROM database where SN = {cbsdSerialNumbers}
-
-        #for cbsd in db:
-            #if cbsd.state == NULL:
-                #create cbsd per modelType
-                #add to cbsdRegList
-            #else: 
-                #nothing
-        
-        
               
 

@@ -1,5 +1,6 @@
 from lib.sasClient import SasClient
 from lib.GrantManger import GrantManger
+from lib.Registration import Registration
 from flask_cors import CORS,cross_origin
 from flask import Flask,request
 import threading
@@ -15,6 +16,9 @@ cors = CORS(app)
 app.config['CORS_HEADER'] = 'Content-Type'
 
 
+for thread in threading.enumerate(): 
+    print(f"Flask Server thread loop -- {thread.name}")
+
 #route for cbsd registration
 @app.route('/dp/v1/register', methods=['POST'])
 @cross_origin()
@@ -26,7 +30,7 @@ def dp_register():
         cbsdSerialNumbers.append(request.args[a])
 
     if cbsdSerialNumbers:
-        sasClient.sasClientRequestStrategy(cbsdSerialNumbers)
+        sasClient.sasClientRequestStrategy(cbsdSerialNumbers,Registration())
 
     return "success"
 
@@ -58,8 +62,8 @@ def printTest():
     gm.printTest()
 
 
-def runFlaskSever():
-   app.run(port = app.config["PORT"], use_reloader=False, host='0.0.0.0')  
+def runFlaskSever(): 
+    app.run(port = app.config["PORT"], use_reloader=False, host='0.0.0.0')  
 
 
 

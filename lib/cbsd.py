@@ -394,6 +394,9 @@ class CbsdInfo(ABC):
         self.update_cbsd_database_value("transmitExpireTime",transmitExpireTime)
         self.transmitExpireTime = transmitExpireTime
 
+    def __eq__(self,sn):
+        return self.SN == sn
+
 
 class OneCA(CbsdInfo):
 

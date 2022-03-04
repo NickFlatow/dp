@@ -1,14 +1,13 @@
 import requests
 import time
-import json
-from lib import sasClient
 from lib.dbConn import dbConn
 from lib import consts
 from lib.log import logger
 from lib.cbsd import CbsdInfo,CbsdModelExporter
 from lib.json import Json
+from lib.GrantManger import GrantManger
 from lib.types import cbsdAction,MessageTypes as m
-
+import threading
 
 class Registration():
     
@@ -16,9 +15,12 @@ class Registration():
         self.json = Json()
         self.logger = logger()
         self.cbsds = []
+        self.gm = GrantManger()
 
 
-
+    def __del__(self):
+        self.cbsds.clear()
+        
     def Run(self,cbsdSerialNumbers: list):
 
         conn = dbConn('ACS_V1_1')
@@ -27,7 +29,8 @@ class Registration():
         conn.dbClose()
 
         for cbsd in sqlCbsds:
-            self.cbsds.append(CbsdModelExporter.getCbsd(cbsd))
+            if cbsd['SN'] not in self.cbsds:
+                self.cbsds.append(CbsdModelExporter.getCbsd(cbsd))
 
         #build Json request
         # jsonRegRequest = self.json.buildJsonRequest(cbsds,consts.REG)
@@ -40,8 +43,16 @@ class Registration():
         # if regResponse.status_code == 200:
             #process SAS resposne
             # self.processResponse(cbsds,regResponse.json())
-        return self.processResponse(regResponse)
+        # return self.processResponse(regResponse)
+        if self.processResponse(regResponse) == cbsdAction.STARTGRANT:
+            self.gm.heartbeat()
 
+        for thread in threading.enumerate(): 
+            print(f"Registration thread loop -- {thread.name}")
+
+
+        self.cbsds.clear()
+        
     
     #return action
     def processResponse(self,response:dict) -> cbsdAction:
