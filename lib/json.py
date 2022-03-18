@@ -1,7 +1,8 @@
-import re
+# import re
 from lib import consts
-from lib.cbsd import CbsdInfo
+# from lib.cbsd import CbsdInfo
 from lib.log import logger
+from models.models import CBSD
 
 
 
@@ -16,16 +17,16 @@ class Json():
         
         req = {requestMessageType:[]}
 
-        cbsd:CbsdInfo
+        cbsd:CBSD
         for cbsd in cbsds:
 
             if typeOfCalling == consts.REG:
                 req[requestMessageType].append(
                     {
-                        "cbsdSerialNumber": cbsd.SN,
-                        "fccId": cbsd.fccID,
-                        "cbsdCategory": cbsd.cbsdCat,
-                        "userId": cbsd.userID
+                        "cbsdSerialNumber": cbsd.cbsd_serial_number,
+                        "fccId": cbsd.fcc_id,
+                        "cbsdCategory": cbsd.cbsd_category,
+                        "userId": cbsd.user_id
                     }
                 )
 
@@ -86,14 +87,13 @@ class Json():
 
     def parseJsonResponse(self,cbsds:list,response:dict,typeOfCalling:str):
         '''Parse Response from SAS and bind data to cbsds'''
-
-
+        
         #log response
         self.logger.log_json(response,len(cbsds))
         
         responseMessageType = typeOfCalling + "Response"
     
-        cbsd:CbsdInfo
+        
         i:int = 0
 
         for cbsd in cbsds:
